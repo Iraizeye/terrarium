@@ -12,4 +12,6 @@ First public cut under this name. One agent, one trader, one machine:
 - Trading desk rail: positions with stop/target and protection type,
   realized P&L today, last decision thesis, live alerts tail
 - Frozen contracts: `POST /api/crew/hook`, `POST /api/sessions/log`
+- FIRST LIGHT theme: the sky follows the session — night, dawn (90 min
+  before open), day, dusk — violet for the agent, gold for the market
 - Backend binds 127.0.0.1; 19 tests

@@ -3,11 +3,13 @@ import type { OpenPosition, TradingMode } from '../types'
 
 const INK = { text: '#f2f1f7', soft: '#a29db8', dim: '#575370' }
 const ACCENT = '#8f5cff'
+const GOLD = '#f5b451'
 const GREEN = '#79ff98'
 const AMBER = '#f0c040'
 const RED = '#ff7060'
 const MONO = '"Fira Code", monospace'
 const HAIRLINE = '1px solid rgba(150,146,172,0.10)'
+const GOLD_DIM_HEADER = 'rgba(245,180,81,0.7)'
 
 function pnlColor(v: number) {
   return v > 0 ? GREEN : v < 0 ? RED : INK.soft
@@ -107,17 +109,17 @@ export default function TradingPanel() {
     }}>
       {/* Header with market chip */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px 8px', borderBottom: HAIRLINE, flexShrink: 0 }}>
-        <span style={{ fontSize: 10, letterSpacing: '0.22em', color: INK.dim, textTransform: 'uppercase' }}>
+        <span style={{ fontSize: 10, letterSpacing: '0.22em', color: GOLD_DIM_HEADER, textTransform: 'uppercase' }}>
           Trading desk
         </span>
         {trading && (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <span style={{
               width: 5, height: 5, borderRadius: '50%',
-              background: trading.market.is_open ? GREEN : INK.dim,
+              background: trading.market.is_open ? GOLD : INK.dim,
               animation: trading.market.is_open ? 'led-pulse 1.6s ease-in-out infinite' : undefined,
             }} />
-            <span style={{ fontSize: 9, letterSpacing: '0.14em', color: trading.market.is_open ? GREEN : INK.dim, fontFamily: MONO }}>
+            <span style={{ fontSize: 9, letterSpacing: '0.14em', color: trading.market.is_open ? GOLD : INK.dim, fontFamily: MONO }}>
               {trading.market.is_open ? 'OPEN' : 'CLOSED'} · {trading.market.et} ET
             </span>
           </span>

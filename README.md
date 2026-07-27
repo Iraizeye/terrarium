@@ -16,6 +16,12 @@ A local-first dashboard that watches the three things that matter on this box:
 - **The machine** — CPU / RAM / disk / uptime, the trading daemons' footprint,
   and TCP checks on the services that still exist
 
+**The sky lives the trading day** — the FIRST LIGHT theme. Violet is the
+agent's color; gold is the market's. Deep pre-dawn indigo while Claude works
+the night, an amber glow climbing the horizon in the 90 minutes before the
+open, a golden horizon under the range while the market trades, and an ember
+fade after the close. Preview any phase with `?phase=night|dawn|day|dusk`.
+
 The centerpiece is a flight-control **big board**: a market clock counting down to
 the next open/close, and a GO/NO-GO grid over the *real* stack — PAPER, LIVE,
 WDOG-P, WDOG-L, KILL, GLANCE, OPTICS, FEED. Red means something is actually

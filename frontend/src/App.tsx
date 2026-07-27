@@ -3,6 +3,7 @@ import { useWebSocket } from './hooks/useWebSocket'
 import { useDashboardStore } from './store/dashboardStore'
 import CrewStage, { OpsLog, buildBoardCells } from './components/CrewStage'
 import TradingPanel from './components/TradingPanel'
+import { GOLD, PHASES, getPhase, type Phase } from './theme'
 
 // ── Color palette ────────────────────────────────────────────────────────────
 
@@ -24,7 +25,7 @@ interface Particle {
   r: number; alpha: number; life: number; decay: number
 }
 
-function FloatingParticles() {
+function FloatingParticles({ rgb }: { rgb: string }) {
   const ref = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -67,14 +68,14 @@ function FloatingParticles() {
         const a = p.alpha * Math.min(p.life * 4, 1)
         ctx.beginPath()
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(190,150,255,${a})`
+        ctx.fillStyle = `rgba(${rgb},${a})`
         ctx.fill()
       }
       id = requestAnimationFrame(frame)
     }
     frame()
     return () => { window.removeEventListener('resize', resize); cancelAnimationFrame(id) }
-  }, [])
+  }, [rgb])
 
   return (
     <canvas ref={ref} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1 }} />
@@ -83,17 +84,17 @@ function FloatingParticles() {
 
 // ── Volumetric fog ───────────────────────────────────────────────────────────
 
-function VolumetricFog() {
+function VolumetricFog({ phase }: { phase: Phase }) {
   return (
     <>
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
-        background: 'radial-gradient(ellipse 70% 50% at 28% 62%, rgba(80,30,140,0.18), transparent)',
+        background: `radial-gradient(ellipse 70% 50% at 28% 62%, ${PHASES[phase].fog1}, transparent)`,
         animation: 'fog-breathe 12s ease-in-out infinite',
       }} />
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
-        background: 'radial-gradient(ellipse 60% 45% at 72% 38%, rgba(60,20,120,0.14), transparent)',
+        background: `radial-gradient(ellipse 60% 45% at 72% 38%, ${PHASES[phase].fog2}, transparent)`,
         animation: 'fog-breathe 16s ease-in-out infinite 5s',
       }} />
       <div style={{
@@ -167,7 +168,7 @@ function CommandHeader() {
       <div style={{ fontSize: 11, color: C.dim, letterSpacing: '0.18em', textTransform: 'uppercase' }}>
         Mission Control
       </div>
-      <div style={{ fontSize: 19, color: C.soft, letterSpacing: '0.09em', textTransform: 'uppercase' }}>
+      <div style={{ fontSize: 19, color: GOLD, letterSpacing: '0.09em', textTransform: 'uppercase' }}>
         Rangewatch
       </div>
       <div style={{ fontSize: 11, color: C.dim, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
@@ -278,6 +279,8 @@ export default function App() {
   const system = useDashboardStore((s) => s.system)
   const usage = useDashboardStore((s) => s.usage)
   const trading = useDashboardStore((s) => s.trading)
+  const phase = getPhase(trading?.market)
+  const sky = PHASES[phase]
 
   const realized = trading
     ? (trading.modes.paper.realized_today + trading.modes.live.realized_today)
@@ -287,17 +290,19 @@ export default function App() {
     <div
       className="h-screen overflow-hidden"
       style={{
-        background: [
-          'radial-gradient(circle at 50% 44%, rgba(140,80,255,0.16), transparent 18%)',
-          'radial-gradient(circle at 50% 50%, rgba(90,40,200,0.09), transparent 36%)',
-          'linear-gradient(180deg, #07030f 0%, #04010a 100%)',
-        ].join(', '),
+        background: sky.sky.join(', '),
+        transition: 'background 3s ease',
         color: C.text,
         fontFamily: '"Geist", ui-sans-serif, system-ui, sans-serif',
       }}
     >
-      <VolumetricFog />
-      <FloatingParticles />
+      {/* The horizon — first light rises here as the session approaches */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
+        background: sky.horizon, transition: 'background 3s ease',
+      }} />
+      <VolumetricFog phase={phase} />
+      <FloatingParticles rgb={sky.particle} />
 
       <div style={{
         position: 'relative', zIndex: 4,

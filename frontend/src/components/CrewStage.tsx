@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDashboardStore } from '../store/dashboardStore'
 import type { CrewEvent, CrewMember, CrewStatus } from '../types'
+import { GOLD, PHASES, getPhase } from '../theme'
 
 // ── Palette ──────────────────────────────────────────────────────────────────
 
@@ -210,6 +211,15 @@ function drawConsole(ctx: CanvasRenderingContext2D, cx: number, groundY: number,
   }
 }
 
+function drawHorizon(ctx: CanvasRenderingContext2D, w: number, groundY: number,
+                     glow: [string, string]) {
+  const grd = ctx.createLinearGradient(0, groundY - 120, 0, groundY + 6)
+  grd.addColorStop(0, glow[1])
+  grd.addColorStop(1, glow[0])
+  ctx.fillStyle = grd
+  ctx.fillRect(0, groundY - 120, w, 126)
+}
+
 function drawBaseplate(ctx: CanvasRenderingContext2D, w: number, h: number, groundY: number) {
   ctx.fillStyle = 'rgba(148,144,170,0.05)'
   ctx.fillRect(0, groundY + 2, w, h - groundY)
@@ -304,6 +314,8 @@ function drawWallBoard(ctx: CanvasRenderingContext2D, w: number, groundY: number
   ctx.roundRect(bx, by, bw, bh, 6)
   ctx.fill()
   ctx.stroke()
+  ctx.fillStyle = 'rgba(245,180,81,0.65)'   // first-light trim
+  ctx.fillRect(bx + 1, by + 1, bw - 2, 2)
   ctx.fillStyle = '#1b1928'
   ctx.fillRect(bx + 24, by + bh, 8, groundY - by - bh)
   ctx.fillRect(bx + bw - 32, by + bh, 8, groundY - by - bh)
@@ -315,7 +327,7 @@ function drawWallBoard(ctx: CanvasRenderingContext2D, w: number, groundY: number
   const open = market?.is_open ?? false
   ctx.fillText(open ? 'MARKET OPEN — CLOSES IN' : 'MARKET CLOSED — OPENS IN', bx + 16, by + 22)
   ctx.font = '700 22px "Fira Code", monospace'
-  ctx.fillStyle = open ? GO : INK.text
+  ctx.fillStyle = open ? GOLD : INK.text
   ctx.fillText(market ? fmtCountdown(market.seconds_to_change) : '——', bx + 16, by + 46)
   ctx.font = '600 11px "Fira Code", monospace'
   ctx.fillStyle = INK.dim
@@ -635,6 +647,7 @@ export default function CrewStage() {
       ctx.clearRect(0, 0, w, h)
       ctx.imageSmoothingEnabled = false
 
+      drawHorizon(ctx, w, groundY, PHASES[getPhase(state.trading?.market)].stageGlow)
       drawBaseplate(ctx, w, h, groundY)
       drawPlaques(ctx, w, groundY)
       const latest = state.crewEvents[0]
