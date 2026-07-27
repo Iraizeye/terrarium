@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --mc-bg: #07030f;
+  --mc-bg-soft: #0f0820;
+  --mc-surface: #160e2a;
+  --mc-surface-2: #0d0619;
+  --mc-border: #33314a;
+  --mc-border-soft: #232132;
+  --mc-text: #f2f1f7;
+  --mc-text-soft: #a29db8;
+  --mc-text-dim: #575370;
+  --mc-accent: #b580ff;
+  --mc-accent-soft: rgba(181, 128, 255, 0.12);
+  background: var(--mc-bg);
+  color: var(--mc-text);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; box-shadow: inherit; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes fog-breathe {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%       { opacity: 0.80; transform: scale(1.04); }
+}
+
+@keyframes stat-pulse {
+  0%   { opacity: 1; }
+  30%  { opacity: 0.35; }
+  100% { opacity: 1; }
+}
+
+@keyframes link-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.28; }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: "Geist", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background:
+    radial-gradient(circle at top, rgba(110, 60, 220, 0.18), transparent 40%),
+    radial-gradient(circle at bottom, rgba(60, 20, 130, 0.16), transparent 34%),
+    linear-gradient(180deg, #07030f 0%, #04010a 100%);
+  color: var(--mc-text);
+  letter-spacing: 0.02em;
+}
+
+button,
+textarea,
+select,
+input {
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease,
+    opacity 0.18s ease;
+}
+
+button:hover:not(:disabled),
+select:hover:not(:disabled) {
+  border-color: #4c4868 !important;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+button:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px rgba(181, 128, 255, 0.42);
+}
+
+details > summary {
+  list-style: none;
+}
+
+details > summary::-webkit-details-marker {
+  display: none;
+}
+
+details[open] {
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.26);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0812;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #363248;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4c4868;
+}
+
+@keyframes bubble-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes led-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
