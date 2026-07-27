@@ -12,6 +12,9 @@ First public cut under this name. One agent, one trader, one machine:
 - Trading desk rail: positions with stop/target and protection type,
   realized P&L today, last decision thesis, live alerts tail
 - Frozen contracts: `POST /api/crew/hook`, `POST /api/sessions/log`
+- The watch-owl: Claude redesigned from scratch as a violet owl with golden
+  iris eyes in a watchtower — status beacon sweeps the sky in state color,
+  eyes track activity, prairie-grass range floor with a fence line
 - FIRST LIGHT theme: the sky follows the session — night, dawn (90 min
   before open), day, dusk — violet for the agent, gold for the market
 - Backend binds 127.0.0.1; 19 tests

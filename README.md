@@ -25,9 +25,14 @@ fade after the close. Preview any phase with `?phase=night|dawn|day|dusk`.
 The centerpiece is a flight-control **big board**: a market clock counting down to
 the next open/close, and a GO/NO-GO grid over the *real* stack — PAPER, LIVE,
 WDOG-P, WDOG-L, KILL, GLANCE, OPTICS, FEED. Red means something is actually
-wrong; a healthy machine reads **ALL STATIONS GO**. A LEGO-minifig Claude
-works the console and gets confetti when a turn finishes, because dashboards
-are allowed to be fun.
+wrong; a healthy machine reads **ALL STATIONS GO**.
+
+Claude is **the watch-owl**: a violet owl with golden iris eyes, perched in a
+watchtower over the range. The eyes track what it's doing, the head cocks when
+it thinks, a wing works the console when it's busy — and the tower's **beacon
+sweeps the sky in Claude's status color**, readable from across the room.
+Finished turns get a burst of first-light sparks, because dashboards are
+allowed to be fun. Click the tower and it waves.
 
 ## Architecture
 

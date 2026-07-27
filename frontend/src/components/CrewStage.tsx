@@ -4,6 +4,9 @@ import type { CrewEvent, CrewMember, CrewStatus } from '../types'
 import { GOLD, PHASES, getPhase } from '../theme'
 
 // ── Palette ──────────────────────────────────────────────────────────────────
+// Sprite discipline: readable silhouette first, 2-3 colors per part,
+// the eyes carry the personality. The owl's eye IS an iris: gold ring,
+// dark pupil — the namesake, watching.
 
 const INK = { text: '#f2f1f7', soft: '#a29db8', dim: '#575370' }
 const PANEL_BORDER = '1px solid rgba(150,146,172,0.16)'
@@ -16,43 +19,55 @@ const STATUS: Record<CrewStatus, string> = {
 const GO = '#79ff98'
 const HOLD = '#f0c040'
 const NOGO = '#ff7060'
-const LEGO_YELLOW = '#ffce3a'
-const LEGO_YELLOW_SHADE = '#e0a81e'
-const BRICK_COLORS = ['#e3000b', '#ffd500', '#0055bf', '#237841', '#ff7e14']
 
-const SKIN = { accent: '#8f5cff', accentShade: '#6a3fd0', glow: 'rgba(143,92,255,0.5)' }
-const CLAUDE_X = 0.24 // anchor as fraction of canvas width
+// The watch-owl (Claude): violet feathers, cream face, golden iris eyes
+const OWL = {
+  body: '#8f5cff',
+  shade: '#6a3fd0',
+  belly: '#e8ddc8',
+  bellyShade: '#c9bda3',
+  iris: '#f5b451',
+  pupil: '#1a1426',
+  beak: '#d99a3a',
+  glow: 'rgba(143,92,255,0.5)',
+}
+// The tower
+const WOOD = { frame: '#26233a', dark: '#1b1928', stud: '#312d48' }
+
+const SPARK_COLORS = ['#f5b451', '#8f5cff', '#79ff98', '#e8ddc8', '#ffce3a']
+
+const CLAUDE_X = 0.24 // tower anchor as fraction of canvas width
 const PX = 5
 
 // Wall plaques — versions flown out of this room
 const PLAQUES = ['v0.4', 'v0.5', 'v0.6', 'v0.7']
 
-// ── Confetti (finished turns still deserve it) ───────────────────────────────
+// ── Celebration sparks (first light, in pieces) ──────────────────────────────
 
-interface Confetto {
+interface Spark {
   x: number; y: number; vx: number; vy: number
   w: number; h: number; rot: number; vrot: number
   color: string; life: number
 }
 
-function spawnConfetti(pool: Confetto[], cx: number, cy: number) {
+function spawnSparks(pool: Spark[], cx: number, cy: number) {
   for (let i = 0; i < 42; i++) {
     pool.push({
       x: cx + (Math.random() - 0.5) * 40,
-      y: cy - 120 + (Math.random() - 0.5) * 30,
+      y: cy + (Math.random() - 0.5) * 30,
       vx: (Math.random() - 0.5) * 5,
       vy: -Math.random() * 6 - 2,
       w: 5 + Math.random() * 4,
       h: 3 + Math.random() * 3,
       rot: Math.random() * Math.PI,
       vrot: (Math.random() - 0.5) * 0.3,
-      color: BRICK_COLORS[i % BRICK_COLORS.length],
+      color: SPARK_COLORS[i % SPARK_COLORS.length],
       life: 1,
     })
   }
 }
 
-function stepConfetti(ctx: CanvasRenderingContext2D, pool: Confetto[], groundY: number) {
+function stepSparks(ctx: CanvasRenderingContext2D, pool: Spark[], groundY: number) {
   for (let i = pool.length - 1; i >= 0; i--) {
     const c = pool[i]
     c.vy += 0.18
@@ -72,142 +87,342 @@ function stepConfetti(ctx: CanvasRenderingContext2D, pool: Confetto[], groundY: 
   ctx.globalAlpha = 1
 }
 
-// ── LEGO minifig — Claude, solo shift ────────────────────────────────────────
+// ── The watchtower ───────────────────────────────────────────────────────────
 
-function drawMinifig(ctx: CanvasRenderingContext2D, cx: number, groundY: number,
-                     status: CrewStatus, t: number, celebrating: boolean, waving = false) {
-  const working = status === 'working'
-  const bobSpeed = celebrating ? 10 : working ? 7 : status === 'thinking' ? 3 : 1.6
-  const bobAmp = celebrating ? 4 : working ? 1.2 : 1.6
-  const bob = Math.sin(t * bobSpeed) * bobAmp
-  const S = PX
-  const y0 = groundY + bob * 2
+function towerGeometry(cx: number, groundY: number) {
+  const cabinFloor = groundY - 24 * PX     // where the owl's talons grip
+  const cabinTop = cabinFloor - 16 * PX    // roof line
+  const beaconY = cabinTop - 3.4 * PX      // lamp center
+  return { cabinFloor, cabinTop, beaconY }
+}
 
-  const Y = (gy: number) => y0 - gy * S
-  const rect = (gx: number, gy: number, gw: number, gh: number, color: string) => {
-    ctx.fillStyle = color
-    ctx.fillRect(Math.round(cx + gx * S), Math.round(Y(gy)), Math.round(gw * S), Math.round(gh * S))
+function drawTower(ctx: CanvasRenderingContext2D, cx: number, groundY: number) {
+  const { cabinFloor, cabinTop } = towerGeometry(cx, groundY)
+  const P = (x: number, y: number, w: number, h: number, c: string) => {
+    ctx.fillStyle = c
+    ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h))
   }
-  const X = (gx: number) => cx + gx * S
+  const legSpread = 11 * PX
 
-  const grd = ctx.createRadialGradient(cx, groundY + 4, 2, cx, groundY + 4, 62)
-  grd.addColorStop(0, SKIN.glow)
+  // splayed lattice legs
+  ctx.strokeStyle = WOOD.frame
+  ctx.lineWidth = 5
+  for (const s of [-1, 1] as const) {
+    ctx.beginPath()
+    ctx.moveTo(cx + s * legSpread, groundY + 2)
+    ctx.lineTo(cx + s * (legSpread - 3 * PX), cabinFloor + 2 * PX)
+    ctx.stroke()
+  }
+  // cross braces
+  ctx.lineWidth = 2.5
+  ctx.strokeStyle = WOOD.dark
+  for (let i = 0; i < 3; i++) {
+    const y0 = groundY - (i * 7 + 1) * PX
+    const y1 = y0 - 7 * PX
+    const spread0 = legSpread - i * PX
+    const spread1 = legSpread - (i + 1) * PX
+    ctx.beginPath()
+    ctx.moveTo(cx - spread0, y0); ctx.lineTo(cx + spread1, y1)
+    ctx.moveTo(cx + spread0, y0); ctx.lineTo(cx - spread1, y1)
+    ctx.stroke()
+  }
+  // ladder
+  P(cx - 1.2 * PX, cabinFloor + 2 * PX, 0.5 * PX, groundY - cabinFloor - 2 * PX, WOOD.dark)
+  P(cx + 0.7 * PX, cabinFloor + 2 * PX, 0.5 * PX, groundY - cabinFloor - 2 * PX, WOOD.dark)
+  for (let y = cabinFloor + 3.4 * PX; y < groundY - PX; y += 2.4 * PX) {
+    P(cx - 1.2 * PX, y, 2.4 * PX, 0.45 * PX, WOOD.frame)
+  }
+
+  // cabin platform
+  P(cx - 10 * PX, cabinFloor, 20 * PX, 1.6 * PX, WOOD.frame)
+  for (let i = 0; i < 5; i++) P(cx - 9 * PX + i * 4 * PX, cabinFloor - 0.5 * PX, 1.1 * PX, 0.5 * PX, WOOD.stud)
+  // side rails
+  P(cx - 10 * PX, cabinFloor - 5 * PX, 1.2 * PX, 5 * PX, WOOD.frame)
+  P(cx + 8.8 * PX, cabinFloor - 5 * PX, 1.2 * PX, 5 * PX, WOOD.frame)
+  P(cx - 10 * PX, cabinFloor - 5 * PX, 20 * PX, 0.8 * PX, WOOD.dark)
+  // roof posts + roof
+  P(cx - 9 * PX, cabinTop, 1.1 * PX, 4 * PX, WOOD.dark)
+  P(cx + 7.9 * PX, cabinTop, 1.1 * PX, 4 * PX, WOOD.dark)
+  P(cx - 11 * PX, cabinTop - 1.6 * PX, 22 * PX, 1.8 * PX, WOOD.frame)
+  P(cx - 9.6 * PX, cabinTop - 2.9 * PX, 19.2 * PX, 1.4 * PX, WOOD.dark)
+
+  // the owl's console: ledge + screen frame, cabin right
+  P(cx + 4.2 * PX, cabinFloor - 4.6 * PX, 4.6 * PX, 0.9 * PX, WOOD.dark)
+  P(cx + 4.6 * PX, cabinFloor - 9.4 * PX, 4 * PX, 4.4 * PX, '#12101e')
+  P(cx + 4.6 * PX, cabinFloor - 9.4 * PX, 4 * PX, 0.5 * PX, OWL.body)
+  // coffee, because some rituals survive redesigns
+  P(cx - 8.6 * PX, cabinFloor - 1.6 * PX, 1.3 * PX, 1.1 * PX, '#e3000b')
+  P(cx - 8.35 * PX, cabinFloor - 1.95 * PX, 0.8 * PX, 0.4 * PX, '#7a4a2b')
+}
+
+function drawConsoleScreen(ctx: CanvasRenderingContext2D, cx: number, groundY: number,
+                           active: boolean, t: number) {
+  const { cabinFloor } = towerGeometry(cx, groundY)
+  const sx = cx + 4.9 * PX, sy = cabinFloor - 9 * PX
+  ctx.fillStyle = active ? '#0d1f16' : '#0d0b16'
+  ctx.fillRect(sx, sy, 3.4 * PX, 3.6 * PX)
+  if (active) {
+    for (let i = 0; i < 4; i++) {
+      const lineT = (t * 2 + i * 0.9) % 3.6
+      const w = (1 + ((i * 37 + Math.floor(t)) % 3)) * PX * 0.7
+      if (lineT < 3.2) {
+        ctx.fillStyle = i % 3 === 0 ? OWL.body : GO
+        ctx.fillRect(sx + 1, sy + 2 + lineT * 4, w, 2)
+      }
+    }
+  }
+}
+
+/** The beacon — Claude's status, readable from across the range. */
+function drawBeacon(ctx: CanvasRenderingContext2D, cx: number, groundY: number,
+                    status: CrewStatus, t: number) {
+  const { cabinTop, beaconY } = towerGeometry(cx, groundY)
+  const color = STATUS[status]
+  ctx.fillStyle = WOOD.dark
+  ctx.fillRect(cx - 0.7 * PX, cabinTop - 3 * PX, 1.4 * PX, 1.6 * PX)
+  ctx.fillStyle = WOOD.frame
+  ctx.fillRect(cx - 1.6 * PX, beaconY - 1.4 * PX, 3.2 * PX, 2.4 * PX)
+  ctx.fillStyle = color
+  ctx.beginPath()
+  ctx.arc(cx, beaconY, 3.2, 0, Math.PI * 2)
+  ctx.fill()
+  const halo = ctx.createRadialGradient(cx, beaconY, 1, cx, beaconY, 26)
+  halo.addColorStop(0, color + 'aa')
+  halo.addColorStop(1, 'transparent')
+  ctx.fillStyle = halo
+  ctx.beginPath()
+  ctx.arc(cx, beaconY, 26, 0, Math.PI * 2)
+  ctx.fill()
+  // sweeping beams — lazy when idle, urgent when working
+  const speed = status === 'working' ? 0.9 : status === 'thinking' ? 0.45 : 0.18
+  const len = 260
+  const spread = 0.16
+  for (const offset of [0, Math.PI]) {
+    const angle = (t * speed + offset) % (Math.PI * 2)
+    ctx.save()
+    ctx.translate(cx, beaconY)
+    ctx.rotate(angle)
+    const beam = ctx.createLinearGradient(0, 0, len, 0)
+    beam.addColorStop(0, color + '3d')
+    beam.addColorStop(1, 'transparent')
+    ctx.fillStyle = beam
+    ctx.beginPath()
+    ctx.moveTo(0, 0)
+    ctx.lineTo(len, -len * spread)
+    ctx.lineTo(len, len * spread)
+    ctx.closePath()
+    ctx.fill()
+    ctx.restore()
+  }
+}
+
+// ── The watch-owl ────────────────────────────────────────────────────────────
+// Round blob + ear tufts: the silhouette reads at any size. The gold irises
+// do the acting — they track, blink, and point at whatever Claude is doing.
+
+function drawOwl(ctx: CanvasRenderingContext2D, cx: number, groundY: number,
+                 status: CrewStatus, t: number, celebrating: boolean, waving: boolean) {
+  const { cabinFloor } = towerGeometry(cx, groundY)
+  const working = status === 'working'
+  const bob = Math.sin(t * (celebrating ? 9 : working ? 5 : 1.4)) * (celebrating ? 3 : 1.2)
+  const ox = cx - 1.5 * PX
+  const oy = cabinFloor - 0.4 * PX + bob
+  const W = 11 * PX, H = 12.5 * PX
+  const bx = ox - W / 2, by = oy - H
+  const tilt = status === 'thinking' ? Math.sin(t * 1.1) * 1.6 : 0   // the head-cock
+
+  // perch glow
+  const grd = ctx.createRadialGradient(ox, oy + 4, 2, ox, oy + 4, 48)
+  grd.addColorStop(0, OWL.glow)
   grd.addColorStop(1, 'transparent')
   ctx.fillStyle = grd
   ctx.beginPath()
-  ctx.ellipse(cx, groundY + 4, 62, 13, 0, 0, Math.PI * 2)
+  ctx.ellipse(ox, oy + 3, 48, 9, 0, 0, Math.PI * 2)
   ctx.fill()
 
-  // legs + hip
-  rect(-3.6, 6.1, 3.2, 6.1, SKIN.accentShade)
-  rect(0.4, 6.1, 3.2, 6.1, SKIN.accentShade)
-  rect(-3.6, 0.9, 3.2, 0.9, '#1b1926')
-  rect(0.4, 0.9, 3.2, 0.9, '#1b1926')
-  rect(-0.35, 6.1, 0.7, 4.8, '#141220')
-  rect(-3.9, 7.9, 7.8, 1.8, SKIN.accentShade)
-
-  // torso
-  ctx.fillStyle = SKIN.accent
+  // body blob
+  ctx.fillStyle = OWL.body
   ctx.beginPath()
-  const topW = 6.2 * S / 2, botW = 8.6 * S / 2
-  ctx.moveTo(cx - topW, Y(15.3))
-  ctx.lineTo(cx + topW, Y(15.3))
-  ctx.lineTo(cx + botW, Y(7.9))
-  ctx.lineTo(cx - botW, Y(7.9))
-  ctx.closePath()
+  ctx.roundRect(bx, by, W, H, 14)
   ctx.fill()
-  rect(-1.6, 13.2, 3.2, 2.6, 'rgba(0,0,0,0.30)')
-  rect(-1.1, 12.7, 0.9, 0.9, STATUS[status])
-  rect(0.25, 12.7, 0.9, 0.9, 'rgba(255,255,255,0.35)')
-  rect(-1.4, 16.0, 2.8, 0.7, '#1b1926')
+  // ear tufts
+  ctx.beginPath()
+  ctx.moveTo(bx + 6 + tilt, by + 6)
+  ctx.lineTo(bx + 13 + tilt, by - 7)
+  ctx.lineTo(bx + 19 + tilt, by + 4)
+  ctx.moveTo(bx + W - 6 + tilt, by + 6)
+  ctx.lineTo(bx + W - 13 + tilt, by - 7)
+  ctx.lineTo(bx + W - 19 + tilt, by + 4)
+  ctx.fill()
 
-  // arms
-  const claw = (px_: number, py: number) => {
-    ctx.strokeStyle = LEGO_YELLOW
-    ctx.lineWidth = 2.4
-    ctx.beginPath()
-    ctx.arc(X(px_), Y(py), 3.2, 0.35, Math.PI * 1.45)
-    ctx.stroke()
-  }
-  const phase = Math.sin(t * 13)
+  // wings
+  ctx.fillStyle = OWL.shade
   if (celebrating) {
     for (const s of [-1, 1] as const) {
-      rect(s * 3.6 - 0.9 + (s < 0 ? -1.8 : 0) + 0.9 * (s < 0 ? 1 : 0), 17.6, 1.8, 3.0, SKIN.accentShade)
-      rect(s * 5.0 + (s < 0 ? -1.8 : 0), 20.6, 1.8, 3.2, SKIN.accentShade)
-      claw(s * 5.9, 21.4)
+      ctx.save()
+      ctx.translate(ox + s * (W / 2 - 2), by + H * 0.45)
+      ctx.rotate(s * -0.9)
+      ctx.beginPath()
+      ctx.roundRect(-3, -H * 0.62, 7, H * 0.62, 4)
+      ctx.fill()
+      ctx.restore()
     }
   } else if (waving) {
-    const wig = Math.sin(t * 12) * 1.1
-    rect(2.7, 17.4, 1.8, 2.8, SKIN.accentShade)
-    rect(3.4 + wig, 20.6, 1.8, 3.4, SKIN.accentShade)
-    claw(4.3 + wig, 21.3)
-    rect(-4.5, 15.0, 1.8, 5.4, SKIN.accentShade)
-    claw(-3.6, 8.6)
+    const wig = Math.sin(t * 11) * 0.35
+    ctx.save()
+    ctx.translate(ox + W / 2 - 2, by + H * 0.42)
+    ctx.rotate(-1.1 + wig)
+    ctx.beginPath()
+    ctx.roundRect(-3, -H * 0.58, 7, H * 0.58, 4)
+    ctx.fill()
+    ctx.restore()
+    ctx.beginPath()
+    ctx.roundRect(bx - 1.5, by + H * 0.3, 5, H * 0.55, 4)
+    ctx.fill()
   } else if (working) {
-    const dip = phase > 0 ? 0.4 : 0
-    rect(2.7, 15.0, 1.8, 2.4, SKIN.accentShade)
-    rect(3.0, 12.9 - dip, 3.6, 1.6, SKIN.accentShade)
-    claw(7.2, 12.4 - dip)
-    rect(-4.5, 15.0, 1.8, 5.4, SKIN.accentShade)
-    claw(-3.6, 8.6)
+    const dip = Math.sin(t * 13) > 0 ? 2 : 0
+    ctx.beginPath()
+    ctx.roundRect(bx - 1.5, by + H * 0.3, 5, H * 0.55, 4)
+    ctx.fill()
+    ctx.save()
+    ctx.translate(ox + W / 2 - 3, by + H * 0.52 + dip * 0.4)
+    ctx.rotate(0.9)
+    ctx.beginPath()
+    ctx.roundRect(-2.5, 0, 6, H * 0.5, 4)
+    ctx.fill()
+    ctx.restore()
   } else {
     for (const s of [-1, 1] as const) {
-      rect(s * 3.6 - 0.9, 15.0, 1.8, 5.4, SKIN.accentShade)
-      claw(s * 3.6, 8.6)
+      ctx.beginPath()
+      ctx.roundRect(ox + s * (W / 2 - 3.5) - 2.5, by + H * 0.3, 5, H * 0.58, 4)
+      ctx.fill()
     }
   }
 
-  // head
-  rect(-2.8, 21.6, 5.6, 5.6, LEGO_YELLOW)
-  rect(-2.8, 16.8, 5.6, 0.8, LEGO_YELLOW_SHADE)
-  rect(-1.5, 22.9, 3.0, 1.3, LEGO_YELLOW)
-  rect(-3.1, 21.9, 6.2, 1.6, SKIN.accent)
-  rect(-3.1, 21.9, 0.7, 3.2, SKIN.accent)
-  rect(2.4, 21.9, 0.7, 3.2, SKIN.accent)
-
-  // face
-  const blink = (t % 4.3) > 4.12
-  const eyeTop = 19.9 + (working ? -0.3 : status === 'thinking' ? 0.35 : 0)
-  if (!blink) {
-    rect(-1.7, eyeTop, 0.85, 0.95, '#20180a')
-    rect(0.85, eyeTop, 0.85, 0.95, '#20180a')
-  } else {
-    rect(-1.7, eyeTop - 0.35, 0.85, 0.3, '#20180a')
-    rect(0.85, eyeTop - 0.35, 0.85, 0.3, '#20180a')
-  }
-  ctx.strokeStyle = '#20180a'
-  ctx.lineWidth = 1.8
+  // belly patch with chevrons
+  ctx.fillStyle = OWL.belly
   ctx.beginPath()
-  const grinR = celebrating ? 5.2 : 4.0
-  ctx.arc(cx, Y(18.9), grinR, Math.PI * 0.24, Math.PI * 0.76)
-  ctx.stroke()
+  ctx.roundRect(bx + W * 0.26, by + H * 0.42, W * 0.48, H * 0.5, 10)
+  ctx.fill()
+  ctx.strokeStyle = OWL.bellyShade
+  ctx.lineWidth = 1.4
+  for (let r = 0; r < 3; r++) {
+    const yy = by + H * 0.55 + r * 7
+    ctx.beginPath()
+    for (let k = 0; k < 3; k++) {
+      const xx = bx + W * 0.32 + k * 8
+      ctx.moveTo(xx, yy)
+      ctx.lineTo(xx + 3, yy + 3)
+      ctx.lineTo(xx + 6, yy)
+    }
+    ctx.stroke()
+  }
+
+  // THE EYES — golden irises, the namesake
+  const eyeY = by + H * 0.27
+  const gazeX = working ? 1.2 : status === 'thinking' ? Math.sin(t * 0.9) * 1.4 : Math.sin(t * 0.5) * 0.8
+  const gazeY = working ? 1.2 : status === 'thinking' ? -0.8 : 0.2
+  const blink = (t % 4.3) > 4.14
+  for (const s of [-1, 1] as const) {
+    const ex = ox + s * W * 0.21 + tilt
+    ctx.fillStyle = OWL.belly
+    ctx.beginPath()
+    ctx.arc(ex, eyeY, 8.6, 0, Math.PI * 2)
+    ctx.fill()
+    if (blink) {
+      ctx.fillStyle = OWL.shade
+      ctx.beginPath()
+      ctx.arc(ex, eyeY, 7.2, 0, Math.PI * 2)
+      ctx.fill()
+    } else {
+      ctx.fillStyle = OWL.iris
+      ctx.beginPath()
+      ctx.arc(ex, eyeY, 5.8, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = OWL.pupil
+      ctx.beginPath()
+      ctx.arc(ex + gazeX * 0.6 * s + gazeX * 0.4, eyeY + gazeY, 2.6, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'
+      ctx.fillRect(ex - 1.5 + gazeX * 0.4, eyeY - 3.4, 1.6, 1.6)
+    }
+  }
+  // beak
+  ctx.fillStyle = OWL.beak
+  ctx.beginPath()
+  ctx.moveTo(ox - 3 + tilt, eyeY + 6.5)
+  ctx.lineTo(ox + 3 + tilt, eyeY + 6.5)
+  ctx.lineTo(ox + tilt, eyeY + 12)
+  ctx.closePath()
+  ctx.fill()
+
+  // talons gripping the platform
+  ctx.fillStyle = OWL.beak
+  for (const s of [-1, 1] as const) {
+    for (let k = 0; k < 3; k++) {
+      ctx.fillRect(ox + s * W * 0.18 - 3 + k * 3, oy - 1, 2, 4)
+    }
+  }
 }
 
-// ── Console, floor, plaques ──────────────────────────────────────────────────
-
-function drawConsole(ctx: CanvasRenderingContext2D, cx: number, groundY: number,
-                     active: boolean, t: number) {
-  const y = groundY - 30 * PX
-  const P = (gx: number, gy: number, gw: number, gh: number, c: string) => {
-    ctx.fillStyle = c
-    ctx.fillRect(Math.round(cx + gx * PX), Math.round(y + gy * PX), gw * PX, gh * PX)
+function drawThoughtDots(ctx: CanvasRenderingContext2D, cx: number, groundY: number, t: number) {
+  const { cabinTop } = towerGeometry(cx, groundY)
+  const y = cabinTop - 14
+  for (let i = 0; i < 3; i++) {
+    const phase = Math.sin(t * 4 - i * 0.9)
+    ctx.globalAlpha = 0.35 + Math.max(0, phase) * 0.65
+    ctx.fillStyle = OWL.body
+    ctx.fillRect(cx - 26 + i * 12, y - Math.max(0, phase) * 4, 6, 6)
   }
-  P(7, 20, 10, 1.6, '#26233a')
-  P(7.6, 21.6, 1.4, 8.6, '#1b1928')
-  P(15, 21.6, 1.4, 8.6, '#1b1928')
-  for (let i = 0; i < 4; i++) P(8 + i * 2.3, 19.5, 1.1, 0.5, '#312d48')
-  P(15.2, 18.9, 1.3, 1.1, '#e3000b')
-  P(15.45, 18.55, 0.8, 0.4, '#7a4a2b')
-  P(8.4, 11, 8, 8, '#12101e')
-  P(8.9, 11.5, 7, 7, active ? '#0d1f16' : '#0d0b16')
-  P(11.6, 19, 1.6, 1.2, '#1b1928')
-  P(8.4, 11, 8, 0.6, SKIN.accent)
-  if (active) {
-    for (let i = 0; i < 5; i++) {
-      const lineT = (t * 2 + i * 0.9) % 4.5
-      const w = 2 + ((i * 37 + Math.floor(t)) % 4)
-      if (lineT < 4) P(9.3, 12.1 + lineT * 1.3, w, 0.55, i % 3 === 0 ? SKIN.accent : '#79ff98')
+  ctx.globalAlpha = 1
+}
+
+function drawWaitingMark(ctx: CanvasRenderingContext2D, cx: number, groundY: number, t: number) {
+  const { cabinTop } = towerGeometry(cx, groundY)
+  const y = cabinTop - 16 + Math.sin(t * 5) * 3
+  ctx.fillStyle = STATUS.waiting
+  ctx.fillRect(cx - 20, y - 12, 5, 9)
+  ctx.fillRect(cx - 20, y + 1, 5, 4)
+}
+
+// ── The range floor — prairie grass in perspective, a fence at the edge ─────
+
+function drawRange(ctx: CanvasRenderingContext2D, w: number, h: number, groundY: number) {
+  ctx.fillStyle = 'rgba(148,144,170,0.05)'
+  ctx.fillRect(0, groundY + 2, w, h - groundY)
+  for (let row = 0; row < 7; row++) {
+    const yy = groundY + 14 + row * row * 5.5
+    if (yy > h) break
+    const scale = 1 + row * 0.35
+    const spacing = 34 * scale
+    const offset = (row % 2) * spacing * 0.5
+    ctx.strokeStyle = `rgba(148,144,170,${0.11 - row * 0.012})`
+    ctx.lineWidth = 1.6
+    for (let x = -offset; x < w + spacing; x += spacing) {
+      const jitter = ((x * 7 + row * 13) % 11) - 5
+      const gx = x + jitter
+      const gh = 3.2 * scale
+      ctx.beginPath()
+      ctx.moveTo(gx, yy); ctx.lineTo(gx - 0.8 * scale, yy - gh)
+      ctx.moveTo(gx, yy); ctx.lineTo(gx + 0.4, yy - gh * 1.25)
+      ctx.moveTo(gx, yy); ctx.lineTo(gx + 0.8 * scale, yy - gh * 0.8)
+      ctx.stroke()
     }
+  }
+  // fence line at the right edge of the range
+  const fy = groundY + 8
+  ctx.strokeStyle = 'rgba(148,144,170,0.14)'
+  ctx.lineWidth = 1.4
+  ctx.beginPath()
+  ctx.moveTo(w * 0.72, fy)
+  ctx.lineTo(w * 0.99, fy + 3)
+  ctx.stroke()
+  for (let i = 0; i < 6; i++) {
+    const fx = w * (0.73 + i * 0.052)
+    ctx.beginPath()
+    ctx.moveTo(fx, fy + i * 0.5)
+    ctx.lineTo(fx, fy - 7 + i * 0.4)
+    ctx.stroke()
   }
 }
 
@@ -218,25 +433,6 @@ function drawHorizon(ctx: CanvasRenderingContext2D, w: number, groundY: number,
   grd.addColorStop(1, glow[0])
   ctx.fillStyle = grd
   ctx.fillRect(0, groundY - 120, w, 126)
-}
-
-function drawBaseplate(ctx: CanvasRenderingContext2D, w: number, h: number, groundY: number) {
-  ctx.fillStyle = 'rgba(148,144,170,0.05)'
-  ctx.fillRect(0, groundY + 2, w, h - groundY)
-  for (let row = 0; row < 7; row++) {
-    const yy = groundY + 14 + row * row * 5.5
-    if (yy > h) break
-    const scale = 1 + row * 0.35
-    const rx = 5 * scale, ry = 1.8 * scale
-    const spacing = 46 * scale
-    const offset = (row % 2) * spacing * 0.5
-    ctx.fillStyle = `rgba(148,144,170,${0.10 - row * 0.011})`
-    for (let x = -offset; x < w + spacing; x += spacing) {
-      ctx.beginPath()
-      ctx.ellipse(x, yy, rx, ry, 0, 0, Math.PI * 2)
-      ctx.fill()
-    }
-  }
 }
 
 function drawPlaques(ctx: CanvasRenderingContext2D, w: number, groundY: number) {
@@ -256,24 +452,6 @@ function drawPlaques(ctx: CanvasRenderingContext2D, w: number, groundY: number) 
     ctx.fillText(label, x + 20, y - 27)
     ctx.textAlign = 'left'
   })
-}
-
-function drawThoughtDots(ctx: CanvasRenderingContext2D, cx: number, groundY: number, t: number) {
-  const y = groundY - 26 * PX
-  for (let i = 0; i < 3; i++) {
-    const phase = Math.sin(t * 4 - i * 0.9)
-    ctx.globalAlpha = 0.35 + Math.max(0, phase) * 0.65
-    ctx.fillStyle = SKIN.accent
-    ctx.fillRect(cx - 12 + i * 12, y - Math.max(0, phase) * 4, 6, 6)
-  }
-  ctx.globalAlpha = 1
-}
-
-function drawWaitingMark(ctx: CanvasRenderingContext2D, cx: number, groundY: number, t: number) {
-  const y = groundY - 27 * PX + Math.sin(t * 5) * 3
-  ctx.fillStyle = STATUS.waiting
-  ctx.fillRect(cx - 2, y - 14, 5, 10)
-  ctx.fillRect(cx - 2, y, 5, 4)
 }
 
 // ── The Big Board — market clock + GO/NO-GO over the REAL stack ──────────────
@@ -320,7 +498,7 @@ function drawWallBoard(ctx: CanvasRenderingContext2D, w: number, groundY: number
   ctx.fillRect(bx + 24, by + bh, 8, groundY - by - bh)
   ctx.fillRect(bx + bw - 32, by + bh, 8, groundY - by - bh)
 
-  // header — market clock replaces the old shift timer
+  // header — market clock
   ctx.font = '600 11px "Fira Code", monospace'
   ctx.fillStyle = INK.dim
   ctx.textAlign = 'left'
@@ -344,7 +522,7 @@ function drawWallBoard(ctx: CanvasRenderingContext2D, w: number, groundY: number
   }
   ctx.stroke()
   const p = (t * 0.07) % 1
-  ctx.fillStyle = open ? GO : INK.dim
+  ctx.fillStyle = open ? GOLD : INK.dim
   ctx.beginPath()
   ctx.arc(ox + p * ow, oy + Math.sin(p * Math.PI * 2) * oh * 0.5, 3, 0, Math.PI * 2)
   ctx.fill()
@@ -455,12 +633,12 @@ function StatusPlate({ member }: { member: CrewMember }) {
       backdropFilter: 'blur(12px)',
       WebkitBackdropFilter: 'blur(12px)',
       border: PANEL_BORDER,
-      borderTop: `2px solid ${SKIN.accent}`,
+      borderTop: `2px solid ${OWL.body}`,
       boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 16px 32px -16px rgba(0,0,0,0.45)',
       zIndex: 5,
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <span style={{ fontSize: 15, letterSpacing: '0.14em', color: SKIN.accent, textTransform: 'uppercase', fontWeight: 700 }}>
+        <span style={{ fontSize: 15, letterSpacing: '0.14em', color: OWL.body, textTransform: 'uppercase', fontWeight: 700 }}>
           {member.name}
         </span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
@@ -474,13 +652,13 @@ function StatusPlate({ member }: { member: CrewMember }) {
         </span>
       </div>
       <div style={{ fontSize: 9.5, color: INK.dim, letterSpacing: '0.1em', marginTop: 2 }}>
-        {member.role} · {member.model}
+        Night watch · {member.role} · {member.model}
       </div>
       <div style={{
         marginTop: 7, fontSize: 11.5, color: INK.text, fontFamily: '"Fira Code", monospace',
         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minHeight: 16,
       }}>
-        {member.activity ?? 'standing by'}
+        {member.activity ?? 'perched, watching the range'}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 9.5, color: INK.soft, letterSpacing: '0.06em' }}>
         <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 150 }}>
@@ -528,7 +706,7 @@ export function OpsLog() {
               style={{
                 background: 'none', padding: '1px 6px', cursor: 'pointer',
                 border: `1px solid ${filter === f ? 'rgba(150,146,172,0.4)' : 'transparent'}`,
-                color: filter === f ? SKIN.accent : INK.dim,
+                color: filter === f ? OWL.body : INK.dim,
                 fontSize: 8.5, letterSpacing: '0.12em', textTransform: 'uppercase',
               }}
             >
@@ -548,7 +726,7 @@ export function OpsLog() {
             <span style={{ fontSize: 9, color: INK.dim, fontVariantNumeric: 'tabular-nums', fontFamily: '"Fira Code", monospace', flexShrink: 0 }}>
               {new Date(e.ts).toLocaleTimeString([], { hour12: false })}
             </span>
-            <span style={{ color: SKIN.accent, fontSize: 10, flexShrink: 0 }}>{KIND_GLYPH[e.kind] ?? '·'}</span>
+            <span style={{ color: OWL.body, fontSize: 10, flexShrink: 0 }}>{KIND_GLYPH[e.kind] ?? '·'}</span>
             <span style={{
               fontSize: 11, color: INK.soft,
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
@@ -576,7 +754,7 @@ export default function CrewStage() {
   const celebrateRef = useRef<{ until: number; spawned: boolean } | null>(null)
   const waveRef = useRef(0)
 
-  // click routing: minifig -> wave; GO/NO-GO cell -> detail popover
+  // click routing: owl/tower -> wing-wave; GO/NO-GO cell -> detail popover
   const handleStageClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -585,7 +763,8 @@ export default function CrewStage() {
     const w = canvas.width, groundY = canvas.height * 0.66
 
     const ax = w * CLAUDE_X
-    if (Math.abs(x - ax) < 60 && y > groundY - 24 * PX - 20 && y < groundY + 12) {
+    const { cabinTop } = towerGeometry(ax, groundY)
+    if (Math.abs(x - ax) < 62 && y > cabinTop - 30 && y < groundY + 12) {
       waveRef.current = Date.now() + 1800
       return
     }
@@ -614,7 +793,7 @@ export default function CrewStage() {
       .catch(() => { /* backend not up yet */ })
   }, [setCrew, setCrewEvents])
 
-  // finished turns -> confetti
+  // finished turns -> sparks
   useEffect(() => {
     const latest = crewEvents[0]
     if (latest?.kind === 'lifecycle' && latest.text.includes('finished')) {
@@ -636,7 +815,7 @@ export default function CrewStage() {
     const ro = new ResizeObserver(resize)
     ro.observe(container)
 
-    const confetti: Confetto[] = []
+    const sparks: Spark[] = []
     let raf: number
     const frame = () => {
       const t = performance.now() / 1000
@@ -648,8 +827,16 @@ export default function CrewStage() {
       ctx.imageSmoothingEnabled = false
 
       drawHorizon(ctx, w, groundY, PHASES[getPhase(state.trading?.market)].stageGlow)
-      drawBaseplate(ctx, w, h, groundY)
+      drawRange(ctx, w, h, groundY)
       drawPlaques(ctx, w, groundY)
+
+      const member = state.crew.claude
+      const status: CrewStatus = member?.status ?? 'idle'
+      const cx = w * CLAUDE_X
+
+      // beacon sweeps BEHIND the board — light across the range
+      drawBeacon(ctx, cx, groundY, status, t)
+
       const latest = state.crewEvents[0]
       const alert = state.trading?.alerts?.length
         ? state.trading.alerts[state.trading.alerts.length - 1]
@@ -661,22 +848,21 @@ export default function CrewStage() {
         latest ? `claude: ${latest.text}` : alert,
       )
 
-      const member = state.crew.claude
-      const status: CrewStatus = member?.status ?? 'idle'
-      const cx = w * CLAUDE_X
       const cel = celebrateRef.current
       const celebrating = !!cel && cel.until > now
       const waving = waveRef.current > now
       if (cel && celebrating && !cel.spawned) {
-        spawnConfetti(confetti, cx, groundY)
+        const { cabinFloor } = towerGeometry(cx, groundY)
+        spawnSparks(sparks, cx, cabinFloor - 40)
         cel.spawned = true
       }
-      drawConsole(ctx, cx, groundY, status === 'working', t)
-      drawMinifig(ctx, cx, groundY, status, t, celebrating, waving)
+      drawTower(ctx, cx, groundY)
+      drawConsoleScreen(ctx, cx, groundY, status === 'working', t)
+      drawOwl(ctx, cx, groundY, status, t, celebrating, waving)
       if (!celebrating && status === 'thinking') drawThoughtDots(ctx, cx, groundY, t)
       if (!celebrating && status === 'waiting') drawWaitingMark(ctx, cx, groundY, t)
 
-      stepConfetti(ctx, confetti, groundY)
+      stepSparks(ctx, sparks, groundY)
       raf = requestAnimationFrame(frame)
     }
     frame()
@@ -747,7 +933,7 @@ function Logbook() {
       background: 'rgba(11,8,18,0.85)', border: PANEL_BORDER,
       backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
     }}>
-      <span style={{ fontSize: 9, letterSpacing: '0.2em', color: INK.dim, flexShrink: 0 }}>LOGBOOK ▸</span>
+      <span style={{ fontSize: 9, letterSpacing: '0.2em', color: GOLD, opacity: 0.8, flexShrink: 0 }}>LOGBOOK ▸</span>
       {note && (
         <span style={{
           position: 'absolute', top: -22, left: 10, fontSize: 10,
@@ -771,7 +957,7 @@ function Logbook() {
         onClick={send}
         disabled={sending || !text.trim()}
         style={{
-          background: 'none', border: `1px solid ${SKIN.accent}`, color: SKIN.accent,
+          background: 'none', border: `1px solid ${GOLD}`, color: GOLD,
           fontSize: 10, letterSpacing: '0.14em', padding: '3px 10px',
           cursor: sending || !text.trim() ? 'default' : 'pointer',
           opacity: sending || !text.trim() ? 0.4 : 1,
