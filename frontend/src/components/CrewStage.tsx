@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDashboardStore } from '../store/dashboardStore'
 import type { CrewEvent, CrewMember, CrewStatus, MarketClock } from '../types'
-import { GOLD, PHASES, getPhase, type Phase } from '../theme'
+import { GOLD, getPhase, palette, type Phase } from '../theme'
 
 // ── THE MESA ─────────────────────────────────────────────────────────────────
 // A silhouette landscape where the sun IS the market: it climbs toward the
@@ -825,7 +825,7 @@ export default function CrewStage() {
       // sky → disc → glow → mesas → floor: the landscape stack
       drawStars(ctx, w, groundY, t, phase)
       drawDisc(ctx, w, groundY, market, phase)
-      drawHorizonGlow(ctx, w, groundY, PHASES[phase].stageGlow)
+      drawHorizonGlow(ctx, w, groundY, palette(phase).stageGlow)
       drawMesas(ctx, w, groundY)
       drawFloor(ctx, w, h, groundY)
       drawPlaques(ctx, w, groundY)

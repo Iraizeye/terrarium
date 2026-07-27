@@ -3,7 +3,7 @@ import { useWebSocket } from './hooks/useWebSocket'
 import { useDashboardStore } from './store/dashboardStore'
 import CrewStage, { OpsLog, buildBoardCells } from './components/CrewStage'
 import TradingPanel from './components/TradingPanel'
-import { GOLD, PHASES, getPhase, type Phase } from './theme'
+import { GOLD, THEME_NAMES, getPhase, getTheme, palette, setTheme, type Phase, type ThemeName } from './theme'
 
 // ── Color palette ────────────────────────────────────────────────────────────
 
@@ -89,12 +89,12 @@ function VolumetricFog({ phase }: { phase: Phase }) {
     <>
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
-        background: `radial-gradient(ellipse 70% 50% at 28% 62%, ${PHASES[phase].fog1}, transparent)`,
+        background: `radial-gradient(ellipse 70% 50% at 28% 62%, ${palette(phase).fog1}, transparent)`,
         animation: 'fog-breathe 12s ease-in-out infinite',
       }} />
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
-        background: `radial-gradient(ellipse 60% 45% at 72% 38%, ${PHASES[phase].fog2}, transparent)`,
+        background: `radial-gradient(ellipse 60% 45% at 72% 38%, ${palette(phase).fog2}, transparent)`,
         animation: 'fog-breathe 16s ease-in-out infinite 5s',
       }} />
       <div style={{
@@ -274,13 +274,35 @@ function StatPill({ label, value, sub, warn }: { label: string; value: string; s
 
 // ── App ──────────────────────────────────────────────────────────────────────
 
+function ThemeToggle({ theme, onCycle }: { theme: ThemeName; onCycle: () => void }) {
+  return (
+    <button
+      onClick={onCycle}
+      title="Cycle the sky theme (?theme=mesa|observatory|embers also works)"
+      style={{
+        background: 'none', border: `1px solid ${C.dim}`, color: C.dim,
+        borderRadius: 4, padding: '3px 9px', fontSize: 9, letterSpacing: '0.18em',
+        textTransform: 'uppercase', cursor: 'pointer', fontFamily: MONO,
+      }}
+    >
+      sky: {theme}
+    </button>
+  )
+}
+
 export default function App() {
   const { isConnected } = useWebSocket()
+  const [theme, setThemeState] = useState<ThemeName>(getTheme())
+  const cycleTheme = () => {
+    const next = THEME_NAMES[(THEME_NAMES.indexOf(theme) + 1) % THEME_NAMES.length]
+    setTheme(next)
+    setThemeState(next)
+  }
   const system = useDashboardStore((s) => s.system)
   const usage = useDashboardStore((s) => s.usage)
   const trading = useDashboardStore((s) => s.trading)
   const phase = getPhase(trading?.market)
-  const sky = PHASES[phase]
+  const sky = palette(phase)
 
   const realized = trading
     ? (trading.modes.paper.realized_today + trading.modes.live.realized_today)
@@ -325,7 +347,10 @@ export default function App() {
           <div style={{ flex: 1, display: 'flex', justifyContent: 'center', minWidth: 0 }}>
             <AlertBar />
           </div>
-          <ClockDot isConnected={isConnected} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <ThemeToggle theme={theme} onCycle={cycleTheme} />
+            <ClockDot isConnected={isConnected} />
+          </div>
         </div>
 
         {/* Left rail — ops log */}

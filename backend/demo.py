@@ -1,0 +1,264 @@
+"""
+Demo mode — a synthetic trading day, so a visitor sees the full MESA in
+five minutes with zero configuration and zero personal data.
+
+RANGEWATCH_DEMO=1 swaps every collector for the scripted versions below.
+The "day" is a pure function of the wall clock: a full 24h ET session is
+compressed into DEMO_DAY_S seconds and weighted toward the interesting
+parts (the market-open sun arc gets 60% of the loop). Nothing is random
+per-request and nothing is stored — refresh mid-day and the day is exactly
+where you left it.
+
+Every ticker, trade, and log line here is fiction. NOVA, RIDGE, CINDER,
+HELIO do not exist; resemblance to real symbols is accidental.
+"""
+from __future__ import annotations
+
+import asyncio
+import os
+import sqlite3
+import time
+from datetime import datetime
+from typing import Any
+
+DEMO_DAY_S = int(os.getenv("RANGEWATCH_DEMO_DAY_S", "300"))
+
+# Loop segments: (fraction of loop, start ET minute, end ET minute)
+_SEGMENTS = [
+    (0.10, 8 * 60 + 15, 9 * 60 + 30),    # dawn  08:15 -> 09:30
+    (0.60, 9 * 60 + 30, 16 * 60),        # day   09:30 -> 16:00
+    (0.15, 16 * 60, 19 * 60),            # dusk  16:00 -> 19:00
+    (0.15, 19 * 60, 24 * 60 + 8 * 60 + 15),  # night 19:00 -> 08:15 (+1d)
+]
+
+
+def _demo_minute(now: float | None = None) -> float:
+    """Synthetic ET minute-of-day for this instant of the loop."""
+    frac = ((now if now is not None else time.time()) % DEMO_DAY_S) / DEMO_DAY_S
+    for i, (seg_frac, start_min, end_min) in enumerate(_SEGMENTS):
+        if frac <= seg_frac or i == len(_SEGMENTS) - 1:
+            minute = start_min + min(1.0, frac / seg_frac) * (end_min - start_min)
+            return minute % (24 * 60)
+        frac -= seg_frac
+    return 0.0
+
+
+def demo_market_clock(now: float | None = None) -> dict[str, Any]:
+    minute = _demo_minute(now)
+    is_open = 9 * 60 + 30 <= minute < 16 * 60
+    # seconds_to_change is only used for the dawn window and countdowns; scale
+    # synthetic minutes to synthetic seconds so the frontend math reads right.
+    if is_open:
+        change_min = 16 * 60 - minute
+    elif minute < 9 * 60 + 30:
+        change_min = 9 * 60 + 30 - minute
+    else:
+        change_min = (24 * 60 - minute) + 9 * 60 + 30
+    return {
+        "is_open": is_open,
+        "seconds_to_change": int(change_min * 60),
+        "et": f"{int(minute) // 60:02d}:{int(minute) % 60:02d}:{int((minute % 1) * 60):02d}",
+    }
+
+
+# ---------------------------------------------------------------------------
+# The scripted book. Times are ET minutes; prices are fiction.
+# ---------------------------------------------------------------------------
+
+_OPEN = 9 * 60 + 30
+
+# (mode, symbol, open_min, close_min|None, qty, entry, stop, target,
+#  trail_min|None, exit, reason)  — close_min None = still open at EOD
+_TRADES = [
+    ("live", "NOVA", _OPEN + 35, _OPEN + 190, 2.0, 41.20, 40.35, 43.80,
+     _OPEN + 120, 43.80, "target"),
+    ("live", "RIDGE", _OPEN + 225, _OPEN + 300, 1.0, 67.10, 65.90, 70.70,
+     None, 65.90, "stop"),
+    ("live", "CINDER", _OPEN + 320, None, 3.0, 28.44, 27.80, 30.10,
+     None, None, None),
+    ("paper", "HELIO", _OPEN + 20, _OPEN + 150, 4.0, 22.05, 21.40, 23.30,
+     _OPEN + 90, 23.30, "target"),
+    ("paper", "VELA", _OPEN + 170, _OPEN + 260, 1.0, 88.60, 86.90, 91.40,
+     None, 91.40, "target"),
+    ("paper", "SABLE", _OPEN + 280, None, 2.0, 34.72, 33.95, 36.60,
+     None, None, None),
+]
+
+_DECISIONS = [
+    (_OPEN + 15, "pass", None,
+     "Opening tape is still deciding. HELIO has the only dated catalyst on "
+     "the board but sits 1.8% above session VWAP with no pullback yet — the "
+     "stop the structure demands is inside the noise. Patience costs nothing."),
+    (_OPEN + 35, "buy", "NOVA",
+     "Fresh guidance raise dated today, reclaimed VWAP on rvol 2.1, and the "
+     "stop below the pullback low at 40.35 risks 0.85 against 2.60 of room to "
+     "yesterday's high — 3.1:1. One catalyst, one structure, one trade."),
+    (_OPEN + 120, "pass", None,
+     "NOVA is +1.0R and trails to breakeven — the trade now pays for itself. "
+     "Nothing new qualifies: RIDGE's move is sector sympathy without its own "
+     "news, and chasing sympathy is how mornings are given back."),
+    (_OPEN + 225, "buy", "RIDGE",
+     "The sector driver finally got RIDGE-specific confirmation at 13:0x. "
+     "Stop under the midday shelf at 65.90; 1.2 risk against 3.6 to the "
+     "measured move. If the shelf breaks the thesis is simply wrong."),
+    (_OPEN + 320, "buy", "CINDER",
+     "Afternoon range break on a contract announcement dated today. Risk "
+     "0.64 to the breakout shelf, 1.66 to the prior high — and the book has "
+     "settled cash freed by this morning's NOVA exit to pay for it."),
+    (_OPEN + 355, "pass", None,
+     "Final window. CINDER is working and needs nothing. The last half hour "
+     "belongs to management, not new risk — EOD flatten runs at 15:50."),
+]
+
+_ALERT_SCRIPT = [
+    (_OPEN - 20, "preflight: broker session OK, scanners armed, risk kernel loaded"),
+    (_OPEN + 35, "LIVE opened NOVA x2 @ 41.20, stop 40.35 (structure: pullback low)"),
+    (_OPEN + 120, "LIVE trailed NOVA to breakeven at +1.0R"),
+    (_OPEN + 190, "LIVE closed NOVA @ 43.80 — target, +$5.20 (+3.1R)"),
+    (_OPEN + 225, "LIVE opened RIDGE x1 @ 67.10, stop 65.90"),
+    (_OPEN + 300, "LIVE stopped RIDGE @ 65.90 — -$1.20 (-1.0R), thesis invalidated"),
+    (_OPEN + 320, "LIVE opened CINDER x3 @ 28.44, stop 27.80"),
+    (16 * 60 + 5, "daily report: +$4.00 live, +$7.68 paper — outcomes table updated"),
+]
+
+
+def _mode_book(mode: str, minute: float) -> dict[str, Any]:
+    opens: list[dict] = []
+    closed: list[dict] = []
+    realized = 0.0
+    for m, sym, o, c, qty, entry, stop, target, trail, exit_px, reason in _TRADES:
+        if m != mode or minute < o:
+            continue
+        if c is not None and minute >= c:
+            pnl = round((exit_px - entry) * qty, 2)
+            realized += pnl
+            closed.append({"symbol": sym, "quantity": qty, "entry": entry,
+                           "exit": exit_px, "reason": reason, "pnl": pnl})
+        else:
+            live_stop = entry if (trail is not None and minute >= trail) else stop
+            opens.append({"symbol": sym, "quantity": qty, "entry": entry,
+                          "stop": live_stop, "target": target, "state": "open",
+                          "adopted": False, "broker_stop": True})
+    return {
+        "status": "alive",
+        "heartbeat_age_s": int(minute * 7) % 41 + 4,
+        "watchdog_armed": True,
+        "open_positions": opens,
+        "closed_today": closed,
+        "realized_today": round(realized, 2),
+    }
+
+
+def demo_trading_status() -> dict[str, Any]:
+    clock = demo_market_clock()
+    minute = _demo_minute()
+    last = None
+    for at, action, symbol, thesis in _DECISIONS:
+        if minute >= at:
+            last = {
+                "at": datetime.now().isoformat(),
+                "action": action, "symbol": symbol, "thesis": thesis,
+            }
+    return {
+        "market": clock,
+        "kill_switch": False,
+        "modes": {"paper": _mode_book("paper", minute),
+                  "live": _mode_book("live", minute)},
+        "last_decision": last,
+        "alerts": [f"[demo] {text}" for at, text in _ALERT_SCRIPT if minute >= at][-12:],
+    }
+
+
+def demo_system_metrics() -> dict[str, Any]:
+    minute = _demo_minute()
+    wobble = (minute * 13) % 17 / 17          # deterministic, gently moving
+    return {
+        "cpu_pct": round(9 + 14 * wobble, 1),
+        "ram_pct": round(58 + 7 * wobble, 1),
+        "ram_used_gb": round(18.6 + 2.2 * wobble, 1),
+        "ram_total_gb": 32.0,
+        "disk_pct": 41.3,
+        "disk_used_gb": 383.2,
+        "disk_total_gb": 926.4,
+        "uptime_seconds": 11 * 86400 + int(minute * 60),
+        "load_1m": round(1.1 + 1.4 * wobble, 2),
+        "trader_procs": 2,
+        "trader_ram_mb": 96 + int(18 * wobble),
+    }
+
+
+def demo_service_checks() -> dict[str, dict[str, Any]]:
+    return {
+        "glance": {"name": "Glance", "port": 8080, "status": "up"},
+        "screenpipe": {"name": "Screenpipe", "port": 3030, "status": "up"},
+        "frontend": {"name": "Frontend", "port": 3000, "status": "up"},
+    }
+
+
+def demo_claude_usage() -> dict[str, Any]:
+    minute = _demo_minute()
+    day_frac = min(1.0, max(0.0, (minute - 7 * 60) / (13 * 60)))
+    return {
+        "available": True,
+        "sessions_today": 1 + int(3 * day_frac),
+        "turns_today": int(310 * day_frac),
+        "input_tokens": int(1_840_000 * day_frac),
+        "output_tokens": int(214_000 * day_frac),
+        "cache_read_tokens": int(9_600_000 * day_frac),
+        "cache_write_tokens": int(1_150_000 * day_frac),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Crew — feed the watchtower through the real pipeline so the art animates.
+# ---------------------------------------------------------------------------
+
+_CREW_SCRIPT = [
+    ("lifecycle", "session started in range-trader", "thinking", None),
+    ("thought", "reading the morning tape", "thinking", None),
+    ("tool", "Read daemon.py", "working", "Read"),
+    ("tool", "run tests: 373 passed", "working", "Bash"),
+    ("tool", "Edit engine.py", "working", "Edit"),
+    ("thought", "weighing the 2:1 experiment arm", "thinking", None),
+    ("tool", "web: verify catalyst for NOVA", "working", "WebSearch"),
+    ("tool", "Grep structure_stop", "working", "Grep"),
+    ("lifecycle", "finished turn", "idle", None),
+    ("tool", "tail decisions.jsonl", "working", "Bash"),
+]
+
+
+async def run_demo_crew() -> None:
+    """Emit a scripted activity loop so the stage is alive for visitors."""
+    from .routers.crew import _emit
+
+    step = 0
+    while True:
+        kind, text, status, tool = _CREW_SCRIPT[step % len(_CREW_SCRIPT)]
+        try:
+            await _emit(kind, f"[demo] {text}", status=status, tool=tool)
+        except Exception as exc:
+            print(f"[demo] crew emit error: {exc}", flush=True)
+        step += 1
+        await asyncio.sleep(9 + (step * 7) % 8)
+
+
+def seed_demo_sessions(db_path) -> None:
+    """A believable session log for the day panel. Fiction, clearly tagged."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    rows = [
+        ("note", "[demo] preflight green: broker session, scanners, risk kernel"),
+        ("note", "[demo] PR merged: trailing-to-breakeven armed at +1R"),
+        ("note", "[demo] LIVE closed NOVA +3.1R at target — outcomes table updated"),
+        ("note", "[demo] paper arm leads the week 4.2R to 2.9R — promotion review Friday"),
+    ]
+    with sqlite3.connect(db_path) as conn:
+        existing = conn.execute(
+            "SELECT COUNT(*) FROM session_log WHERE date = ?", (today,)
+        ).fetchone()[0]
+        if existing:
+            return
+        for role, content in rows:
+            conn.execute(
+                "INSERT INTO session_log (date, ts, role, content) VALUES (?, ?, ?, ?)",
+                (today, datetime.now().astimezone().isoformat(), role, content),
+            )

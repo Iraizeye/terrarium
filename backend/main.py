@@ -15,10 +15,21 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import state as _st
-from .collectors import claude_usage, service_checks, system_metrics, trading_status
-from .config import MAX_WS_CONNECTIONS, POLL_INTERVAL, SESSIONS_DB
+from .config import DEMO, MAX_WS_CONNECTIONS, POLL_INTERVAL, SESSIONS_DB
 from .routers import crew, sessions
 from .state import _now_iso, _state, broadcast_status, status_payload
+
+if DEMO:
+    from .demo import (
+        demo_claude_usage as claude_usage,
+        demo_service_checks as service_checks,
+        demo_system_metrics as system_metrics,
+        demo_trading_status as trading_status,
+    )
+else:
+    from .collectors import (
+        claude_usage, service_checks, system_metrics, trading_status,
+    )
 
 
 def _init_sessions_db() -> None:
@@ -62,6 +73,11 @@ async def _lifespan(app: FastAPI):
     _init_sessions_db()
     asyncio.create_task(run_poll_loop())
     asyncio.create_task(crew.run_crew_idle_decay())
+    if DEMO:
+        from .demo import run_demo_crew, seed_demo_sessions
+        seed_demo_sessions(SESSIONS_DB)
+        asyncio.create_task(run_demo_crew())
+        print("[startup] DEMO MODE — every panel is scripted fiction", flush=True)
     print(f"[startup] RANGEWATCH backend on :8000 — polling every {POLL_INTERVAL}s", flush=True)
     yield
 

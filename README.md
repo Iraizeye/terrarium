@@ -2,7 +2,37 @@
 
 **Mission control for one agent, one trader, one machine.**
 
-![RANGEWATCH — all stations go](assets/rangewatch.jpg)
+![THE MESA — a compressed trading day in demo mode](docs/media/rangewatch-demo-day.gif)
+
+*The sun is the market. It rises for the open, arcs while the session runs,
+and sets after the close; nights get a cratered moon. The watchtower is
+Claude — lit window, sweeping beacon, an owl on the roof. Above: demo mode
+compressing a full trading day into five minutes.*
+
+## Try it in 60 seconds — no accounts, no config
+
+```bash
+git clone https://github.com/iriseye931-ai/rangewatch && cd rangewatch
+make demo        # -> http://127.0.0.1:3000
+```
+
+Demo mode (`RANGEWATCH_DEMO=1`) runs every panel on a **scripted synthetic
+day** — a fictional trader working NOVA, RIDGE and CINDER through entries,
+breakeven trails, a stop-out and a target, while a scripted agent works the
+watchtower. A compressed 24h session loops every 5 minutes so you see dawn,
+the open, the close and the stars without waiting for New York. Every line
+is fiction and labeled `[demo]`; nothing on your machine is read.
+
+## Skies
+
+Three themes, same range. Cycle with the `SKY:` button in the header, pin
+one with `?theme=mesa|observatory|embers`, preview any hour with
+`?phase=night|dawn|day|dusk`.
+
+| MESA *(flagship)* | OBSERVATORY | EMBERS |
+|---|---|---|
+| ![MESA](docs/media/theme-mesa.jpg) | ![OBSERVATORY](docs/media/theme-observatory.jpg) | ![EMBERS](docs/media/theme-embers.jpg) |
+| First light — violet & gold | High-altitude steel & cyan | Fire watch — copper & coal |
 
 A local-first dashboard that watches the three things that matter on this box:
 
@@ -52,28 +82,32 @@ Everything the backend watches, it watches read-only: ledgers open in SQLite
 ro-mode, transcripts and logs are tail-read from byte offsets, and the only
 thing it ever writes is its own session-log DB.
 
-## Run it
+## Run it for real
 
 ```bash
-# backend
-cd backend && python -m venv venv && venv/bin/pip install -r requirements.txt
-./run_mission_control.sh          # uvicorn on 127.0.0.1:8000
-
-# frontend
-cd frontend && npm install && npm run dev   # vite on :3000
+make dev         # backend :8000 + frontend :3000 against YOUR machine
 ```
 
-Both run under launchd on the owner's machine (`local.mcd-backend`,
-`local.mcd-frontend`) and bind to localhost only. This is a local-first,
-host-path-bound tool by design — it reads `~/.range-trader` and
-`~/.claude/projects` directly, so there is deliberately no Docker setup.
+Point it at your own stack with env vars (all optional — a panel with
+nothing to watch renders quietly instead of breaking):
+
+| Env | Watches | Default |
+|---|---|---|
+| `RANGE_TRADER_DIR` | trader heartbeats, ledgers, alerts | `~/.range-trader` |
+| `CLAUDE_PROJECTS_DIR` | Claude Code transcripts (token usage) | `~/.claude/projects` |
+| `RANGEWATCH_SESSIONS_DB` | session-log SQLite | `~/.claude/atlas-sessions.db` |
+
+Everything binds to localhost only. This is a local-first, host-path-bound
+tool by design — it reads local state directly, so there is deliberately no
+hosted version.
 
 ## Tests
 
 ```bash
-backend/venv/bin/python -m pytest backend/tests/
+make test
 ```
 
 Covers the market clock (including weekend rollover), the trading collector
-against fixture ledgers, incremental usage parsing, and both frozen contracts.
+against fixture ledgers, incremental usage parsing, demo-mode shape parity,
+and both frozen contracts.
 

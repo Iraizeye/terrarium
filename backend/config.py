@@ -17,12 +17,23 @@ ET = ZoneInfo("America/New_York")
 # Filesystem — the three things being watched
 # ---------------------------------------------------------------------------
 
-RANGE_TRADER_DIR   = Path(os.getenv("RANGE_TRADER_DIR", str(Path.home() / ".range-trader")))
-CLAUDE_PROJECTS_DIR = Path.home() / ".claude" / "projects"
-LAUNCH_AGENTS_DIR  = Path.home() / "Library" / "LaunchAgents"
+# Demo mode: every collector is swapped for a scripted synthetic day
+# (backend/demo.py) — zero config, zero personal data, full MESA.
+DEMO = os.getenv("RANGEWATCH_DEMO", "") == "1"
 
-# Session log DB — long-lived local file; the name is historical.
-SESSIONS_DB        = Path.home() / ".claude" / "atlas-sessions.db"
+RANGE_TRADER_DIR   = Path(os.getenv("RANGE_TRADER_DIR", str(Path.home() / ".range-trader")))
+CLAUDE_PROJECTS_DIR = Path(os.getenv("CLAUDE_PROJECTS_DIR",
+                                     str(Path.home() / ".claude" / "projects")))
+LAUNCH_AGENTS_DIR  = Path(os.getenv("LAUNCH_AGENTS_DIR",
+                                    str(Path.home() / "Library" / "LaunchAgents")))
+
+# Session log DB — long-lived local file; the name is historical. Demo mode
+# keeps its fiction in a separate throwaway DB, never the real log.
+_default_sessions_db = (
+    "/tmp/rangewatch-demo-sessions.db" if DEMO
+    else str(Path.home() / ".claude" / "atlas-sessions.db")
+)
+SESSIONS_DB        = Path(os.getenv("RANGEWATCH_SESSIONS_DB", _default_sessions_db))
 
 # ---------------------------------------------------------------------------
 # Services worth a GO/NO-GO cell (checked by TCP port, localhost only)

@@ -199,3 +199,59 @@ class TestFrozenContracts:
         body = client.get("/api/status").json()
         for key in ("services", "system", "trading", "usage", "timestamp"):
             assert key in body
+
+
+class TestDemoMode:
+    """Demo collectors must be indistinguishable in shape from the real ones —
+    the frontend has exactly one code path."""
+
+    def test_full_loop_covers_every_phase(self):
+        from backend.demo import DEMO_DAY_S, _demo_minute, demo_market_clock
+
+        seen = set()
+        for i in range(0, DEMO_DAY_S, 2):
+            clock = demo_market_clock(now=float(i))
+            minute = _demo_minute(float(i))
+            if clock["is_open"]:
+                seen.add("day")
+            elif 8 * 60 <= minute < 9 * 60 + 30:
+                seen.add("dawn")
+            elif 16 * 60 <= minute < 19 * 60:
+                seen.add("dusk")
+            else:
+                seen.add("night")
+        assert seen == {"dawn", "day", "dusk", "night"}
+
+    def test_trading_shape_matches_real_collector(self):
+        from backend.demo import demo_trading_status
+
+        t = demo_trading_status()
+        assert set(t) == {"market", "kill_switch", "modes", "last_decision", "alerts"}
+        for mode in ("paper", "live"):
+            m = t["modes"][mode]
+            assert set(m) == {"status", "heartbeat_age_s", "watchdog_armed",
+                              "open_positions", "closed_today", "realized_today"}
+            for p in m["open_positions"]:
+                assert set(p) == {"symbol", "quantity", "entry", "stop", "target",
+                                  "state", "adopted", "broker_stop"}
+
+    def test_demo_is_deterministic(self):
+        from backend.demo import demo_market_clock
+
+        assert demo_market_clock(now=123.0) == demo_market_clock(now=123.0)
+
+    def test_system_and_usage_shapes(self):
+        from backend.demo import demo_claude_usage, demo_system_metrics
+        from backend.collectors import system_metrics
+
+        assert set(demo_system_metrics()) == set(system_metrics())
+        usage = demo_claude_usage()
+        assert usage["available"] is True
+        assert usage["output_tokens"] >= 0
+
+    def test_demo_fiction_is_labeled(self):
+        from backend.demo import demo_trading_status
+
+        # Every synthetic alert self-identifies; nobody mistakes fiction for a fill.
+        for line in demo_trading_status()["alerts"]:
+            assert line.startswith("[demo]")
