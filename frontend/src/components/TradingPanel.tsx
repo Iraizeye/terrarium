@@ -81,15 +81,29 @@ function ModeSection({ label, mode }: { label: string; mode: TradingMode }) {
         </div>
       )}
       {mode.open_positions.map((p) => <PositionRow key={p.symbol} p={p} />)}
+      {mode.closed_today.length > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '6px 0 2px', marginTop: 3, borderTop: HAIRLINE,
+        }}>
+          <span style={{ fontSize: 8, letterSpacing: '0.22em', color: INK.dim, textTransform: 'uppercase' }}>
+            Closed today
+          </span>
+          <span style={{ flex: 1, borderTop: HAIRLINE }} />
+        </div>
+      )}
       {mode.closed_today.map((c, i) => (
         <div key={`${c.symbol}-${i}`} style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-          padding: '4px 0', borderTop: HAIRLINE,
+          padding: '3px 0', opacity: 0.75,
         }}>
-          <span style={{ fontSize: 11, color: INK.soft, fontFamily: MONO }}>
-            {c.symbol} <span style={{ color: INK.dim, fontSize: 9 }}>[{c.reason ?? 'closed'}]</span>
+          <span style={{ fontSize: 10.5, color: INK.soft, fontFamily: MONO }}>
+            {c.symbol}
+            <span style={{ color: INK.dim, fontSize: 9, marginLeft: 6 }}>
+              {c.quantity}× · {c.reason ?? 'closed'}
+            </span>
           </span>
-          <span style={{ fontSize: 11, fontFamily: MONO, color: pnlColor(c.pnl) }}>{fmtMoney(c.pnl)}</span>
+          <span style={{ fontSize: 10.5, fontFamily: MONO, color: pnlColor(c.pnl) }}>{fmtMoney(c.pnl)}</span>
         </div>
       ))}
     </div>
