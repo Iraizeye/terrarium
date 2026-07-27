@@ -27,12 +27,14 @@ the next open/close, and a GO/NO-GO grid over the *real* stack — PAPER, LIVE,
 WDOG-P, WDOG-L, KILL, GLANCE, OPTICS, FEED. Red means something is actually
 wrong; a healthy machine reads **ALL STATIONS GO**.
 
-Claude is **the watch-owl**: a violet owl with golden iris eyes, perched in a
-watchtower over the range. The eyes track what it's doing, the head cocks when
-it thinks, a wing works the console when it's busy — and the tower's **beacon
-sweeps the sky in Claude's status color**, readable from across the room.
-Finished turns get a burst of first-light sparks, because dashboards are
-allowed to be fun. Click the tower and it waves.
+The stage is **THE MESA** — a silhouette landscape where the sun *is* the
+market: it climbs toward the ridge as the open approaches, arcs across the
+sky while the session runs, and sets after the close; off-hours get a
+cratered violet moon and twinkling stars. Claude is the watchtower on the
+range — a lit window and a sweeping beacon in status color, readable from
+across the room — with a small owl silhouette on the roof, gold eyes
+blinking. A finished turn sends a shooting star across the sky. Click the
+tower: the owl waves.
 
 ## Architecture
 

@@ -12,7 +12,11 @@ First public cut under this name. One agent, one trader, one machine:
 - Trading desk rail: positions with stop/target and protection type,
   realized P&L today, last decision thesis, live alerts tail
 - Frozen contracts: `POST /api/crew/hook`, `POST /api/sessions/log`
-- The watch-owl: Claude redesigned from scratch as a violet owl with golden
+- THE MESA stage: silhouette landscape where the sun IS the market — it
+  tracks the session arc across the sky; moon + stars off-hours; Claude as
+  the lit watchtower with status beacon; shooting-star celebrations; the
+  owl remains as a roof silhouette with gold eyes
+- (superseded same night) The watch-owl: Claude redesigned from scratch as a violet owl with golden
   iris eyes in a watchtower — status beacon sweeps the sky in state color,
   eyes track activity, prairie-grass range floor with a fence line
 - FIRST LIGHT theme: the sky follows the session — night, dawn (90 min
