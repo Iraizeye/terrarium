@@ -168,8 +168,16 @@ def _positions(db: Path) -> tuple[list[dict], list[dict], float]:
     return opens, closed, round(realized, 2)
 
 
-def _last_decision() -> dict[str, Any] | None:
-    path = RANGE_TRADER_DIR / "decisions.jsonl"
+def _last_decision(mode: str | None = None) -> dict[str, Any] | None:
+    """The newest decision, per mode.
+
+    The trader split its decision log per mode on 2026-07-28 — a shared log
+    meant this panel could show a paper decision under the live heading. The
+    legacy shared file is still read as a fallback so history keeps rendering.
+    """
+    path = RANGE_TRADER_DIR / (f"decisions_{mode}.jsonl" if mode else "decisions.jsonl")
+    if mode and not path.exists():
+        path = RANGE_TRADER_DIR / "decisions.jsonl"
     try:
         with path.open("rb") as f:
             f.seek(0, 2)
@@ -233,6 +241,7 @@ def trading_status() -> dict[str, Any]:
             "open_positions": opens,
             "closed_today": closed,
             "realized_today": realized,
+            "last_decision": _last_decision(mode),
         }
     return {
         "market": clock,

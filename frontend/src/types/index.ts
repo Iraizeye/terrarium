@@ -53,6 +53,7 @@ export interface TradingMode {
   open_positions: OpenPosition[]
   closed_today: ClosedTrade[]
   realized_today: number
+  last_decision?: LastDecision | null
 }
 
 export interface LastDecision {

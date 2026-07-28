@@ -106,6 +106,33 @@ function ModeSection({ label, mode }: { label: string; mode: TradingMode }) {
           <span style={{ fontSize: 10.5, fontFamily: MONO, color: pnlColor(c.pnl) }}>{fmtMoney(c.pnl)}</span>
         </div>
       ))}
+      {mode.last_decision && (
+        <div style={{ padding: '6px 0 2px', marginTop: 4, borderTop: HAIRLINE }}>
+          <div style={{ fontSize: 10.5, fontFamily: MONO }}>
+            <span style={{
+              color: mode.last_decision.action === 'buy' ? GREEN : ACCENT,
+              fontWeight: 700, letterSpacing: '0.1em',
+            }}>
+              {(mode.last_decision.action ?? '?').toUpperCase()}
+            </span>
+            {mode.last_decision.symbol && (
+              <span style={{ color: INK.text, marginLeft: 6 }}>{mode.last_decision.symbol}</span>
+            )}
+            <span style={{ color: INK.dim, marginLeft: 6, fontSize: 9 }}>
+              {mode.last_decision.at
+                ? new Date(mode.last_decision.at).toLocaleTimeString([], { hour12: false })
+                : ''}
+            </span>
+          </div>
+          <div style={{
+            marginTop: 2, fontSize: 9.5, lineHeight: 1.45, color: INK.dim,
+            display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}>
+            {mode.last_decision.thesis}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
