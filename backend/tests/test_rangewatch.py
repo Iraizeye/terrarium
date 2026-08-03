@@ -255,3 +255,180 @@ class TestDemoMode:
         # Every synthetic alert self-identifies; nobody mistakes fiction for a fill.
         for line in demo_trading_status()["alerts"]:
             assert line.startswith("[demo]")
+
+
+# ---------------------------------------------------------------------------
+# Agent fleet
+# ---------------------------------------------------------------------------
+
+def _write_transcript(dir_: Path, session: str, rows: list[dict], age_s: float = 0) -> Path:
+    import os, time
+    dir_.mkdir(parents=True, exist_ok=True)
+    path = dir_ / f"{session}.jsonl"
+    path.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    if age_s:
+        stamp = time.time() - age_s
+        os.utime(path, (stamp, stamp))
+    return path
+
+
+def _assistant_row(tool: str | None = None, file_path: str | None = None,
+                   text: str | None = None) -> dict:
+    content = []
+    if tool:
+        block = {"type": "tool_use", "name": tool, "input": {}}
+        if file_path:
+            block["input"]["file_path"] = file_path
+        content.append(block)
+    if text:
+        content.append({"type": "text", "text": text})
+    return {"type": "assistant",
+            "message": {"role": "assistant", "model": "claude-opus-5",
+                        "content": content,
+                        "usage": {"input_tokens": 10, "output_tokens": 5}}}
+
+
+class TestAgentFleet:
+    def _fleet(self, monkeypatch, projects_dir):
+        monkeypatch.setattr(collectors, "CLAUDE_PROJECTS_DIR", projects_dir)
+        return collectors.agent_fleet()
+
+    def test_states_split_by_recency(self, tmp_path, monkeypatch):
+        base = tmp_path / "projects"
+        _write_transcript(base / "-Users-iris-Projects-range-trader", "aaaa1111",
+                          [_assistant_row(tool="Edit", file_path="/x/engine.py")], age_s=10)
+        _write_transcript(base / "-Users-iris-Projects-rangewatch", "bbbb2222",
+                          [_assistant_row(text="ok")], age_s=600)
+        fleet = self._fleet(monkeypatch, base)
+
+        assert fleet["available"]
+        by = {a["session"]: a for a in fleet["agents"]}
+        assert by["aaaa1111"]["state"] == "live"
+        assert by["bbbb2222"]["state"] == "idle"
+        # live sorts before idle regardless of glob order
+        assert fleet["agents"][0]["session"] == "aaaa1111"
+
+    def test_project_name_decodes_from_dir(self, tmp_path, monkeypatch):
+        base = tmp_path / "projects"
+        _write_transcript(base / "-Users-iris-Projects-range-trader", "aaaa1111",
+                          [_assistant_row(text="x")])
+        _write_transcript(base / "-Users-iris", "bbbb2222", [_assistant_row(text="x")])
+        fleet = self._fleet(monkeypatch, base)
+        names = {a["session"]: a["project"] for a in fleet["agents"]}
+        assert names["aaaa1111"] == "range-trader"
+        assert names["bbbb2222"] == "iris"
+
+    def test_action_is_tool_and_basename_never_content(self, tmp_path, monkeypatch):
+        """The privacy guarantee: prompt/command text must be structurally
+        unable to reach the payload — the dashboard gets screenshotted."""
+        secret = "SUPER_SECRET_PROMPT_TEXT"
+        rows = [
+            {"type": "user", "message": {"role": "user", "content": secret}},
+            _assistant_row(tool="Bash", text=secret),
+            _assistant_row(tool="Edit", file_path="/deep/path/engine.py"),
+        ]
+        base = tmp_path / "projects"
+        _write_transcript(base / "-Users-iris-Projects-range-trader", "aaaa1111", rows)
+        fleet = self._fleet(monkeypatch, base)
+
+        assert fleet["agents"][0]["action"] == "Edit engine.py"
+        assert secret not in json.dumps(fleet)
+
+    def test_done_sessions_carry_no_action(self, tmp_path, monkeypatch):
+        base = tmp_path / "projects"
+        _write_transcript(base / "-Users-iris-Projects-old", "cccc3333",
+                          [_assistant_row(tool="Bash")], age_s=5000)
+        fleet = self._fleet(monkeypatch, base)
+        agent = fleet["agents"][0]
+        assert agent["state"] == "done" and agent["action"] is None
+
+    def test_yesterdays_sessions_are_excluded(self, tmp_path, monkeypatch):
+        base = tmp_path / "projects"
+        _write_transcript(base / "-Users-iris-Projects-x", "dddd4444",
+                          [_assistant_row(text="x")], age_s=86400 * 2)
+        assert self._fleet(monkeypatch, base)["agents"] == []
+
+    def test_missing_dir_is_a_status_not_an_exception(self, tmp_path, monkeypatch):
+        fleet = self._fleet(monkeypatch, tmp_path / "nope")
+        assert fleet == {"available": False, "agents": []}
+
+    def test_fleet_is_capped(self, tmp_path, monkeypatch):
+        base = tmp_path / "projects"
+        for i in range(collectors.FLEET_MAX_AGENTS + 5):
+            _write_transcript(base / f"-Users-iris-Projects-p{i}", f"sess{i:04d}",
+                              [_assistant_row(text="x")])
+        fleet = self._fleet(monkeypatch, base)
+        assert len(fleet["agents"]) == collectors.FLEET_MAX_AGENTS
+
+    def test_corrupt_lines_do_not_break_the_tail(self, tmp_path, monkeypatch):
+        base = tmp_path / "projects"
+        d = base / "-Users-iris-Projects-x"
+        d.mkdir(parents=True)
+        (d / "eeee5555.jsonl").write_text('{"broken\nnot json at all\n')
+        fleet = self._fleet(monkeypatch, base)
+        assert fleet["agents"][0]["action"] is None  # degraded, not dead
+
+
+# ---------------------------------------------------------------------------
+# The Board
+# ---------------------------------------------------------------------------
+
+class TestBoardState:
+    def _setup(self, tmp_path, monkeypatch):
+        import json as _json
+
+        logs = tmp_path / "logs"
+        logs.mkdir()
+        monkeypatch.setattr(collectors, "RANGE_TRADER_DIR", tmp_path)
+        monkeypatch.setattr(collectors, "BOARD_LOG", {
+            "paper": logs / "daemon.log", "live": logs / "daemon-live.log",
+        })
+        board = {"CAKE": {"tech": "RSI 64; ADX(10,5m) 31",
+                          "earn": "reported yesterday pm: +26% beat",
+                          "last": 100.77, "rvol": 3.7}}
+        funnel = {"scanned": 8, "to_engine": 5, "unaffordable_filtered": 2}
+        (logs / "daemon-live.log").write_text(
+            "noise line\n"
+            f"[board] {_json.dumps(board)}\n"
+            f"[funnel] {_json.dumps(funnel)}\n"
+        )
+        (logs / "daemon.log").write_text("")
+        (tmp_path / "decisions_live.jsonl").write_text(_json.dumps({
+            "at": "2026-08-03T11:20:04-04:00",
+            "decision": {"action": "pass", "pass_reason": "rr_below_min",
+                         "symbol": None,
+                         "thesis": "CAKE is clean but 1.3:1 after the spread. " + "x" * 400},
+        }) + "\n")
+        (tmp_path / "shadow_live.json").write_text(_json.dumps({
+            "day": "2026-08-03",
+            "tickets": {"CAKE": {"symbol": "CAKE", "mark": 98.70, "last": 100.77,
+                                 "high": 101.0, "low": 98.5, "cycles": 3,
+                                 "affordable": True,
+                                 "first_seen": "2026-08-03T09:51:00"}},
+        }))
+        return collectors.board_state()
+
+    def test_candidates_carry_instruments_and_moves(self, tmp_path, monkeypatch):
+        state = self._setup(tmp_path, monkeypatch)
+        live = state["arms"]["live"]
+        cake = live["candidates"][0]
+        assert cake["tech"].endswith("ADX(10,5m) 31")
+        assert "+26% beat" in cake["earn"]
+        assert round(cake["move_pct"], 4) == round((100.77 - 98.70) / 98.70, 4)
+        assert live["funnel"]["unaffordable_filtered"] == 2
+        assert live["pass_reason"] == "rr_below_min"
+
+    def test_gist_is_capped_never_full_reasoning(self, tmp_path, monkeypatch):
+        """The dashboard is screenshotted; a sentence of why, never the model's
+        full chain of thought."""
+        state = self._setup(tmp_path, monkeypatch)
+        assert len(state["arms"]["live"]["gist"]) <= 180
+
+    def test_missing_files_degrade_to_empty_arm(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(collectors, "RANGE_TRADER_DIR", tmp_path / "nope")
+        monkeypatch.setattr(collectors, "BOARD_LOG", {
+            "paper": tmp_path / "nope" / "a.log", "live": tmp_path / "nope" / "b.log",
+        })
+        state = collectors.board_state()
+        assert state["available"] is True
+        assert state["arms"]["live"]["candidates"] == []

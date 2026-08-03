@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type {
-  ClaudeUsage, CrewEvent, CrewMember, ServiceHealth, SystemMetrics, TradingStatus,
+  AgentFleet, BoardState, ClaudeUsage, CrewEvent, CrewMember, ServiceHealth, SystemMetrics,
+  TradingStatus,
 } from '../types'
 
 type OpsFilter = 'all' | 'tools' | 'events'
@@ -13,6 +14,8 @@ interface DashboardState {
   system: SystemMetrics | null
   trading: TradingStatus | null
   usage: ClaudeUsage | null
+  fleet: AgentFleet | null
+  board: BoardState | null
 
   crew: Record<string, CrewMember>
   crewEvents: CrewEvent[]
@@ -24,6 +27,8 @@ interface DashboardState {
   setSystem: (system: SystemMetrics | null) => void
   setTrading: (trading: TradingStatus | null) => void
   setUsage: (usage: ClaudeUsage | null) => void
+  setFleet: (fleet: AgentFleet | null) => void
+  setBoard: (board: BoardState | null) => void
   setCrew: (crew: Record<string, CrewMember>) => void
   addCrewEvent: (event: CrewEvent) => void
   setCrewEvents: (events: CrewEvent[]) => void
@@ -38,6 +43,8 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   system: null,
   trading: null,
   usage: null,
+  fleet: null,
+  board: null,
 
   crew: {},
   crewEvents: [],
@@ -49,6 +56,8 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   setSystem: (system) => set({ system }),
   setTrading: (trading) => set({ trading }),
   setUsage: (usage) => set({ usage }),
+  setFleet: (fleet) => set({ fleet }),
+  setBoard: (board) => set({ board }),
   setCrew: (crew) => set({ crew }),
   addCrewEvent: (event) =>
     set((state) => ({ crewEvents: [event, ...state.crewEvents].slice(0, 200) })),

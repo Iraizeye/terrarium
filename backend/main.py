@@ -21,6 +21,8 @@ from .state import _now_iso, _state, broadcast_status, status_payload
 
 if DEMO:
     from .demo import (
+        demo_agent_fleet as agent_fleet,
+        demo_board_state as board_state,
         demo_claude_usage as claude_usage,
         demo_service_checks as service_checks,
         demo_system_metrics as system_metrics,
@@ -28,7 +30,8 @@ if DEMO:
     )
 else:
     from .collectors import (
-        claude_usage, service_checks, system_metrics, trading_status,
+        agent_fleet, board_state, claude_usage, service_checks,
+        system_metrics, trading_status,
     )
 
 
@@ -56,10 +59,16 @@ async def run_poll_loop() -> None:
                 loop.run_in_executor(None, trading_status),
                 loop.run_in_executor(None, claude_usage),
             )
+            # Sequenced after the gather on purpose: fleet reads the token
+            # offsets claude_usage maintains, so running it afterwards keeps
+            # the counts consistent instead of racing the same dict.
+            fleet = await loop.run_in_executor(None, agent_fleet)
+            _state["board"] = await loop.run_in_executor(None, board_state)
             _state["system"] = system
             _state["services"] = services
             _state["trading"] = trading
             _state["usage"] = usage
+            _state["fleet"] = fleet
             _state["last_updated"] = _now_iso()
             await broadcast_status()
         except Exception as exc:

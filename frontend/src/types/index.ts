@@ -81,6 +81,60 @@ export interface ClaudeUsage {
   cache_write_tokens?: number
 }
 
+export interface BoardCandidate {
+  symbol: string
+  last: number | null
+  rvol: number | null
+  tech: string | null
+  earn: string | null
+  affordable: boolean
+  move_pct: number
+}
+
+export interface BoardShadow {
+  symbol: string
+  mark: number
+  last: number
+  move_pct: number
+  affordable: boolean
+  first_seen: string
+}
+
+export interface BoardArm {
+  cycle_at: string | null
+  action: string | null
+  action_symbol: string | null
+  pass_reason: string | null
+  bear_veto: boolean
+  gist: string | null
+  funnel: Record<string, number>
+  candidates: BoardCandidate[]
+  shadows: BoardShadow[]
+}
+
+export interface BoardState {
+  available: boolean
+  arms: Record<'paper' | 'live', BoardArm>
+}
+
+export type FleetState = 'live' | 'idle' | 'done'
+
+export interface FleetAgent {
+  project: string
+  session: string
+  state: FleetState
+  age_s: number
+  action: string | null
+  model: string | null
+  tokens: number
+  turns: number
+}
+
+export interface AgentFleet {
+  available: boolean
+  agents: FleetAgent[]
+}
+
 export type CrewStatus = 'idle' | 'thinking' | 'working' | 'waiting'
 
 export interface CrewMember {
@@ -112,6 +166,8 @@ export interface StatusUpdate {
   system: SystemMetrics | null
   trading: TradingStatus | null
   usage: ClaudeUsage | null
+  fleet: AgentFleet | null
+  board: BoardState | null
 }
 
 export interface CrewEventMessage {

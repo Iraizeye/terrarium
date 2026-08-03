@@ -1,11 +1,12 @@
 """
 Collectors — everything RANGEWATCH knows, gathered read-only.
 
-Four collectors, one per panel:
+Five collectors, one per panel:
   system_metrics()   CPU / RAM / disk / uptime + trading-daemon footprint
   service_checks()   TCP port probes for the services worth a GO/NO-GO cell
   trading_status()   ~/.range-trader: heartbeats, ledgers, decisions, alerts
   claude_usage()     ~/.claude/projects transcripts: tokens + sessions today
+  agent_fleet()      the same transcripts as a per-session fleet board
 
 All collectors are best-effort and side-effect-free: a missing file is a
 status, never an exception. Nothing here writes anywhere.
@@ -13,6 +14,7 @@ status, never an exception. Nothing here writes anywhere.
 from __future__ import annotations
 
 import json
+import os
 import socket
 import sqlite3
 from datetime import UTC, date, datetime, timedelta
@@ -327,3 +329,223 @@ def claude_usage() -> dict[str, Any]:
         "cache_read_tokens": totals["cache_read"],
         "cache_write_tokens": totals["cache_write"],
     }
+
+
+# ---------------------------------------------------------------------------
+# Agent fleet — every Claude Code session on this machine, as its own card
+# ---------------------------------------------------------------------------
+
+FLEET_LIVE_S = 120        # last write within 2 min: the agent is mid-turn
+FLEET_IDLE_S = 3600       # within the hour: session open, human thinking
+FLEET_MAX_AGENTS = 12     # cards, not a census — newest first
+_FLEET_TAIL_BYTES = 65536
+
+
+def _fleet_project(dir_name: str) -> str:
+    """'-Users-iris-Projects-range-trader' -> 'range-trader'.
+
+    Transcript dirs encode the cwd with '/' flattened to '-'. The readable
+    name is whatever follows the Projects segment; a session launched from
+    the home directory has no project at all and shows as 'home'.
+    """
+    marker = "-Projects-"
+    if marker in dir_name:
+        return dir_name.split(marker, 1)[1]
+    return dir_name.rsplit("-", 1)[-1] or "home"
+
+
+def _fleet_tail(path: Path) -> tuple[str | None, str | None]:
+    """(current action, model) from the transcript tail.
+
+    PRIVACY GUARANTEE: only tool names and file basenames leave this
+    function — never prompt text, command strings, or message content. The
+    dashboard is screenshotted and the repo is public; session content must
+    be unleakable by construction, not by carefulness.
+    """
+    try:
+        with path.open("rb") as f:
+            f.seek(max(0, path.stat().st_size - _FLEET_TAIL_BYTES))
+            lines = f.read().decode("utf-8", errors="replace").splitlines()
+    except OSError:
+        return None, None
+
+    action = model = None
+    for line in reversed(lines):
+        if '"assistant"' not in line and '"model"' not in line:
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        message = row.get("message") or {}
+        if model is None and message.get("model"):
+            model = str(message["model"])
+        if action is None:
+            for block in message.get("content") or []:
+                if not isinstance(block, dict) or block.get("type") != "tool_use":
+                    continue
+                tool = str(block.get("name") or "tool")
+                target = (block.get("input") or {}).get("file_path")
+                action = f"{tool} {Path(str(target)).name}" if target else tool
+                break
+            if action is None and message.get("role") == "assistant":
+                action = "responding"
+        if action is not None and model is not None:
+            break
+    return action, model
+
+
+def agent_fleet() -> dict[str, Any]:
+    """Per-session view of today's Claude Code activity.
+
+    Token counts ride on the offsets that claude_usage() maintains — both
+    collectors run in the same poll cycle, so the counts are at most one
+    interval stale and the transcript is never parsed twice.
+    """
+    if not CLAUDE_PROJECTS_DIR.exists():
+        return {"available": False, "agents": []}
+
+    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+    now = datetime.now().timestamp()
+    agents: list[dict[str, Any]] = []
+
+    for path in CLAUDE_PROJECTS_DIR.glob("*/*.jsonl"):
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        if stat.st_mtime < today_start or stat.st_size > USAGE_MAX_FILE_MB * 1e6:
+            continue
+        age = int(now - stat.st_mtime)
+        state = "live" if age < FLEET_LIVE_S else ("idle" if age < FLEET_IDLE_S else "done")
+        action, model = _fleet_tail(path)
+        _, counts = _usage_offsets.get(path, (0, _blank_counts()))
+        agents.append({
+            "project": _fleet_project(path.parent.name),
+            "session": path.stem[:8],
+            "state": state,
+            "age_s": age,
+            "action": action if state != "done" else None,
+            "model": model,
+            "tokens": counts["input"] + counts["output"],
+            "turns": counts["turns"],
+        })
+
+    order = {"live": 0, "idle": 1, "done": 2}
+    agents.sort(key=lambda a: (order[a["state"]], a["age_s"]))
+    return {"available": True, "agents": agents[:FLEET_MAX_AGENTS]}
+
+
+# ---------------------------------------------------------------------------
+# The Board — what each arm's model saw last cycle, and what it did
+# ---------------------------------------------------------------------------
+
+BOARD_LOG = {
+    "paper": Path(os.getenv("RANGE_TRADER_LOGS",
+                            str(Path.home() / ".range-trader" / "logs"))) / "daemon.log",
+    "live": Path(os.getenv("RANGE_TRADER_LOGS",
+                           str(Path.home() / ".range-trader" / "logs"))) / "daemon-live.log",
+}
+_BOARD_TAIL_BYTES = 131072
+
+
+def _tail_lines(path: Path) -> list[str]:
+    try:
+        with path.open("rb") as f:
+            f.seek(max(0, path.stat().st_size - _BOARD_TAIL_BYTES))
+            return f.read().decode("utf-8", errors="replace").splitlines()
+    except OSError:
+        return []
+
+
+def _last_json_line(lines: list[str], prefix: str) -> dict:
+    for line in reversed(lines):
+        idx = line.find(prefix)
+        if idx >= 0:
+            try:
+                return json.loads(line[idx + len(prefix):].strip())
+            except json.JSONDecodeError:
+                continue
+    return {}
+
+
+def _board_decision(mode: str) -> dict:
+    path = RANGE_TRADER_DIR / f"decisions_{mode}.jsonl"
+    try:
+        lines = _tail_lines(path)
+        for line in reversed(lines):
+            if line.startswith("{"):
+                rec = json.loads(line)
+                d = rec.get("decision") or {}
+                thesis = (d.get("thesis") or "")
+                return {
+                    "at": rec.get("at"),
+                    "action": d.get("action"),
+                    "symbol": d.get("symbol"),
+                    "pass_reason": d.get("pass_reason"),
+                    "bear_veto": thesis.startswith("bear objection:"),
+                    # A sentence of why, never the whole reasoning: the
+                    # dashboard gets screenshotted and the repo is public.
+                    "gist": thesis[:180],
+                }
+    except (OSError, json.JSONDecodeError):
+        pass
+    return {}
+
+
+def _shadow_rows(mode: str) -> list[dict]:
+    try:
+        raw = json.loads((RANGE_TRADER_DIR / f"shadow_{mode}.json").read_text())
+    except (OSError, json.JSONDecodeError):
+        return []
+    rows = []
+    for t in (raw.get("tickets") or {}).values():
+        mark = float(t.get("mark") or 0)
+        last = float(t.get("last") or mark)
+        rows.append({
+            "symbol": t.get("symbol"),
+            "mark": mark,
+            "last": last,
+            "move_pct": (last - mark) / mark if mark > 0 else 0.0,
+            "affordable": bool(t.get("affordable")),
+            "first_seen": (t.get("first_seen") or "")[11:16],
+        })
+    return rows
+
+
+def board_state() -> dict[str, Any]:
+    """Per-arm: the last cycle's instrument readings, funnel, decision, and
+    today's shadow-tracked names with their live moves. Read-only over files
+    the daemons already write; every failure degrades to an empty arm."""
+    out: dict[str, Any] = {"available": True, "arms": {}}
+    for mode, log_path in BOARD_LOG.items():
+        lines = _tail_lines(log_path)
+        instruments = _last_json_line(lines, "[board] ")
+        funnel = _last_json_line(lines, "[funnel] ")
+        decision = _board_decision(mode)
+        shadows = _shadow_rows(mode)
+        by_symbol = {s["symbol"]: s for s in shadows}
+        candidates = []
+        for sym, info in instruments.items():
+            row = {
+                "symbol": sym,
+                "last": info.get("last"),
+                "rvol": info.get("rvol"),
+                "tech": info.get("tech"),
+                "earn": info.get("earn"),
+                "affordable": by_symbol.get(sym, {}).get("affordable", True),
+                "move_pct": by_symbol.get(sym, {}).get("move_pct", 0.0),
+            }
+            candidates.append(row)
+        out["arms"][mode] = {
+            "cycle_at": decision.get("at"),
+            "action": decision.get("action"),
+            "action_symbol": decision.get("symbol"),
+            "pass_reason": decision.get("pass_reason"),
+            "bear_veto": decision.get("bear_veto", False),
+            "gist": decision.get("gist"),
+            "funnel": funnel,
+            "candidates": candidates,
+            "shadows": shadows,
+        }
+    return out

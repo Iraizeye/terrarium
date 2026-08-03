@@ -209,6 +209,60 @@ def demo_claude_usage() -> dict[str, Any]:
     }
 
 
+def demo_board_state() -> dict[str, Any]:
+    """A scripted cycle for both arms, fiction like every other panel."""
+    arm = {
+        "cycle_at": "2026-08-03T11:20:04-04:00", "action": "pass",
+        "action_symbol": None, "pass_reason": "rr_below_min",
+        "bear_veto": False,
+        "gist": "CAKE has the cleanest catalyst but 1.3:1 after the spread",
+        "funnel": {"scanned": 8, "to_engine": 5, "unaffordable_filtered": 2,
+                   "untradable": 1, "held": 1},
+        "candidates": [
+            {"symbol": "CAKE", "last": 100.77, "rvol": 3.7,
+             "tech": "ATR(5m) 0.42; RSI(14,5m) 64; above VWAP 99.80; ADX(10,5m) 31",
+             "earn": "reported yesterday pm: EPS 1.44 vs 1.14 est (+26% beat)",
+             "affordable": True, "move_pct": 0.021},
+            {"symbol": "TEVA", "last": 34.60, "rvol": 2.1,
+             "tech": "RSI(14,5m) 52; BELOW VWAP 34.75", "earn": None,
+             "affordable": True, "move_pct": -0.004},
+        ],
+        "shadows": [
+            {"symbol": "CAKE", "mark": 98.70, "last": 100.77, "move_pct": 0.021,
+             "affordable": True, "first_seen": "09:51"},
+            {"symbol": "TEVA", "mark": 34.74, "last": 34.60, "move_pct": -0.004,
+             "affordable": True, "first_seen": "10:12"},
+        ],
+    }
+    import copy
+    live = copy.deepcopy(arm)
+    live["pass_reason"] = None
+    live["action"] = "buy"
+    live["action_symbol"] = "CAKE"
+    live["gist"] = "CAKE: earnings beat + above VWAP; stop 99.75 under structure"
+    return {"available": True, "arms": {"paper": arm, "live": live}}
+
+
+def demo_agent_fleet() -> dict[str, Any]:
+    """A believable three-agent afternoon; fiction like every other panel."""
+    minute = _demo_minute()
+    day_frac = min(1.0, max(0.0, (minute - 7 * 60) / (13 * 60)))
+    return {
+        "available": True,
+        "agents": [
+            {"project": "range-trader", "session": "a197e4ec", "state": "live",
+             "age_s": 12, "action": "Edit reconcile.py", "model": "claude-opus-5",
+             "tokens": int(96_000 * day_frac), "turns": int(41 * day_frac)},
+            {"project": "rangewatch", "session": "0e2d77f7", "state": "idle",
+             "age_s": 1240, "action": "responding", "model": "claude-opus-5",
+             "tokens": int(31_000 * day_frac), "turns": int(17 * day_frac)},
+            {"project": "worldmonitor", "session": "9f940eb0", "state": "done",
+             "age_s": 9800, "action": None, "model": "claude-sonnet-5",
+             "tokens": 12_400, "turns": 9},
+        ],
+    }
+
+
 # ---------------------------------------------------------------------------
 # Crew — feed the watchtower through the real pipeline so the art animates.
 # ---------------------------------------------------------------------------

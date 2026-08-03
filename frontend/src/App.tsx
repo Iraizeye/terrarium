@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useDashboardStore } from './store/dashboardStore'
 import CrewStage, { OpsLog, buildBoardCells } from './components/CrewStage'
+import BoardPanel from './components/BoardPanel'
+import FleetPanel from './components/FleetPanel'
 import TradingPanel from './components/TradingPanel'
 import { GOLD, THEME_NAMES, getPhase, getTheme, palette, setTheme, type Phase, type ThemeName } from './theme'
 
@@ -353,9 +355,17 @@ export default function App() {
           </div>
         </div>
 
-        {/* Left rail — ops log */}
-        <div style={{ gridArea: 'log', minHeight: 0, padding: '4px 0 8px' }}>
-          <OpsLog />
+        {/* Left rail — fleet board over the ops log */}
+        <div style={{
+          gridArea: 'log', minHeight: 0, padding: '4px 0 8px',
+          display: 'flex', flexDirection: 'column', gap: 10,
+        }}>
+          <div style={{ flexShrink: 0, maxHeight: '38%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <FleetPanel />
+          </div>
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <OpsLog />
+          </div>
         </div>
 
         {/* Center — the stage */}
@@ -363,9 +373,17 @@ export default function App() {
           <CrewStage />
         </div>
 
-        {/* Right rail — trading desk */}
-        <div style={{ gridArea: 'desk', minHeight: 0, padding: '4px 0 8px' }}>
-          <TradingPanel />
+        {/* Right rail — trading desk over the decision board */}
+        <div style={{
+          gridArea: 'desk', minHeight: 0, padding: '4px 0 8px',
+          display: 'flex', flexDirection: 'column', gap: 10,
+        }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+            <TradingPanel />
+          </div>
+          <div style={{ flexShrink: 0, maxHeight: '45%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <BoardPanel />
+          </div>
         </div>
 
         {/* Footer — vitals + usage */}

@@ -44,6 +44,8 @@ export const useWebSocket = () => {
           if (su.system && 'cpu_pct' in su.system) store.setSystem(su.system)
           if (su.trading && 'market' in su.trading) store.setTrading(su.trading)
           if (su.usage && 'available' in su.usage) store.setUsage(su.usage)
+          if (su.fleet && 'agents' in su.fleet) store.setFleet(su.fleet)
+          if (su.board && 'arms' in su.board) store.setBoard(su.board)
         }
       } catch {
         // malformed frame — ignore

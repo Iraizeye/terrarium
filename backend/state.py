@@ -15,6 +15,8 @@ _state: dict[str, Any] = {
     "system": {},          # cpu/ram/disk/uptime + trading daemon RSS
     "trading": {},         # per-mode status + market clock + alerts
     "usage": {},           # Claude Code usage today
+    "fleet": {},           # per-session agent fleet board
+    "board": {},           # per-arm decision board: instruments, funnel, shadows
     "last_updated": None,
 }
 
@@ -34,6 +36,8 @@ def status_payload() -> dict[str, Any]:
         "system": _state["system"],
         "trading": _state["trading"],
         "usage": _state["usage"],
+        "fleet": _state["fleet"],
+        "board": _state["board"],
     }
 
 
