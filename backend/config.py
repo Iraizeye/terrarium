@@ -64,3 +64,13 @@ POLL_INTERVAL      = 10             # seconds between background polls
 MAX_WS_CONNECTIONS = 50
 ALERTS_TAIL_LINES  = 12
 USAGE_MAX_FILE_MB  = 200            # skip absurdly large transcript files
+
+# Claude Home — the agent's own page. All read-only, all optional: a missing
+# path renders as an empty shelf, never an error.
+CLAUDE_HOME_DIR    = Path(os.getenv("CLAUDE_HOME_DIR", str(Path.home() / ".claude")))
+CLAUDE_MEMORY_DIR  = Path(os.getenv(
+    "CLAUDE_MEMORY_DIR",
+    str(Path.home() / ".claude" / "projects" / "-Users-iris" / "memory")))
+EXPERIMENTS_MD     = Path(os.getenv(
+    "EXPERIMENTS_MD",
+    str(Path.home() / "Projects" / "range-trader" / "docs" / "EXPERIMENTS.md")))

@@ -3,6 +3,7 @@ import { useWebSocket } from './hooks/useWebSocket'
 import { useDashboardStore } from './store/dashboardStore'
 import CrewStage, { OpsLog, buildBoardCells } from './components/CrewStage'
 import BoardPanel from './components/BoardPanel'
+import ClaudeHomePanel from './components/ClaudeHomePanel'
 import FleetPanel from './components/FleetPanel'
 import TradingPanel from './components/TradingPanel'
 import { GOLD, THEME_NAMES, getPhase, getTheme, palette, setTheme, type Phase, type ThemeName } from './theme'
@@ -295,6 +296,8 @@ function ThemeToggle({ theme, onCycle }: { theme: ThemeName; onCycle: () => void
 export default function App() {
   const { isConnected } = useWebSocket()
   const [theme, setThemeState] = useState<ThemeName>(getTheme())
+  // Center-stage view: the crew canvas, or the agent's home page.
+  const [view, setView] = useState<'stage' | 'home'>('stage')
   const cycleTheme = () => {
     const next = THEME_NAMES[(THEME_NAMES.indexOf(theme) + 1) % THEME_NAMES.length]
     setTheme(next)
@@ -350,6 +353,18 @@ export default function App() {
             <AlertBar />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <button
+              onClick={() => setView(view === 'stage' ? 'home' : 'stage')}
+              style={{
+                fontFamily: '"Fira Code", monospace', fontSize: 10, letterSpacing: 1.5,
+                color: view === 'home' ? '#a78bfa' : '#a29db8',
+                background: 'transparent', border: '1px solid rgba(150,146,172,0.18)',
+                borderRadius: 4, padding: '3px 9px', cursor: 'pointer',
+              }}
+              title="the agent's own page"
+            >
+              {'\u2302'} home
+            </button>
             <ThemeToggle theme={theme} onCycle={cycleTheme} />
             <ClockDot isConnected={isConnected} />
           </div>
@@ -368,9 +383,9 @@ export default function App() {
           </div>
         </div>
 
-        {/* Center — the stage */}
+        {/* Center — the stage, or the agent's home */}
         <div style={{ gridArea: 'stage', minWidth: 0, minHeight: 0 }}>
-          <CrewStage />
+          {view === 'stage' ? <CrewStage /> : <ClaudeHomePanel />}
         </div>
 
         {/* Right rail — trading desk over the decision board */}
