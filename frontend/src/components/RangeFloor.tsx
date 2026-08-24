@@ -344,10 +344,27 @@ export default function RangeFloor() {
       ctx.fillRect(0, 0, rect.width, rect.height)
 
       const img = imgRef.current
-      const iw = img?.width || 1280
-      const ih = img?.height || 720
+      if (!img) {
+        // skeleton: the office warming up — shimmer band over dark glass
+        const shim = ((now / 6) % (rect.width * 1.6)) - rect.width * 0.3
+        const g = ctx.createLinearGradient(shim - 140, 0, shim + 140, 0)
+        g.addColorStop(0, 'rgba(120,200,160,0)')
+        g.addColorStop(0.5, 'rgba(120,200,160,0.05)')
+        g.addColorStop(1, 'rgba(120,200,160,0)')
+        ctx.fillStyle = g
+        ctx.fillRect(0, 0, rect.width, rect.height)
+        ctx.fillStyle = 'rgba(140,170,155,0.55)'
+        ctx.font = `10px ${MONO}`
+        ctx.textAlign = 'center'
+        ctx.fillText('warming up the office…', rect.width / 2, rect.height / 2)
+        ctx.textAlign = 'left'
+        raf = requestAnimationFrame(draw)
+        return
+      }
+      const iw = img.width
+      const ih = img.height
       const { dx, dy, dw, dh } = coverRect(rect.width, rect.height, iw, ih)
-      if (img) ctx.drawImage(img, dx, dy, dw, dh)
+      ctx.drawImage(img, dx, dy, dw, dh)
 
       // time-of-day grade over the painting (sprites and live glass stay crisp)
       const phase = getPhase(trading?.market)
