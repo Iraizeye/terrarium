@@ -44,7 +44,7 @@ const ANCHOR_X: Record<Action, number> = { sit: 0.42, work: 0.66, walk: 0.50, po
 const SPRITE_FRAC: Record<Action, number> = { sit: 0.50, work: 0.50, walk: 0.36, point: 0.50 }
 
 // the painted sign lies; this LED panel tells the truth (fractions of office.jpg)
-const SIGN = { x: 0.548, y: 0.088, w: 0.185, h: 0.062 }
+const SIGN = { x: 0.547, y: 0.099, w: 0.181, h: 0.047 }
 // one of the painted wall monitors is switched on with live data
 const WALLMON = { x: 0.192, y: 0.034, w: 0.140, h: 0.134 }
 // the tilted corner monitor painted with a fake ticker — live now, tilt matched
@@ -62,20 +62,23 @@ function phaseText(phase: Phase): string {
 }
 
 // live glass — the painting's own four wall monitors, inner-screen fractions
+// measured against office.jpg's natural 1280x720 pixels — aspect-proof
 const WALL_PANELS: { x: number; y: number; w: number; h: number }[] = [
-  { x: 0.192, y: 0.028, w: 0.135, h: 0.135 },
-  { x: 0.352, y: 0.024, w: 0.146, h: 0.138 },
-  { x: 0.186, y: 0.198, w: 0.152, h: 0.140 },
-  { x: 0.356, y: 0.206, w: 0.144, h: 0.136 },
+  { x: 0.219, y: 0.028, w: 0.123, h: 0.128 },
+  { x: 0.369, y: 0.025, w: 0.131, h: 0.135 },
+  { x: 0.220, y: 0.192, w: 0.130, h: 0.128 },
+  { x: 0.377, y: 0.194, w: 0.130, h: 0.128 },
 ]
 // the tilted corner monitor: the book screen (positions, or quiet when flat)
-const TILT = { cx: 0.110, cy: 0.160, w: 0.142, h: 0.220, rot: -0.09 }
+const TILT = { cx: 0.112, cy: 0.180, w: 0.156, h: 0.252, rot: 0.12 }
 
 function coverRect(cw: number, ch: number, iw: number, ih: number) {
   const s = Math.max(cw / iw, ch / ih)
   const dw = iw * s
   const dh = ih * s
-  return { dx: (cw - dw) / 2, dy: ch - dh, dw, dh }
+  // vertical overflow crops mostly sky-side but keeps the desks: 72% off
+  // the top, 28% off the floor (papers), so the wall survives short frames
+  return { dx: (cw - dw) / 2, dy: (ch - dh) * 0.72, dw, dh }
 }
 
 function fleetBusy(fleet: AgentFleet | null): boolean {
