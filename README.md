@@ -25,10 +25,11 @@ make demo        # -> http://127.0.0.1:3000
 
 Demo mode (`TERRARIUM_DEMO=1`) runs every panel on a **scripted synthetic
 day** — a fictional trader working NOVA, RIDGE and CINDER through entries,
-breakeven trails, a stop-out and a target, while a scripted agent works the
-watchtower. A compressed 24h session loops every 5 minutes so you see dawn,
-the open, the close and the stars without waiting for New York. Every line
-is fiction and labeled `[demo]`; nothing on your machine is read.
+breakeven trails, a stop-out and a target, while scripted agent sessions
+stream the ops log. A compressed 24h session loops every 5 minutes so you
+see the glasshouse at dawn, through the open, past the close and into the
+firefly night without waiting for New York. Every line is fiction and
+labeled `[demo]`; nothing on your machine is read.
 
 First visit, an intro overlay walks you through the four zones; reopen it
 any time with the `?` button in the header. Preview any hour of the sky
@@ -46,9 +47,9 @@ A local-first dashboard that watches the three things that matter on the box:
 - **The machine** — CPU / RAM / disk / uptime, the trading daemons' footprint,
   and TCP checks on the services that still exist
 
-The centerpiece is a flight-control **big board**: a market clock counting down to
-the next open/close, and a GO/NO-GO grid over the *real* stack. Red means
-something is actually wrong; a healthy machine reads **ALL STATIONS GO**.
+Health checks run over the *real* stack — daemons, watchdogs, heartbeats,
+kill switch, disk — and feed the header status bar. Red means something is
+actually wrong; a healthy machine reads **ALL STATIONS GO**.
 
 The stage is a pixel glasshouse: the market day is the light through the
 panes — deep green night with fireflies outside the glass, amber climbing

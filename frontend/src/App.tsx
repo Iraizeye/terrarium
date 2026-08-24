@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useDashboardStore } from './store/dashboardStore'
-import { OpsLog, buildBoardCells } from './components/CrewStage'
+import { OpsLog, buildBoardCells } from './components/CrewTelemetry'
 import RangeFloor from './components/RangeFloor'
 import BoardPanel from './components/BoardPanel'
 import ClaudeHomePanel from './components/ClaudeHomePanel'

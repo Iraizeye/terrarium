@@ -14,7 +14,7 @@ export function markIntroSeen(): void {
 }
 
 const ZONES: { name: string; desc: string }[] = [
-  { name: 'The floor', desc: 'center stage — every agent on this machine is a figure at a desk. The sun tracks the real market session; the tower beacon is the lead agent’s status.' },
+  { name: 'The floor', desc: 'center stage — every agent on this machine is a robot at a bench inside the glasshouse. The light through the glass lives the real market session; the terrarium dome at center is the chief of staff, its firefly glowing mint once the morning brief is in.' },
   { name: 'Fleet & ops', desc: 'left rail — each running Claude session as a card (tool names only, never content), the scheduled desk seats, and a live log of agent activity.' },
   { name: 'Trading desk', desc: 'right rail — both trading books (live + paper) with positions, stops, and the engine’s actual reasoning for its last decision, verbatim.' },
   { name: 'The board', desc: 'bottom right — what the trading engine saw last cycle and what it did. PASS means it judged a candidate and declined: discipline is the product.' },
