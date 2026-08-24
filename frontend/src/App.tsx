@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useDashboardStore } from './store/dashboardStore'
-import CrewStage, { OpsLog, buildBoardCells } from './components/CrewStage'
+import { OpsLog, buildBoardCells } from './components/CrewStage'
+import RangeFloor from './components/RangeFloor'
 import BoardPanel from './components/BoardPanel'
 import ClaudeHomePanel from './components/ClaudeHomePanel'
 import DeskPanel from './components/DeskPanel'
@@ -389,7 +390,7 @@ export default function App() {
 
         {/* Center — the stage, or the agent's home */}
         <div style={{ gridArea: 'stage', minWidth: 0, minHeight: 0 }}>
-          {view === 'stage' ? <CrewStage /> : <ClaudeHomePanel />}
+          {view === 'stage' ? <RangeFloor /> : <ClaudeHomePanel />}
         </div>
 
         {/* Right rail — trading desk over the decision board */}
