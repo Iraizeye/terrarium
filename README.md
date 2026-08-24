@@ -87,8 +87,6 @@ nothing to watch renders quietly instead of breaking):
 | `CLAUDE_PROJECTS_DIR` | Claude Code transcripts (token usage) | `~/.claude/projects` |
 | `TERRARIUM_SESSIONS_DB` | session-log SQLite | `~/.claude/atlas-sessions.db` |
 
-`RANGEWATCH_*` env names from earlier releases still work.
-
 Everything binds to localhost only. This is a local-first, host-path-bound
 tool by design — it reads local state directly, so there is deliberately no
 hosted version.
