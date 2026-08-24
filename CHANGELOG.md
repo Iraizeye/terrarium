@@ -1,14 +1,16 @@
 # Changelog
 
-## v0.8.1 - 2026-08-24 — the tank
+## v0.9.0 - 2026-08-24 — the office
 
-- Center stage is a closed terrarium: brass-framed glass, soil, moss,
-  ferns, condensation, fireflies at night. Agents work at stone slabs
-  in the garden; the chief of staff is the inner cloche.
-- Pending seats render as dim amber robots instead of empty desks.
-  Canvas sky follows `?phase=` / the real session clock.
-- Shell is responsive: the tank stays the hero on tablet and phone.
-- Demo mode scripts the desk roster so `make demo` shows a full house.
+- Center stage is a hand-drawn night trading office (art by a guest
+  agent; wiring by the house). Copper robots are the real cast: four desk
+  seats, both trading books, and the chief of staff pointing at the wall
+  when the morning brief is in.
+- Every painted screen that showed data now shows real data: desk CRTs
+  and two wall monitors render the live tape, and the office sign is a
+  live LED with the actual session phase and clock.
+- A time-of-day grade tints the painting with the real market phase.
+- Sky variants and the toggle removed; the office is the one stage.
 
 ## v0.8.0 - 2026-08-24 — TERRARIUM
 

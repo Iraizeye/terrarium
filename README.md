@@ -1,12 +1,12 @@
 # TERRARIUM
 
-**Your AI agents, under glass.**
+**A little world of working agents.**
 
 ![Terrarium at dawn — live telemetry, real agents](docs/media/terrarium-hero.jpg)
 
-*Dawn run: every agent on a bench (mint visor on shift, amber waiting on
-the clock), the chief of staff as the dome at center, a PASS on the live
-book, and the sky living the real session.*
+*Market open: the full crew at their desks — chief of staff running the
+floor, the LIVE bot walking the aisle, real tickers on every lit screen,
+the LED sign reading the actual session clock.*
 
 ## What am I looking at?
 
@@ -51,11 +51,14 @@ Health checks run over the *real* stack — daemons, watchdogs, heartbeats,
 kill switch, disk — and feed the header status bar. Red means something is
 actually wrong; a healthy machine reads **ALL STATIONS GO**.
 
-The stage is a closed terrarium. Light through the glass is the real
-market day — fireflies at night, amber at dawn, gold while the session
-runs. Every agent lives in the garden (mint visor on shift, amber waiting
-on the clock); the chief of staff is the inner cloche. A quiet tank still
-looks quiet — pending bots sit idle rather than vanish.
+The stage is a hand-drawn trading office. The painting is set dressing;
+everything rendered onto it is live: desk CRTs and two wall monitors show
+the tape the engine actually judged, the LED sign is the real session
+clock, and every copper robot is a real seat or book — typing when its
+session is working, walking the aisle when the live book is up, pointing
+at the wall when the chief's brief is in, dim while waiting, red when
+down. Fleet, seats, ops log, both books, the board, the tape, and vitals
+stay on screen — nothing is behind a pill.
 
 ## Architecture
 

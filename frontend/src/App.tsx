@@ -8,7 +8,7 @@ import ClaudeHomePanel from './components/ClaudeHomePanel'
 import DeskPanel from './components/DeskPanel'
 import FleetPanel from './components/FleetPanel'
 import TradingPanel from './components/TradingPanel'
-import { getPhase, palette, type Phase } from './theme'
+import { getPhase, type Phase } from './theme'
 import IntroOverlay, { introSeen, markIntroSeen } from './components/IntroOverlay'
 import { MONO, UI } from './ui'
 
@@ -24,92 +24,7 @@ const C = {
   red: UI.red,
 }
 
-// ── Floating particles (canvas) ──────────────────────────────────────────────
-
-interface Particle {
-  x: number; y: number; vx: number; vy: number
-  r: number; alpha: number; life: number; decay: number
-}
-
-function FloatingParticles({ rgb }: { rgb: string }) {
-  const ref = useRef<HTMLCanvasElement>(null)
-
-  useEffect(() => {
-    const canvas = ref.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight }
-    resize()
-    window.addEventListener('resize', resize)
-
-    const mkParticle = (w: number, h: number): Particle => ({
-      x: Math.random() * w,
-      y: Math.random() * h + h * 0.1,
-      vx: (Math.random() - 0.5) * 0.25,
-      vy: -Math.random() * 0.35 - 0.08,
-      r: Math.random() * 1.4 + 0.2,
-      alpha: Math.random() * 0.45 + 0.05,
-      life: 1,
-      decay: 0.0008 + Math.random() * 0.0012,
-    })
-
-    const particles: Particle[] = Array.from({ length: 70 }, (_, i) => {
-      const p = mkParticle(canvas.width, canvas.height)
-      p.life = i / 70
-      return p
-    })
-
-    let id: number
-    const frame = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-      for (const p of particles) {
-        p.x += p.vx; p.y += p.vy; p.life -= p.decay
-        if (p.life <= 0 || p.y < -10) {
-          Object.assign(p, mkParticle(canvas.width, canvas.height))
-          p.y = canvas.height + 4
-          p.life = 1
-        }
-        const a = p.alpha * Math.min(p.life * 4, 1)
-        ctx.beginPath()
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(${rgb},${a})`
-        ctx.fill()
-      }
-      id = requestAnimationFrame(frame)
-    }
-    frame()
-    return () => { window.removeEventListener('resize', resize); cancelAnimationFrame(id) }
-  }, [rgb])
-
-  return (
-    <canvas ref={ref} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1 }} />
-  )
-}
-
-// ── Volumetric fog ───────────────────────────────────────────────────────────
-
-function VolumetricFog({ phase }: { phase: Phase }) {
-  return (
-    <>
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
-        background: `radial-gradient(ellipse 70% 50% at 28% 62%, ${palette(phase).fog1}, transparent)`,
-        animation: 'fog-breathe 12s ease-in-out infinite',
-      }} />
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
-        background: `radial-gradient(ellipse 60% 45% at 72% 38%, ${palette(phase).fog2}, transparent)`,
-        animation: 'fog-breathe 16s ease-in-out infinite 5s',
-      }} />
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
-        background: 'radial-gradient(ellipse 80% 30% at 50% 90%, rgba(10,45,32,0.22), transparent)',
-      }} />
-    </>
-  )
-}
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -162,24 +77,6 @@ function ClockDot({ isConnected }: { isConnected: boolean }) {
           reconnecting…
         </span>
       )}
-    </div>
-  )
-}
-
-// ── Header ───────────────────────────────────────────────────────────────────
-
-function CommandHeader() {
-  return (
-    <div style={{ display: 'grid', gap: 1, padding: '2px 0' }}>
-      <div style={{ fontSize: 11, color: C.dim, letterSpacing: '0.18em', textTransform: 'uppercase' }}>
-        Mission Control
-      </div>
-      <div style={{ fontSize: 19, color: UI.accent, letterSpacing: '0.09em', textTransform: 'uppercase' }}>
-        Terrarium
-      </div>
-      <div style={{ fontSize: 11, color: C.dim, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-        your agents, under glass
-      </div>
     </div>
   )
 }
@@ -282,9 +179,37 @@ function StatPill({ label, value, sub, warn }: { label: string; value: string; s
 
 // ── App ──────────────────────────────────────────────────────────────────────
 
+function phaseLabel(phase: Phase): string {
+  if (phase === 'day') return 'MARKET OPEN'
+  if (phase === 'dawn') return 'DAWN RUN'
+  if (phase === 'dusk') return 'DUSK'
+  return 'NIGHT'
+}
+
+function Ticker() {
+  const trading = useDashboardStore(s => s.trading)
+  const board = useDashboardStore(s => s.board)
+  const cells: { txt: string; c: string }[] = []
+  for (const mode of ['live', 'paper'] as const) {
+    for (const p of trading?.modes?.[mode]?.open_positions ?? []) {
+      cells.push({ txt: `${p.symbol} HELD`, c: UI.accent })
+    }
+  }
+  for (const c of board?.arms?.live?.candidates ?? []) {
+    const up = c.move_pct >= 0
+    cells.push({ txt: `${c.symbol} ${up ? '+' : ''}${c.move_pct.toFixed(1)}%`, c: up ? UI.green : UI.red })
+  }
+  if (!cells.length) cells.push({ txt: trading?.market?.is_open ? 'quiet tape' : 'night crew on', c: UI.dim })
+  const line = cells.map(c => c.txt).join('   ·   ')
+  return (
+    <div className="ticker" aria-hidden>
+      <span>{line}   ·   {line}   ·   {line}</span>
+    </div>
+  )
+}
+
 export default function App() {
   const { isConnected } = useWebSocket()
-  // Center-stage view: the crew canvas, or the agent's home page.
   const [view, setView] = useState<'stage' | 'home'>('stage')
   const [showIntro, setShowIntro] = useState(() => !introSeen())
   const closeIntro = () => { markIntroSeen(); setShowIntro(false) }
@@ -292,71 +217,47 @@ export default function App() {
   const usage = useDashboardStore((s) => s.usage)
   const trading = useDashboardStore((s) => s.trading)
   const phase = getPhase(trading?.market)
-  const sky = palette(phase)
-
   const realized = trading
     ? (trading.modes.paper.realized_today + trading.modes.live.realized_today)
     : 0
+  const et = trading?.market?.et?.match(/\d{1,2}:\d{2}/)?.[0] ?? '--:--'
 
   return (
-    <div
-      className="app-root"
-      style={{
-        background: sky.sky.join(', '),
-        transition: 'background 3s ease',
-        color: C.text,
-        fontFamily: '"Geist", ui-sans-serif, system-ui, sans-serif',
-      }}
-    >
-      {/* The horizon — first light rises here as the session approaches */}
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
-        background: sky.horizon, transition: 'background 3s ease',
-      }} />
-      <VolumetricFog phase={phase} />
-      <FloatingParticles rgb={sky.particle} />
+    <div className="app-root" style={{ color: C.text, fontFamily: '"Geist", ui-sans-serif, system-ui, sans-serif' }}>
       {showIntro && <IntroOverlay onClose={closeIntro} />}
 
       <div className="shell">
-
-        {/* Header — identity | alerts | clock */}
         <div className="shell-header">
-          <CommandHeader />
-          <div style={{ flex: 1, display: 'flex', justifyContent: 'center', minWidth: 0 }}>
-            <AlertBar />
+          <div>
+            <div style={{ fontSize: 11, color: UI.accent, letterSpacing: '0.18em', textTransform: 'uppercase' }}>Terrarium</div>
+            <div style={{ fontSize: 9, color: C.dim, letterSpacing: '0.14em', textTransform: 'uppercase', marginTop: 1 }}>a little world of working agents</div>
+            <div className="hud-chip" style={{ marginTop: 4 }}>
+              {phaseLabel(phase)} / {et} ET
+            </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <AlertBar />
+          <div className="hud-tools">
             <button
               onClick={() => setShowIntro(true)}
               style={{
-                fontFamily: MONO, fontSize: 10,
-                color: C.dim, background: 'transparent',
-                border: '1px solid rgba(148,163,184,0.22)',
-                borderRadius: 999, padding: '3px 9px', cursor: 'pointer',
+                fontFamily: MONO, fontSize: 10, color: C.dim, background: 'transparent',
+                border: '1px solid rgba(148,163,184,0.22)', borderRadius: 999, padding: '3px 9px', cursor: 'pointer',
               }}
               title="what am I looking at?"
-            >
-              ?
-            </button>
+            >?</button>
             <button
               onClick={() => setView(view === 'stage' ? 'home' : 'stage')}
               style={{
                 fontFamily: MONO, fontSize: 10, letterSpacing: 1.5,
-                color: view === 'home' ? UI.accent : UI.soft,
-                background: 'transparent', border: '1px solid rgba(148,163,184,0.22)',
-                borderRadius: 999, padding: '3px 10px', cursor: 'pointer',
+                color: view === 'home' ? UI.accent : UI.soft, background: 'transparent',
+                border: '1px solid rgba(148,163,184,0.22)', borderRadius: 999, padding: '3px 10px', cursor: 'pointer',
               }}
               title="the agent's own page"
-            >
-              {'\u2302'} home
-            </button>
-            <div className="clock-block">
-              <ClockDot isConnected={isConnected} />
-            </div>
+            >{'\u2302'} home</button>
+            <ClockDot isConnected={isConnected} />
           </div>
         </div>
 
-        {/* Left rail — fleet board over the ops log */}
         <div className="shell-log">
           <div style={{ flexShrink: 0, maxHeight: '38%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             <FleetPanel />
@@ -369,12 +270,11 @@ export default function App() {
           </div>
         </div>
 
-        {/* Center — the stage, or the agent's home */}
         <div className="shell-stage">
           {view === 'stage' ? <RangeFloor /> : <ClaudeHomePanel />}
+          <Ticker />
         </div>
 
-        {/* Right rail — trading desk over the decision board */}
         <div className="shell-desk">
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
             <TradingPanel />
@@ -384,26 +284,15 @@ export default function App() {
           </div>
         </div>
 
-        {/* Footer — vitals + usage */}
         <div className="shell-footer">
           <StatPill label="Memory" value={system?.ram_pct != null ? `${Math.round(system.ram_pct)}%` : '—'} sub={system ? `${system.ram_used_gb}/${system.ram_total_gb} GB` : undefined} />
           <StatPill label="CPU" value={system?.cpu_pct != null ? `${Math.round(system.cpu_pct)}%` : '—'} sub={system?.load_1m ? `${system.load_1m} avg` : undefined} />
           <StatPill label="Disk" value={system?.disk_pct != null ? `${Math.round(system.disk_pct)}%` : '—'} sub={system ? `${system.disk_used_gb}/${system.disk_total_gb} GB` : undefined} warn={system?.disk_pct != null && system.disk_pct > 85} />
           <StatPill label="Trader" value={system ? `${system.trader_procs}` : '—'} sub={system?.trader_ram_mb ? `${system.trader_ram_mb} MB` : 'daemons'} warn={system != null && system.trader_procs < 2} />
-          <StatPill
-            label="P&L today"
-            value={trading ? `${realized >= 0 ? '+' : ''}${realized.toFixed(2)}` : '—'}
-            sub="paper+live"
-            warn={realized < 0}
-          />
-          <StatPill
-            label="Claude today"
-            value={usage?.available ? fmtTokens((usage.input_tokens ?? 0) + (usage.output_tokens ?? 0)) : '—'}
-            sub={usage?.available ? `${usage.sessions_today} sessions · ${fmtTokens(usage.cache_read_tokens)} cached` : 'tokens'}
-          />
-          <StatPill label="Uptime" value={system?.uptime_seconds ? formatUptime(system.uptime_seconds) : '—'} sub={undefined} />
+          <StatPill label="P&L today" value={trading ? `${realized >= 0 ? '+' : ''}${realized.toFixed(2)}` : '—'} sub="paper+live" warn={realized < 0} />
+          <StatPill label="Claude today" value={usage?.available ? fmtTokens((usage.input_tokens ?? 0) + (usage.output_tokens ?? 0)) : '—'} sub={usage?.available ? `${usage.sessions_today} sessions` : 'tokens'} />
+          <StatPill label="Uptime" value={system?.uptime_seconds ? formatUptime(system.uptime_seconds) : '—'} />
         </div>
-
       </div>
     </div>
   )

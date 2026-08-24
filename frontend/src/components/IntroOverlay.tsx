@@ -14,10 +14,10 @@ export function markIntroSeen(): void {
 }
 
 const ZONES: { name: string; desc: string }[] = [
-  { name: 'The tank', desc: 'center stage — a closed terrarium. Every agent lives in the garden: mint visor on shift, amber waiting on the clock, red down. The inner cloche is the chief of staff. Light through the glass is the real market day.' },
-  { name: 'Fleet & ops', desc: 'left rail — each running Claude session as a card (tool names only, never content), the scheduled desk seats, and a live log of agent activity.' },
-  { name: 'Trading desk', desc: 'right rail — both trading books (live + paper) with positions, stops, and the engine’s actual reasoning for its last decision, verbatim.' },
-  { name: 'The board', desc: 'bottom right — what the trading engine saw last cycle and what it did. PASS means it judged a candidate and declined: discipline is the product.' },
+  { name: 'The floor', desc: 'center — a hand-drawn trading office. Every robot is a real seat or book: typing on shift, dim while waiting, red when down. The chief of staff points at the wall once the morning brief is in; the LED sign and the lit wall monitors are the real session clock and tape.' },
+  { name: 'Fleet', desc: 'left rail — sessions, scheduled seats, and the ops log. Always on. Tool names only, never content.' },
+  { name: 'Books', desc: 'right rail — live and paper books, positions, stops, and the last decision verbatim. Always on.' },
+  { name: 'The tape', desc: 'under the office — what the engine saw last cycle. PASS means it judged a candidate and declined.' },
 ]
 
 export default function IntroOverlay({ onClose }: { onClose: () => void }) {
@@ -45,8 +45,9 @@ export default function IntroOverlay({ onClose }: { onClose: () => void }) {
           Terrarium
         </div>
         <div style={{ fontSize: 12.5, color: UI.soft, lineHeight: 1.5, marginBottom: 18 }}>
-          Your AI agents, under glass. Everything on screen is real telemetry from this
-          machine — nothing is simulated except demo mode, which says so.
+          A little world of working agents. The office is hand-drawn; every number,
+          chart, sign, and robot in it is live telemetry from this machine —
+          nothing rendered is simulated except demo mode, which says so.
         </div>
         <div style={{ display: 'grid', gap: 12, marginBottom: 20 }}>
           {ZONES.map((z) => (
