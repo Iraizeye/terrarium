@@ -57,7 +57,7 @@ const STYLE: Record<string, { shirt: string; pants: string; screen: Station['scr
   content: { shirt: '#c05a8a', pants: '#4a2438', screen: 'film' },
   projects: { shirt: '#c8a04a', pants: '#4a3a1c', screen: 'list' },
   live: { shirt: '#e07050', pants: '#4a2a20', screen: 'candles' },
-  paper: { shirt: '#8a8ac0', pants: '#32324a', screen: 'candles' },
+  paper: { shirt: '#7a9ab0', pants: '#2c3c4a', screen: 'candles' },
 }
 
 function px(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, c: string) {

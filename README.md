@@ -31,18 +31,8 @@ the open, the close and the stars without waiting for New York. Every line
 is fiction and labeled `[demo]`; nothing on your machine is read.
 
 First visit, an intro overlay walks you through the four zones; reopen it
-any time with the `?` button in the header.
-
-## Skies
-
-Three themes, same glass. Cycle with the `SKY:` button in the header, pin
-one with `?theme=greenhouse|observatory|embers`, preview any hour with
-`?phase=night|dawn|day|dusk`.
-
-| GREENHOUSE *(flagship)* | OBSERVATORY | EMBERS |
-|---|---|---|
-| ![GREENHOUSE](docs/media/theme-greenhouse.jpg) | ![OBSERVATORY](docs/media/theme-observatory.jpg) | ![EMBERS](docs/media/theme-embers.jpg) |
-| Under glass — green & gold | High-altitude steel & cyan | Fire watch — copper & coal |
+any time with the `?` button in the header. Preview any hour of the sky
+with `?phase=night|dawn|day|dusk`.
 
 A local-first dashboard that watches the three things that matter on the box:
 

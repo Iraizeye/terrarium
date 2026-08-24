@@ -7,14 +7,14 @@
 // websocket status contract.
 
 import { useEffect, useState } from 'react'
+import { MONO, UI } from '../ui'
 
-const INK = { text: '#f2f1f7', soft: '#a29db8', dim: '#575370' }
-const GREEN = '#79ff98'
-const AMBER = '#f0c040'
-const VIOLET = '#a78bfa'
-const MONO = '"Fira Code", monospace'
-const HAIRLINE = '1px solid rgba(150,146,172,0.10)'
-const CARD_BG = 'rgba(20,18,34,0.55)'
+const INK = { text: UI.text, soft: UI.soft, dim: UI.dim }
+const GREEN = UI.green
+const AMBER = UI.amber
+const VIOLET = UI.accent
+const HAIRLINE = UI.hairline
+const CARD_BG = UI.surfaceSoft
 
 interface MemoryEntry { title: string; hook: string; updated: string | null }
 interface Experiment { title: string; sample: string | null; pass_bar: string | null; n: number | null }
@@ -171,7 +171,7 @@ function Chip({ label, value, warn, accent }: { label: string; value: string; wa
   return (
     <span style={{
       fontFamily: MONO, fontSize: 10, padding: '3px 8px', borderRadius: 4,
-      border: HAIRLINE, background: 'rgba(20,18,34,0.4)', whiteSpace: 'nowrap',
+      border: HAIRLINE, background: UI.surfaceSoft, whiteSpace: 'nowrap',
     }}>
       <span style={{ color: INK.dim }}>{label} </span>
       <span style={{ color }}>{value}</span>

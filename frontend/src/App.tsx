@@ -8,7 +8,7 @@ import ClaudeHomePanel from './components/ClaudeHomePanel'
 import DeskPanel from './components/DeskPanel'
 import FleetPanel from './components/FleetPanel'
 import TradingPanel from './components/TradingPanel'
-import { THEME_NAMES, getPhase, getTheme, palette, setTheme, type Phase, type ThemeName } from './theme'
+import { getPhase, palette, type Phase } from './theme'
 import IntroOverlay, { introSeen, markIntroSeen } from './components/IntroOverlay'
 import { MONO, UI } from './ui'
 
@@ -282,34 +282,12 @@ function StatPill({ label, value, sub, warn }: { label: string; value: string; s
 
 // ── App ──────────────────────────────────────────────────────────────────────
 
-function ThemeToggle({ theme, onCycle }: { theme: ThemeName; onCycle: () => void }) {
-  return (
-    <button
-      onClick={onCycle}
-      title="Cycle the sky theme (?theme=greenhouse|observatory|embers also works)"
-      style={{
-        background: 'none', border: '1px solid rgba(148,163,184,0.22)', color: C.dim,
-        borderRadius: 999, padding: '3px 10px', fontSize: 9, letterSpacing: '0.18em',
-        textTransform: 'uppercase', cursor: 'pointer', fontFamily: MONO,
-      }}
-    >
-      sky: {theme}
-    </button>
-  )
-}
-
 export default function App() {
   const { isConnected } = useWebSocket()
-  const [theme, setThemeState] = useState<ThemeName>(getTheme())
   // Center-stage view: the crew canvas, or the agent's home page.
   const [view, setView] = useState<'stage' | 'home'>('stage')
   const [showIntro, setShowIntro] = useState(() => !introSeen())
   const closeIntro = () => { markIntroSeen(); setShowIntro(false) }
-  const cycleTheme = () => {
-    const next = THEME_NAMES[(THEME_NAMES.indexOf(theme) + 1) % THEME_NAMES.length]
-    setTheme(next)
-    setThemeState(next)
-  }
   const system = useDashboardStore((s) => s.system)
   const usage = useDashboardStore((s) => s.usage)
   const trading = useDashboardStore((s) => s.trading)
@@ -385,7 +363,6 @@ export default function App() {
             >
               {'\u2302'} home
             </button>
-            <ThemeToggle theme={theme} onCycle={cycleTheme} />
             <ClockDot isConnected={isConnected} />
           </div>
         </div>

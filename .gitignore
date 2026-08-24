@@ -2,28 +2,31 @@
 __pycache__/
 *.pyc
 *.pyo
+.venv
 venv/
-.env
 *.egg-info/
 
 # Node
-node_modules/
+node_modules
 dist/
-.DS_Store
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
 
 # Logs
 logs/
 *.log
 
 # Local config
+.env
 *.local
-
-# Test artifacts
-.pytest_cache/
-.coverage
-htmlcov/
-.worktrees/
+.DS_Store
+.claude-subconscious/
 
 # Dev planning notes (local only)
 docs_dev/
-.claude-subconscious/
+
+# Worktrees
+.worktrees/
