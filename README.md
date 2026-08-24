@@ -2,12 +2,16 @@
 
 **Your AI agents, under glass.**
 
+![Terrarium at dawn — live telemetry, real agents](docs/media/terrarium-hero.jpg)
+
+*Dawn run, live: agents at their desks under the glass wall, the trading
+books flat before the open, a PASS ruling fresh off the engine, and the
+ops log streaming the very session that took this screenshot.*
+
 ![A compressed trading day in demo mode](docs/media/rangewatch-demo-day.gif)
 
-*The sun is the market. It rises for the open, arcs while the session runs,
-and sets after the close; nights get a cratered moon. The watchtower is
-your lead agent — lit window, sweeping beacon, an owl on the roof. Above:
-demo mode compressing a full trading day into five minutes.*
+*Demo mode compresses a full trading day into five minutes — a fictional
+tape, labeled `[demo]` on every line.*
 
 ## What am I looking at?
 
@@ -37,13 +41,13 @@ any time with the `?` button in the header.
 ## Skies
 
 Three themes, same glass. Cycle with the `SKY:` button in the header, pin
-one with `?theme=mesa|observatory|embers`, preview any hour with
+one with `?theme=greenhouse|observatory|embers`, preview any hour with
 `?phase=night|dawn|day|dusk`.
 
-| MESA *(flagship)* | OBSERVATORY | EMBERS |
+| GREENHOUSE *(flagship)* | OBSERVATORY | EMBERS |
 |---|---|---|
-| ![MESA](docs/media/theme-mesa.jpg) | ![OBSERVATORY](docs/media/theme-observatory.jpg) | ![EMBERS](docs/media/theme-embers.jpg) |
-| First light — violet & gold | High-altitude steel & cyan | Fire watch — copper & coal |
+| ![GREENHOUSE](docs/media/theme-mesa.jpg) | ![OBSERVATORY](docs/media/theme-observatory.jpg) | ![EMBERS](docs/media/theme-embers.jpg) |
+| Under glass — green & gold | High-altitude steel & cyan | Fire watch — copper & coal |
 
 A local-first dashboard that watches the three things that matter on the box:
 
@@ -61,13 +65,11 @@ The centerpiece is a flight-control **big board**: a market clock counting down 
 the next open/close, and a GO/NO-GO grid over the *real* stack. Red means
 something is actually wrong; a healthy machine reads **ALL STATIONS GO**.
 
-The stage is a silhouette landscape where the sun *is* the market: it climbs
-toward the ridge as the open approaches, arcs across the sky while the
-session runs, and sets after the close; off-hours get a cratered moon and
-twinkling stars. The lead agent is the watchtower on the range — a lit
-window and a sweeping beacon in status color, readable from across the room
-— with a small owl silhouette on the roof, gold eyes blinking. A finished
-turn sends a shooting star across the sky. Click the tower: the owl waves.
+The stage is a pixel glasshouse: the market day is the light through the
+panes — deep green night with fireflies outside the glass, amber climbing
+at dawn, warm gold while the session runs. Agents work at wooden desks
+among hanging planters; the ticker runs across the glass; a quiet floor
+looks quiet, because nothing on it is simulated.
 
 ## Architecture
 

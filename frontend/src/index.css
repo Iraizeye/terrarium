@@ -3,17 +3,17 @@
 @tailwind utilities;
 
 :root {
-  --mc-bg: #07030f;
-  --mc-bg-soft: #0f0820;
-  --mc-surface: #160e2a;
-  --mc-surface-2: #0d0619;
-  --mc-border: #33314a;
-  --mc-border-soft: #232132;
-  --mc-text: #f2f1f7;
-  --mc-text-soft: #a29db8;
-  --mc-text-dim: #575370;
-  --mc-accent: #b580ff;
-  --mc-accent-soft: rgba(181, 128, 255, 0.12);
+  --mc-bg: #06110c;
+  --mc-bg-soft: #0b1a13;
+  --mc-surface: #12201a;
+  --mc-surface-2: #0a1610;
+  --mc-border: #2c4038;
+  --mc-border-soft: #1e2d26;
+  --mc-text: #e8eaef;
+  --mc-text-soft: #9aa3b2;
+  --mc-text-dim: #5d6570;
+  --mc-accent: #3ecf9a;
+  --mc-accent-soft: rgba(62, 207, 154, 0.12);
   background: var(--mc-bg);
   color: var(--mc-text);
 }
@@ -55,9 +55,9 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background:
-    radial-gradient(circle at top, rgba(110, 60, 220, 0.18), transparent 40%),
-    radial-gradient(circle at bottom, rgba(60, 20, 130, 0.16), transparent 34%),
-    linear-gradient(180deg, #07030f 0%, #04010a 100%);
+    radial-gradient(circle at top, rgba(60, 190, 140, 0.14), transparent 40%),
+    radial-gradient(circle at bottom, rgba(30, 110, 80, 0.13), transparent 34%),
+    linear-gradient(180deg, #06110c 0%, #030a07 100%);
   color: var(--mc-text);
   letter-spacing: 0.02em;
 }
@@ -76,7 +76,7 @@ input {
 
 button:hover:not(:disabled),
 select:hover:not(:disabled) {
-  border-color: #4c4868 !important;
+  border-color: #3d5548 !important;
 }
 
 button:active:not(:disabled) {
@@ -88,7 +88,7 @@ textarea:focus-visible,
 select:focus-visible,
 input:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 1px rgba(181, 128, 255, 0.42);
+  box-shadow: 0 0 0 1px rgba(62, 207, 154, 0.42);
 }
 
 details > summary {
@@ -109,16 +109,16 @@ details[open] {
 }
 
 ::-webkit-scrollbar-track {
-  background: #0a0812;
+  background: #0a120d;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #363248;
+  background: #2c4038;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #4c4868;
+  background: #3d5548;
 }
 
 @keyframes bubble-in {

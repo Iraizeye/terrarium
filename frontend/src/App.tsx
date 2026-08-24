@@ -105,7 +105,7 @@ function VolumetricFog({ phase }: { phase: Phase }) {
       }} />
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
-        background: 'radial-gradient(ellipse 80% 30% at 50% 90%, rgba(30,10,70,0.22), transparent)',
+        background: 'radial-gradient(ellipse 80% 30% at 50% 90%, rgba(10,45,32,0.22), transparent)',
       }} />
     </>
   )
@@ -286,7 +286,7 @@ function ThemeToggle({ theme, onCycle }: { theme: ThemeName; onCycle: () => void
   return (
     <button
       onClick={onCycle}
-      title="Cycle the sky theme (?theme=mesa|observatory|embers also works)"
+      title="Cycle the sky theme (?theme=greenhouse|observatory|embers also works)"
       style={{
         background: 'none', border: '1px solid rgba(148,163,184,0.22)', color: C.dim,
         borderRadius: 999, padding: '3px 10px', fontSize: 9, letterSpacing: '0.18em',
