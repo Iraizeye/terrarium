@@ -248,7 +248,7 @@ function drawScreen(
 export default function RangeFloor() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const stillsRef = useRef<Record<string, HTMLImageElement>>({})
-  const framesRef = useRef<Record<string, HTMLImageElement[]>>({ chair: [], walk: [], point: [] })
+  const framesRef = useRef<Record<string, HTMLImageElement[]>>({ chair: [], walk: [], point: [], type: [] })
   const sparkRef = useRef<Record<string, number[]>>({})
   const [ready, setReady] = useState(false)
   const [seats, setSeats] = useState<DeskSeat[]>([])
@@ -263,7 +263,7 @@ export default function RangeFloor() {
       loadImage('/bots/work-chair.png').then(img => ['work', img] as const),
       loadImage('/bots/stand.png').then(img => ['stand', img] as const),
     ])
-    const packs = (['chair', 'walk', 'point'] as const).map(kind =>
+    const packs = (['chair', 'walk', 'point', 'type'] as const).map(kind =>
       Promise.all(
         Array.from({ length: FRAMES }, (_, i) => loadImage(`/bots/${kind}/${i}.png`)),
       ).then(imgs => [kind, imgs] as const),
@@ -271,7 +271,7 @@ export default function RangeFloor() {
     Promise.all([stills, Promise.all(packs)]).then(([stillPairs, packs]) => {
       if (cancelled) return
       stillsRef.current = Object.fromEntries(stillPairs)
-      const bag: Record<string, HTMLImageElement[]> = { chair: [], walk: [], point: [] }
+      const bag: Record<string, HTMLImageElement[]> = { chair: [], walk: [], point: [], type: [] }
       for (const [kind, imgs] of packs) bag[kind] = imgs
       framesRef.current = bag
       setReady(true)
@@ -549,7 +549,7 @@ export default function RangeFloor() {
         let sprite: HTMLImageElement | undefined
         if (s.action === 'walk') sprite = frames.walk[frameN]
         else if (s.action === 'point') sprite = working ? frames.point[frameN] : stills.stand
-        else if (s.action === 'work') sprite = stills.work
+        else if (s.action === 'work') sprite = working ? (frames.type[frameN] ?? stills.work) : stills.work
         else sprite = working ? frames.chair[frameN] : stills.idle
         const frac = SPRITE_FRAC[s.action]
         if (sprite) {
