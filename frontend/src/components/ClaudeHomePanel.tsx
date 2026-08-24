@@ -7,14 +7,7 @@
 // websocket status contract.
 
 import { useEffect, useState } from 'react'
-import { MONO, UI } from '../ui'
-
-const INK = { text: UI.text, soft: UI.soft, dim: UI.dim }
-const GREEN = UI.green
-const AMBER = UI.amber
-const VIOLET = UI.accent
-const HAIRLINE = UI.hairline
-const CARD_BG = UI.surfaceSoft
+import { Clamp2, EmptyState, MONO, Panel, PanelHeader, UI } from '../ui'
 
 interface MemoryEntry { title: string; hook: string; updated: string | null }
 interface Experiment { title: string; sample: string | null; pass_bar: string | null; n: number | null }
@@ -35,11 +28,37 @@ function tokenRunway(expiresAt: number | null): { text: string; warn: boolean } 
   return { text: `${Math.round(hours / 24)}d runway`, warn: false }
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Chip({ label, value, warn, title }: { label: string; value: string; warn?: boolean; title?: string }) {
   return (
-    <div style={{ background: CARD_BG, border: HAIRLINE, borderRadius: 6, padding: '10px 12px', minWidth: 0 }}>
-      <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: 2, color: VIOLET, marginBottom: 8 }}>
-        {title}
+    <span title={title} style={{
+      fontFamily: MONO, fontSize: 10, padding: '4px 10px', borderRadius: 999,
+      border: UI.hairline, background: UI.surfaceSoft, whiteSpace: 'nowrap',
+    }}>
+      <span style={{ color: UI.dim }}>{label} </span>
+      <span style={{ color: warn ? UI.amber : UI.text }}>{value}</span>
+    </span>
+  )
+}
+
+function SkeletonBar({ w, delay }: { w: string; delay: number }) {
+  return (
+    <div style={{
+      height: 10, width: w, borderRadius: 6, background: 'rgba(148,163,184,0.10)',
+      animation: `led-pulse 1.6s ease-in-out ${delay}s infinite`,
+    }} />
+  )
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ height: '100%', overflowY: 'auto', display: 'grid', gap: 10, alignContent: 'start', padding: '4px 2px 8px' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+        <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: 3, color: UI.accentDim }}>
+          {'⌂'} CLAUDE HOME
+        </span>
+        <span style={{ fontSize: 10, color: UI.dim, letterSpacing: '0.08em' }}>
+          what the agent knows, watches, and carries — read from its own files
+        </span>
       </div>
       {children}
     </div>
@@ -62,125 +81,134 @@ export default function ClaudeHomePanel() {
     return () => { alive = false; clearInterval(id) }
   }, [])
 
-  if (error) return <Shell><Empty text="home unreachable — backend down?" /></Shell>
-  if (!data) return <Shell><Empty text="opening the front door…" /></Shell>
+  if (error) {
+    return (
+      <Shell>
+        <Panel>
+          <EmptyState>home unreachable — is the backend on :8000 running?</EmptyState>
+        </Panel>
+      </Shell>
+    )
+  }
+
+  if (!data) {
+    return (
+      <Shell>
+        <Panel style={{ padding: '14px 16px', display: 'grid', gap: 10 }}>
+          <SkeletonBar w="42%" delay={0} />
+          <SkeletonBar w="86%" delay={0.15} />
+          <SkeletonBar w="71%" delay={0.3} />
+        </Panel>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.05fr 1fr', gap: 10 }}>
+          <Panel style={{ padding: '14px 16px', display: 'grid', gap: 10, alignContent: 'start' }}>
+            <SkeletonBar w="34%" delay={0.1} />
+            <SkeletonBar w="78%" delay={0.25} />
+            <SkeletonBar w="64%" delay={0.4} />
+          </Panel>
+          <Panel style={{ padding: '14px 16px', display: 'grid', gap: 10, alignContent: 'start' }}>
+            <SkeletonBar w="46%" delay={0.2} />
+            <SkeletonBar w="82%" delay={0.35} />
+            <SkeletonBar w="58%" delay={0.5} />
+          </Panel>
+        </div>
+      </Shell>
+    )
+  }
 
   const runway = tokenRunway(data.watch.token_expires_at)
 
   return (
     <Shell>
       {/* Doctor — the morning's one-line diagnosis, front and center */}
-      <div style={{
-        display: 'flex', alignItems: 'baseline', gap: 10, padding: '8px 12px',
-        background: CARD_BG, border: HAIRLINE, borderRadius: 6,
-        borderLeft: `3px solid ${data.doctor.green ? GREEN : AMBER}`,
-      }}>
-        <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: 2, color: data.doctor.green ? GREEN : AMBER, flexShrink: 0 }}>
+      <Panel style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, padding: '10px 14px', borderLeft: `3px solid ${data.doctor.green ? UI.green : UI.amber}` }}>
+        <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: 2, color: data.doctor.green ? UI.green : UI.amber, flexShrink: 0 }}>
           {data.doctor.green ? 'DOCTOR · GREEN' : 'DOCTOR'}
         </span>
-        <span style={{ fontFamily: MONO, fontSize: 11, color: INK.soft, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {data.doctor.line ?? 'no diagnosis yet — first scheduled run is 9:15 ET'}
-        </span>
-      </div>
+        <Clamp2 text={data.doctor.line ?? 'no diagnosis yet — first scheduled run is 9:15 ET'} size={10.5} />
+      </Panel>
 
-      {/* Watch — the standing threads that used to need a human to ask */}
-      <Section title="WATCH">
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <Chip label="token" value={runway.text} warn={runway.warn} />
-          <Chip label="kill switch" value={data.watch.kill ? 'ACTIVE' : 'clear'} warn={data.watch.kill} />
-          {data.watch.positions.length === 0 && <Chip label="book" value="flat" />}
-          {data.watch.positions.map((p) => (
-            <Chip
-              key={`${p.mode}-${p.symbol}`}
-              label={p.mode}
-              value={`${p.symbol} ×${p.quantity}${p.horizon === 'swing' ? ' · swing' : ''}`}
-              accent={p.horizon === 'swing' ? VIOLET : undefined}
-            />
-          ))}
-        </div>
-      </Section>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.05fr 1fr', gap: 10, alignItems: 'start' }}>
+        <div style={{ display: 'grid', gap: 10 }}>
+          {/* Watch — the standing threads that used to need a human to ask */}
+          <Panel>
+            <PanelHeader label="Watch" title="the standing threads: auth runway, kill switch, open positions" />
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '10px 14px 12px' }}>
+              <Chip label="token" value={runway.text} warn={runway.warn} title="broker OAuth runway" />
+              <Chip label="kill switch" value={data.watch.kill ? 'ACTIVE' : 'clear'} warn={data.watch.kill} />
+              <Chip
+                label="broker contact"
+                value={data.watch.last_broker_contact ? data.watch.last_broker_contact.slice(5, 16).replace('T', ' ') : '—'}
+              />
+              {data.watch.positions.length === 0 && <Chip label="book" value="flat" />}
+              {data.watch.positions.map((p) => (
+                <Chip
+                  key={`${p.mode}-${p.symbol}`}
+                  label={p.mode}
+                  value={`${p.symbol} ×${p.quantity}${p.horizon === 'swing' ? ' · swing' : ''}`}
+                  title={`stop ${p.stop}`}
+                />
+              ))}
+            </div>
+          </Panel>
 
-      {/* Experiments — the pre-registered board, pass bars set before data */}
-      <Section title="EXPERIMENTS · PRE-REGISTERED">
-        <div style={{ display: 'grid', gap: 6 }}>
-          {data.experiments.map((e) => (
-            <div key={e.title} style={{ display: 'grid', gap: 2, paddingBottom: 6, borderBottom: HAIRLINE }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ fontFamily: MONO, fontSize: 11, color: INK.text }}>{e.title}</span>
-                <span style={{ fontFamily: MONO, fontSize: 10, color: e.n != null ? GREEN : INK.dim, flexShrink: 0 }}>
-                  {e.n != null ? `n=${e.n}` : 'accruing'}
-                </span>
-              </div>
-              {e.pass_bar && (
-                <span style={{ fontFamily: MONO, fontSize: 9.5, color: INK.dim, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  pass: {e.pass_bar}
-                </span>
+          {/* Experiments — the pre-registered board, pass bars set before data */}
+          <Panel>
+            <PanelHeader label="Experiments · pre-registered" title="pass bars set before the data arrives — no moving the goalposts" />
+            <div style={{ display: 'grid', gap: 6, padding: '8px 14px 12px' }}>
+              {data.experiments.map((e) => (
+                <div key={e.title} style={{ display: 'grid', gap: 2, paddingBottom: 6, borderBottom: UI.hairline }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                    <span style={{ fontFamily: MONO, fontSize: 11, color: UI.text }}>{e.title}</span>
+                    <span style={{ fontFamily: MONO, fontSize: 10, color: e.n != null ? UI.green : UI.dim, flexShrink: 0 }}>
+                      {e.n != null ? `n=${e.n}` : 'accruing'}
+                    </span>
+                  </div>
+                  {e.pass_bar && <Clamp2 text={`pass: ${e.pass_bar}`} size={9.5} color={UI.dim} />}
+                </div>
+              ))}
+              {data.experiments.length === 0 && (
+                <EmptyState>no experiments registered — hypotheses land here with their pass bars.</EmptyState>
               )}
             </div>
-          ))}
-          {data.experiments.length === 0 && <Empty text="no experiments registered" />}
-        </div>
-      </Section>
+          </Panel>
 
-      {/* Memory shelf — what the agent currently knows and believes */}
-      <Section title={`MEMORY · ${data.memory.length} FILES`}>
-        <div style={{ display: 'grid', gap: 7, overflowY: 'auto', maxHeight: 260 }}>
-          {data.memory.map((m) => (
-            <div key={m.title} style={{ display: 'grid', gap: 1 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ fontFamily: MONO, fontSize: 11, color: INK.text }}>{m.title}</span>
-                {m.updated && (
-                  <span style={{ fontFamily: MONO, fontSize: 9, color: INK.dim, flexShrink: 0 }}>
-                    {m.updated.slice(5, 16).replace('T', ' ')}
-                  </span>
-                )}
+          {/* Toolbox — the vanity corner that doubles as breakage detection */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <Chip label="skills" value={fmt(data.toolbox.skills)} />
+            <Chip label="agents" value={fmt(data.toolbox.agents)} />
+            <Chip label="commands" value={fmt(data.toolbox.commands)} />
+            <Chip label="memories" value={fmt(data.toolbox.memories)} />
+          </div>
+        </div>
+
+        {/* Memory shelf — what the agent currently knows and believes */}
+        <Panel style={{ maxHeight: '100%' }}>
+          <PanelHeader
+            label={`Memory · ${data.memory.length} files`}
+            title="the agent's persistent memory index — titles and hooks only"
+          />
+          <div style={{ display: 'grid', gap: 8, overflowY: 'auto', minHeight: 0, padding: '8px 14px 12px', maxHeight: 420 }}>
+            {data.memory.map((m) => (
+              <div key={m.title} style={{ display: 'grid', gap: 1, paddingBottom: 6, borderBottom: UI.hairline }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                  <span style={{ fontFamily: MONO, fontSize: 11, color: UI.text }}>{m.title}</span>
+                  {m.updated && (
+                    <span style={{ fontFamily: MONO, fontSize: 9, color: UI.dim, flexShrink: 0 }}>
+                      {m.updated.slice(5, 16).replace('T', ' ')}
+                    </span>
+                  )}
+                </div>
+                <Clamp2 text={m.hook} size={9.5} />
               </div>
-              <span style={{ fontFamily: MONO, fontSize: 9.5, color: INK.soft, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {m.hook}
-              </span>
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      {/* Toolbox — the vanity corner that doubles as breakage detection */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <Chip label="skills" value={fmt(data.toolbox.skills)} />
-        <Chip label="agents" value={fmt(data.toolbox.agents)} />
-        <Chip label="commands" value={fmt(data.toolbox.commands)} />
-        <Chip label="memories" value={fmt(data.toolbox.memories)} />
-        <Chip label="broker contact" value={data.watch.last_broker_contact ? data.watch.last_broker_contact.slice(5, 16).replace('T', ' ') : '—'} />
+            ))}
+            {data.memory.length === 0 && (
+              <EmptyState>no memory files yet — the agent writes them as it works.</EmptyState>
+            )}
+          </div>
+        </Panel>
       </div>
     </Shell>
   )
-}
-
-function Shell({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ height: '100%', overflowY: 'auto', display: 'grid', gap: 10, alignContent: 'start', padding: '4px 2px 8px' }}>
-      <div style={{ fontFamily: MONO, fontSize: 11, letterSpacing: 3, color: INK.soft }}>
-        ⌂ CLAUDE HOME
-      </div>
-      {children}
-    </div>
-  )
-}
-
-function Chip({ label, value, warn, accent }: { label: string; value: string; warn?: boolean; accent?: string }) {
-  const color = warn ? AMBER : accent ?? INK.text
-  return (
-    <span style={{
-      fontFamily: MONO, fontSize: 10, padding: '3px 8px', borderRadius: 4,
-      border: HAIRLINE, background: UI.surfaceSoft, whiteSpace: 'nowrap',
-    }}>
-      <span style={{ color: INK.dim }}>{label} </span>
-      <span style={{ color }}>{value}</span>
-    </span>
-  )
-}
-
-function Empty({ text }: { text: string }) {
-  return <span style={{ fontFamily: MONO, fontSize: 10, color: INK.dim }}>{text}</span>
 }
 
 function fmt(n: number | null): string {
