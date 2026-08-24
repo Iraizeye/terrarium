@@ -61,14 +61,15 @@ function phaseText(phase: Phase): string {
   return phase === 'day' ? 'MARKET OPEN' : phase === 'dawn' ? 'DAWN RUN' : phase === 'dusk' ? 'AFTER CLOSE' : 'NIGHT WATCH'
 }
 
-// CRT glass, fractions of office.jpg
-const SCREENS: { x: number; y: number; w: number; h: number }[] = [
-  { x: 0.058, y: 0.352, w: 0.082, h: 0.098 },
-  { x: 0.210, y: 0.350, w: 0.100, h: 0.095 },
-  { x: 0.430, y: 0.348, w: 0.092, h: 0.092 },
-  { x: 0.718, y: 0.348, w: 0.085, h: 0.092 },
-  { x: 0.848, y: 0.350, w: 0.082, h: 0.095 },
+// live glass — the painting's own four wall monitors, inner-screen fractions
+const WALL_PANELS: { x: number; y: number; w: number; h: number }[] = [
+  { x: 0.196, y: 0.030, w: 0.124, h: 0.128 },
+  { x: 0.354, y: 0.026, w: 0.140, h: 0.134 },
+  { x: 0.190, y: 0.200, w: 0.144, h: 0.134 },
+  { x: 0.360, y: 0.208, w: 0.138, h: 0.132 },
 ]
+// the tilted corner monitor: the book screen (positions, or quiet when flat)
+const TILT = { cx: 0.110, cy: 0.160, w: 0.142, h: 0.220, rot: -0.09 }
 
 function coverRect(cw: number, ch: number, iw: number, ih: number) {
   const s = Math.max(cw / iw, ch / ih)
@@ -115,7 +116,7 @@ function stationsFrom(
   const cp = SPOTS.chief
   const chiefOk = chiefSeat?.status === 'ok'
   out.push({
-    key: 'chief', label: 'CHIEF OF STAFF', x: cp.x, y: cp.y,
+    key: 'chief', label: 'CHIEF', x: cp.x, y: cp.y,
     action: 'point', flip: false,
     present: chiefOk || busy, down: chiefSeat?.status === 'failed',
     pending: !(chiefOk || busy) && chiefSeat?.status !== 'failed',
@@ -190,46 +191,99 @@ function drawScreen(
   hist: number[],
   now: number,
 ) {
-  const r = Math.min(5, w * 0.08, h * 0.12)
+  const r = Math.min(5, w * 0.06, h * 0.1)
   ctx.save()
   ctx.beginPath()
   ctx.roundRect(x, y, w, h, r)
   ctx.clip()
   ctx.fillStyle = P.crt
   ctx.fillRect(x, y, w, h)
-  ctx.fillStyle = 'rgba(50, 220, 110, 0.07)'
-  ctx.fillRect(x, y, w, h * 0.45)
-  const scan = ((now / 35) % (h + 8)) - 4
-  ctx.fillStyle = 'rgba(80, 255, 140, 0.08)'
+  const scan = ((now / 45) % (h + 10)) - 5
+  ctx.fillStyle = 'rgba(120,230,160,0.05)'
   ctx.fillRect(x, y + scan, w, 2)
   if (q) {
     const up = q.move >= 0
-    const col = up ? P.green : P.red
-    const pad = Math.max(2, w * 0.06)
-    ctx.fillStyle = col
+    const line = up ? '#56d98f' : '#e0837c'
+    const pad = Math.max(3, w * 0.06)
     ctx.textAlign = 'left'
-    ctx.font = `bold ${Math.max(7, Math.min(10, h * 0.22))}px ${MONO}`
-    ctx.fillText(q.symbol.slice(0, 5), x + pad, y + h * 0.30)
-    ctx.font = `${Math.max(6, Math.min(9, h * 0.20))}px ${MONO}`
-    ctx.fillText(q.last ? q.last.toFixed(2) : '—', x + pad, y + h * 0.52)
-    const series = hist.length > 2 ? hist : [q.last * 0.995, q.last]
+    ctx.fillStyle = '#9fe8c0'
+    ctx.font = `bold ${Math.max(7, Math.min(11, h * 0.16))}px ${MONO}`
+    ctx.fillText(q.symbol.slice(0, 5), x + pad, y + h * 0.17)
+    ctx.textAlign = 'right'
+    ctx.fillStyle = line
+    ctx.font = `${Math.max(6, Math.min(10, h * 0.14))}px ${MONO}`
+    ctx.fillText(
+      `${q.last ? q.last.toFixed(2) : '—'}  ${up ? '+' : ''}${(q.move * 100).toFixed(1)}%`,
+      x + w - pad, y + h * 0.17,
+    )
+    ctx.textAlign = 'left'
+    const series = hist.length > 2 ? hist : [q.last * 0.996, q.last]
     const min = Math.min(...series)
     const max = Math.max(...series)
     const span = max - min || 1
+    const chartY = y + h * 0.30
+    const chartH = h * 0.58
     ctx.beginPath()
-    ctx.strokeStyle = col
-    ctx.lineWidth = 1.2
-    const chartY = y + h * 0.58
-    const chartH = h * 0.34
     series.forEach((v, i) => {
       const px = x + pad + (i / Math.max(1, series.length - 1)) * (w - pad * 2)
       const py = chartY + chartH - ((v - min) / span) * chartH
       if (i === 0) ctx.moveTo(px, py)
       else ctx.lineTo(px, py)
     })
+    ctx.strokeStyle = line
+    ctx.lineWidth = 1.4
     ctx.stroke()
+    ctx.lineTo(x + w - pad, chartY + chartH + 2)
+    ctx.lineTo(x + pad, chartY + chartH + 2)
+    ctx.closePath()
+    ctx.fillStyle = up ? 'rgba(70,190,120,0.20)' : 'rgba(220,120,110,0.16)'
+    ctx.fill()
   }
   ctx.restore()
+}
+
+function drawBookScreen(
+  ctx: CanvasRenderingContext2D,
+  w: number, h: number,
+  trading: TradingStatus | null,
+  now: number,
+) {
+  // called inside a translated+rotated frame centered at (0,0)
+  const x = -w / 2, y = -h / 2
+  ctx.beginPath()
+  ctx.roundRect(x, y, w, h, 5)
+  ctx.fillStyle = P.crt
+  ctx.fill()
+  const scan = ((now / 60) % (h + 10)) - 5
+  ctx.fillStyle = 'rgba(120,230,160,0.05)'
+  ctx.fillRect(x, y + scan, w, 2)
+  const pad = w * 0.08
+  const lh = Math.max(9, h * 0.13)
+  ctx.textAlign = 'left'
+  ctx.font = `bold ${Math.max(7, h * 0.10)}px ${MONO}`
+  ctx.fillStyle = '#9fe8c0'
+  ctx.fillText('THE BOOK', x + pad, y + pad + lh * 0.5)
+  ctx.font = `${Math.max(6, h * 0.085)}px ${MONO}`
+  let ly = y + pad + lh * 1.6
+  const rows: { txt: string; c: string }[] = []
+  for (const mode of ['live', 'paper'] as const) {
+    const m = trading?.modes?.[mode]
+    for (const pos of m?.open_positions ?? []) {
+      rows.push({ txt: `${mode === 'live' ? 'L' : 'P'} ${pos.symbol} ${pos.quantity}× @${pos.entry.toFixed(2)}`, c: '#9fe8c0' })
+    }
+  }
+  if (!rows.length) {
+    const realized = trading
+      ? trading.modes.live.realized_today + trading.modes.paper.realized_today : 0
+    rows.push({ txt: 'FLAT', c: '#56d98f' })
+    rows.push({ txt: `P&L ${realized >= 0 ? '+' : ''}${realized.toFixed(2)}`, c: realized >= 0 ? '#56d98f' : '#e0837c' })
+    rows.push({ txt: trading?.market?.is_open ? 'scanning…' : 'off hours', c: '#3f6a52' })
+  }
+  for (const rrow of rows.slice(0, 4)) {
+    ctx.fillStyle = rrow.c
+    ctx.fillText(rrow.txt.slice(0, 20), x + pad, ly)
+    ly += lh
+  }
 }
 
 export default function RangeFloor() {
@@ -343,43 +397,27 @@ export default function RangeFloor() {
         ctx.restore()
       }
 
-      // two painted wall monitors are switched on with live data
-      {
-        const qs = quotesFrom(board, trading)
-        const q0 = qs[0] ?? null
-        const wx = dx + WALLMON.x * dw, wy = dy + WALLMON.y * dh
-        const ww = WALLMON.w * dw, wh = WALLMON.h * dh
-        drawScreen(ctx, wx, wy, ww, wh, q0, q0 ? (sparkRef.current[q0.symbol] ?? []) : [], now)
-        const q1 = qs[1] ?? q0
-        const m = WALLMON2
-        ctx.save()
-        ctx.translate(dx + m.cx * dw, dy + m.cy * dh)
-        ctx.rotate(m.rot)
-        drawScreen(ctx, -m.w * dw / 2, -m.h * dh / 2, m.w * dw, m.h * dh,
-          q1, q1 ? (sparkRef.current[q1.symbol] ?? []) : [], now)
-        ctx.restore()
-      }
-
+      // the painting's four wall monitors carry the live tape
       const quotes = quotesFrom(board, trading)
       if (now - lastPush > 400) {
         lastPush = now
         for (const q of quotes) {
           const hist = sparkRef.current[q.symbol] ?? []
-          const jitter = q.last * (1 + Math.sin(now / 700 + q.symbol.length) * 0.0015)
-          hist.push(q.last || jitter)
+          hist.push(q.last)
           sparkRef.current[q.symbol] = hist.slice(-48)
         }
       }
-
-      for (const [i, scr] of SCREENS.entries()) {
-        const q = quotes[i % Math.max(1, quotes.length)] ?? null
+      for (const [i, scr] of WALL_PANELS.entries()) {
+        const q = quotes[i] ?? null
         const hist = q ? (sparkRef.current[q.symbol] ?? []) : []
-        drawScreen(
-          ctx,
-          dx + scr.x * dw, dy + scr.y * dh, scr.w * dw, scr.h * dh,
-          q, hist, now,
-        )
+        drawScreen(ctx, dx + scr.x * dw, dy + scr.y * dh, scr.w * dw, scr.h * dh, q, hist, now)
       }
+      // the tilted corner screen is the book: positions when held, quiet when flat
+      ctx.save()
+      ctx.translate(dx + TILT.cx * dw, dy + TILT.cy * dh)
+      ctx.rotate(TILT.rot)
+      drawBookScreen(ctx, TILT.w * dw, TILT.h * dh, trading, now)
+      ctx.restore()
 
       const stations = stationsFrom(seats, trading, fleet)
       const frames = framesRef.current
@@ -418,10 +456,16 @@ export default function RangeFloor() {
           ctx.drawImage(sprite, -ax * tw, -th, tw, th)
           ctx.restore()
         }
-        ctx.font = `9px ${MONO}`
+        ctx.font = `8px ${MONO}`
         ctx.textAlign = 'center'
+        ctx.save()
+        ctx.globalAlpha = 0.8
+        ctx.fillStyle = 'rgba(6,8,10,0.6)'
+        const lw2 = ctx.measureText(s.label).width + 8
+        ctx.fillRect(x - lw2 / 2, y + 6, lw2, 11)
         ctx.fillStyle = s.down ? P.red : s.pending ? P.amber : P.text
         ctx.fillText(s.label, x, y + 14)
+        ctx.restore()
         ctx.textAlign = 'left'
       }
 
