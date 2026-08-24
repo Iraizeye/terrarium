@@ -63,10 +63,10 @@ function phaseText(phase: Phase): string {
 
 // live glass — the painting's own four wall monitors, inner-screen fractions
 const WALL_PANELS: { x: number; y: number; w: number; h: number }[] = [
-  { x: 0.196, y: 0.030, w: 0.124, h: 0.128 },
-  { x: 0.354, y: 0.026, w: 0.140, h: 0.134 },
-  { x: 0.190, y: 0.200, w: 0.144, h: 0.134 },
-  { x: 0.360, y: 0.208, w: 0.138, h: 0.132 },
+  { x: 0.192, y: 0.028, w: 0.135, h: 0.135 },
+  { x: 0.352, y: 0.024, w: 0.146, h: 0.138 },
+  { x: 0.186, y: 0.198, w: 0.152, h: 0.140 },
+  { x: 0.356, y: 0.206, w: 0.144, h: 0.136 },
 ]
 // the tilted corner monitor: the book screen (positions, or quiet when flat)
 const TILT = { cx: 0.110, cy: 0.160, w: 0.142, h: 0.220, rot: -0.09 }
@@ -191,7 +191,7 @@ function drawScreen(
   hist: number[],
   now: number,
 ) {
-  const r = Math.min(5, w * 0.06, h * 0.1)
+  const r = Math.min(6, w * 0.06, h * 0.1)
   ctx.save()
   ctx.beginPath()
   ctx.roundRect(x, y, w, h, r)
@@ -204,25 +204,13 @@ function drawScreen(
   if (q) {
     const up = q.move >= 0
     const line = up ? '#56d98f' : '#e0837c'
-    const pad = Math.max(3, w * 0.06)
-    ctx.textAlign = 'left'
-    ctx.fillStyle = '#9fe8c0'
-    ctx.font = `bold ${Math.max(7, Math.min(11, h * 0.16))}px ${MONO}`
-    ctx.fillText(q.symbol.slice(0, 5), x + pad, y + h * 0.17)
-    ctx.textAlign = 'right'
-    ctx.fillStyle = line
-    ctx.font = `${Math.max(6, Math.min(10, h * 0.14))}px ${MONO}`
-    ctx.fillText(
-      `${q.last ? q.last.toFixed(2) : '—'}  ${up ? '+' : ''}${(q.move * 100).toFixed(1)}%`,
-      x + w - pad, y + h * 0.17,
-    )
-    ctx.textAlign = 'left'
+    const pad = Math.max(3, w * 0.05)
     const series = hist.length > 2 ? hist : [q.last * 0.996, q.last]
     const min = Math.min(...series)
     const max = Math.max(...series)
     const span = max - min || 1
-    const chartY = y + h * 0.30
-    const chartH = h * 0.58
+    const chartY = y + h * 0.14
+    const chartH = h * 0.62
     ctx.beginPath()
     series.forEach((v, i) => {
       const px = x + pad + (i / Math.max(1, series.length - 1)) * (w - pad * 2)
@@ -236,53 +224,50 @@ function drawScreen(
     ctx.lineTo(x + w - pad, chartY + chartH + 2)
     ctx.lineTo(x + pad, chartY + chartH + 2)
     ctx.closePath()
-    ctx.fillStyle = up ? 'rgba(70,190,120,0.20)' : 'rgba(220,120,110,0.16)'
+    ctx.fillStyle = up ? 'rgba(70,190,120,0.18)' : 'rgba(220,120,110,0.15)'
     ctx.fill()
+    ctx.textAlign = 'left'
+    ctx.fillStyle = '#9fe8c0'
+    ctx.font = `bold ${Math.max(7, Math.min(10, h * 0.15))}px ${MONO}`
+    ctx.fillText(
+      `${q.symbol.slice(0, 5)}  ${q.last ? q.last.toFixed(2) : ''}  ${up ? '+' : ''}${(q.move * 100).toFixed(1)}%`,
+      x + pad + 1, y + h - pad - 2,
+    )
   }
+  // glass edge
+  ctx.strokeStyle = 'rgba(160,255,200,0.10)'
+  ctx.lineWidth = 1
+  ctx.stroke()
   ctx.restore()
 }
 
-function drawBookScreen(
+function drawOffScreen(
   ctx: CanvasRenderingContext2D,
   w: number, h: number,
-  trading: TradingStatus | null,
   now: number,
 ) {
-  // called inside a translated+rotated frame centered at (0,0)
+  // called inside a translated+rotated frame centered at (0,0): a monitor
+  // that is simply off — dark glass, one standby ember
   const x = -w / 2, y = -h / 2
   ctx.beginPath()
   ctx.roundRect(x, y, w, h, 5)
-  ctx.fillStyle = P.crt
+  ctx.fillStyle = '#0a0f0d'
   ctx.fill()
-  const scan = ((now / 60) % (h + 10)) - 5
-  ctx.fillStyle = 'rgba(120,230,160,0.05)'
-  ctx.fillRect(x, y + scan, w, 2)
-  const pad = w * 0.08
-  const lh = Math.max(9, h * 0.13)
-  ctx.textAlign = 'left'
-  ctx.font = `bold ${Math.max(7, h * 0.10)}px ${MONO}`
-  ctx.fillStyle = '#9fe8c0'
-  ctx.fillText('THE BOOK', x + pad, y + pad + lh * 0.5)
-  ctx.font = `${Math.max(6, h * 0.085)}px ${MONO}`
-  let ly = y + pad + lh * 1.6
-  const rows: { txt: string; c: string }[] = []
-  for (const mode of ['live', 'paper'] as const) {
-    const m = trading?.modes?.[mode]
-    for (const pos of m?.open_positions ?? []) {
-      rows.push({ txt: `${mode === 'live' ? 'L' : 'P'} ${pos.symbol} ${pos.quantity}× @${pos.entry.toFixed(2)}`, c: '#9fe8c0' })
-    }
-  }
-  if (!rows.length) {
-    const realized = trading
-      ? trading.modes.live.realized_today + trading.modes.paper.realized_today : 0
-    rows.push({ txt: 'FLAT', c: '#56d98f' })
-    rows.push({ txt: `P&L ${realized >= 0 ? '+' : ''}${realized.toFixed(2)}`, c: realized >= 0 ? '#56d98f' : '#e0837c' })
-    rows.push({ txt: trading?.market?.is_open ? 'scanning…' : 'off hours', c: '#3f6a52' })
-  }
-  for (const rrow of rows.slice(0, 4)) {
-    ctx.fillStyle = rrow.c
-    ctx.fillText(rrow.txt.slice(0, 20), x + pad, ly)
-    ly += lh
+  ctx.save()
+  ctx.clip()
+  ctx.fillStyle = 'rgba(200,240,220,0.035)'
+  ctx.beginPath()
+  ctx.moveTo(x + w * 0.15, y)
+  ctx.lineTo(x + w * 0.38, y)
+  ctx.lineTo(x + w * 0.12, y + h)
+  ctx.lineTo(x - w * 0.11, y + h)
+  ctx.closePath()
+  ctx.fill()
+  ctx.restore()
+  const on = Math.sin(now / 900) > -0.6
+  if (on) {
+    ctx.fillStyle = 'rgba(120,220,170,0.5)'
+    ctx.fillRect(x + w - 8, y + h - 7, 3, 3)
   }
 }
 
@@ -412,12 +397,24 @@ export default function RangeFloor() {
         const hist = q ? (sparkRef.current[q.symbol] ?? []) : []
         drawScreen(ctx, dx + scr.x * dw, dy + scr.y * dh, scr.w * dw, scr.h * dh, q, hist, now)
       }
-      // the tilted corner screen is the book: positions when held, quiet when flat
+      // the tilted corner monitor is off — dark glass over the painted ticker
       ctx.save()
       ctx.translate(dx + TILT.cx * dw, dy + TILT.cy * dh)
       ctx.rotate(TILT.rot)
-      drawBookScreen(ctx, TILT.w * dw, TILT.h * dh, trading, now)
+      drawOffScreen(ctx, TILT.w * dw, TILT.h * dh, now)
       ctx.restore()
+
+      // vignette pulls the eye to the cast
+      {
+        const g = ctx.createRadialGradient(
+          rect.width / 2, rect.height * 0.58, rect.height * 0.35,
+          rect.width / 2, rect.height * 0.58, rect.width * 0.72,
+        )
+        g.addColorStop(0, 'rgba(0,0,0,0)')
+        g.addColorStop(1, 'rgba(4,6,8,0.34)')
+        ctx.fillStyle = g
+        ctx.fillRect(0, 0, rect.width, rect.height)
+      }
 
       const stations = stationsFrom(seats, trading, fleet)
       const frames = framesRef.current

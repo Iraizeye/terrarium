@@ -52,13 +52,13 @@ kill switch, disk — and feed the header status bar. Red means something is
 actually wrong; a healthy machine reads **ALL STATIONS GO**.
 
 The stage is a hand-drawn trading office. The painting is set dressing;
-everything rendered onto it is live: desk CRTs and two wall monitors show
-the tape the engine actually judged, the LED sign is the real session
-clock, and every copper robot is a real seat or book — typing when its
-session is working, walking the aisle when the live book is up, pointing
-at the wall when the chief's brief is in, dim while waiting, red when
-down. Fleet, seats, ops log, both books, the board, the tape, and vitals
-stay on screen — nothing is behind a pill.
+everything rendered onto it is live: the wall of four monitors charts the
+names the engine actually judged this session, the LED sign is the real
+session clock, and every copper robot is a real seat or book — typing
+when its session is working, walking the aisle when the live book is up,
+pointing at the wall when the chief's brief is in, dim while waiting, red
+when down. Fleet, seats, ops log, both books, the board, the tape, and
+vitals stay on screen — nothing is behind a pill.
 
 ## Architecture
 
