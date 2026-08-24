@@ -8,11 +8,6 @@
 books flat before the open, a PASS ruling fresh off the engine, and the
 ops log streaming the very session that took this screenshot.*
 
-![A compressed trading day in demo mode](docs/media/rangewatch-demo-day.gif)
-
-*Demo mode compresses a full trading day into five minutes — a fictional
-tape, labeled `[demo]` on every line.*
-
 ## What am I looking at?
 
 Terrarium is a local-first mission control for the AI agents running on one
@@ -46,7 +41,7 @@ one with `?theme=greenhouse|observatory|embers`, preview any hour with
 
 | GREENHOUSE *(flagship)* | OBSERVATORY | EMBERS |
 |---|---|---|
-| ![GREENHOUSE](docs/media/theme-mesa.jpg) | ![OBSERVATORY](docs/media/theme-observatory.jpg) | ![EMBERS](docs/media/theme-embers.jpg) |
+| ![GREENHOUSE](docs/media/theme-greenhouse.jpg) | ![OBSERVATORY](docs/media/theme-observatory.jpg) | ![EMBERS](docs/media/theme-embers.jpg) |
 | Under glass — green & gold | High-altitude steel & cyan | Fire watch — copper & coal |
 
 A local-first dashboard that watches the three things that matter on the box:

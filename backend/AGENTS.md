@@ -1,6 +1,6 @@
 # Backend Context
 
-FastAPI backend for RANGEWATCH on 127.0.0.1:8000. Five modules; keep it small.
+FastAPI backend for TERRARIUM on 127.0.0.1:8000. Five modules; keep it small.
 
 - `collectors.py` — all data gathering, read-only and best-effort: a missing
   file is a status, never an exception

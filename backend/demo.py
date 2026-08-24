@@ -1,5 +1,5 @@
 """
-Demo mode — a synthetic trading day, so a visitor sees the full MESA in
+Demo mode — a synthetic trading day, so a visitor sees the full glasshouse in
 five minutes with zero configuration and zero personal data.
 
 TERRARIUM_DEMO=1 swaps every collector for the scripted versions below.

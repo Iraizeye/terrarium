@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.8.0 - 2026-08-24 — TERRARIUM
+
+- Renamed RANGEWATCH -> TERRARIUM ("your agents, under glass"); old
+  RANGEWATCH_* env names still honored, saved theme prefs migrate.
+- Floor scene rebuilt as a pixel glasshouse: glass back wall living the
+  market day, hanging planters, fireflies at night; workers are now
+  little AI robots; the chief of staff is a glass terrarium dome.
+- Rails redesigned on a shared cool-dark design system (zinc + emerald);
+  first-visit intro overlay; readable empty states; no more mid-word
+  truncation.
+
 ## v0.7.0 - 2026-07-26 — RANGEWATCH
 
 First public cut under this name. One agent, one trader, one machine:

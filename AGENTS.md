@@ -1,6 +1,6 @@
 # Project Context
 
-`rangewatch` (local path: `mission-control-dashboard`) is the operator UI for a
+`terrarium` (local path: `mission-control-dashboard`) is the operator UI for a
 single-agent setup: **Claude Code** (the only agent), the **range-trader**
 autonomous trading stack, and the machine they run on. Single-agent is a design
 decision — do not add polling for services that do not exist.

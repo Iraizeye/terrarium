@@ -18,7 +18,7 @@ ET = ZoneInfo("America/New_York")
 # ---------------------------------------------------------------------------
 
 # Demo mode: every collector is swapped for a scripted synthetic day
-# (backend/demo.py) — zero config, zero personal data, full MESA.
+# (backend/demo.py) — zero config, zero personal data, the full glasshouse.
 DEMO = (os.getenv("TERRARIUM_DEMO") or os.getenv("RANGEWATCH_DEMO", "")) == "1"
 
 RANGE_TRADER_DIR   = Path(os.getenv("RANGE_TRADER_DIR", str(Path.home() / ".range-trader")))
