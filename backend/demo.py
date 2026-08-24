@@ -2,7 +2,7 @@
 Demo mode — a synthetic trading day, so a visitor sees the full MESA in
 five minutes with zero configuration and zero personal data.
 
-RANGEWATCH_DEMO=1 swaps every collector for the scripted versions below.
+TERRARIUM_DEMO=1 swaps every collector for the scripted versions below.
 The "day" is a pure function of the wall clock: a full 24h ET session is
 compressed into DEMO_DAY_S seconds and weighted toward the interesting
 parts (the market-open sun arc gets 60% of the loop). Nothing is random
@@ -21,7 +21,7 @@ import time
 from datetime import datetime
 from typing import Any
 
-DEMO_DAY_S = int(os.getenv("RANGEWATCH_DEMO_DAY_S", "300"))
+DEMO_DAY_S = int(os.getenv("TERRARIUM_DEMO_DAY_S") or os.getenv("RANGEWATCH_DEMO_DAY_S", "300"))
 
 # Loop segments: (fraction of loop, start ET minute, end ET minute)
 _SEGMENTS = [
@@ -253,7 +253,7 @@ def demo_agent_fleet() -> dict[str, Any]:
             {"project": "range-trader", "session": "a197e4ec", "state": "live",
              "age_s": 12, "action": "Edit reconcile.py", "model": "claude-opus-5",
              "tokens": int(96_000 * day_frac), "turns": int(41 * day_frac)},
-            {"project": "rangewatch", "session": "0e2d77f7", "state": "idle",
+            {"project": "terrarium", "session": "0e2d77f7", "state": "idle",
              "age_s": 1240, "action": "responding", "model": "claude-opus-5",
              "tokens": int(31_000 * day_frac), "turns": int(17 * day_frac)},
             {"project": "worldmonitor", "session": "9f940eb0", "state": "done",

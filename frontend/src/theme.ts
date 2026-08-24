@@ -200,13 +200,14 @@ const THEMES: Record<ThemeName, Record<Phase, PhasePalette>> = {
   embers: EMBERS,
 }
 
-const THEME_KEY = 'rangewatch.theme'
+const THEME_KEY = 'terrarium.theme'
+const LEGACY_THEME_KEY = 'rangewatch.theme'
 
 /** Active theme: `?theme=` wins (previews/screenshots), else the saved pick. */
 export function getTheme(): ThemeName {
   const forced = new URLSearchParams(window.location.search).get('theme') as ThemeName | null
   if (forced && forced in THEMES) return forced
-  const saved = localStorage.getItem(THEME_KEY) as ThemeName | null
+  const saved = (localStorage.getItem(THEME_KEY) ?? localStorage.getItem(LEGACY_THEME_KEY)) as ThemeName | null
   return saved && saved in THEMES ? saved : 'mesa'
 }
 

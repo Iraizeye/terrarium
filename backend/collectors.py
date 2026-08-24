@@ -1,5 +1,5 @@
 """
-Collectors — everything RANGEWATCH knows, gathered read-only.
+Collectors — everything TERRARIUM knows, gathered read-only.
 
 Five collectors, one per panel:
   system_metrics()   CPU / RAM / disk / uptime + trading-daemon footprint

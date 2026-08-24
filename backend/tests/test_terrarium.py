@@ -1,4 +1,4 @@
-"""RANGEWATCH backend tests — collectors and the two frozen API contracts."""
+"""TERRARIUM backend tests — collectors and the two frozen API contracts."""
 import json
 import sqlite3
 from datetime import datetime
@@ -297,7 +297,7 @@ class TestAgentFleet:
         base = tmp_path / "projects"
         _write_transcript(base / "-Users-iris-Projects-range-trader", "aaaa1111",
                           [_assistant_row(tool="Edit", file_path="/x/engine.py")], age_s=10)
-        _write_transcript(base / "-Users-iris-Projects-rangewatch", "bbbb2222",
+        _write_transcript(base / "-Users-iris-Projects-terrarium", "bbbb2222",
                           [_assistant_row(text="ok")], age_s=600)
         fleet = self._fleet(monkeypatch, base)
 

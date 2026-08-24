@@ -1,4 +1,4 @@
-// RANGEWATCH types — mirrors backend/state.status_payload() exactly.
+// TERRARIUM types — mirrors backend/state.status_payload() exactly.
 
 export interface ServiceHealth {
   name: string

@@ -1,4 +1,4 @@
-# RANGEWATCH — one-command runs.
+# TERRARIUM — one-command runs.
 #
 #   make demo    full dashboard on a scripted synthetic day (no config, no
 #                personal data; a compressed 24h session loops every 5 min)
@@ -18,9 +18,9 @@ frontend/node_modules: frontend/package.json
 .PHONY: demo dev test
 
 demo: $(VENV)/bin/uvicorn frontend/node_modules
-	@echo "RANGEWATCH demo -> http://127.0.0.1:3000  (Ctrl-C stops both)"
+	@echo "TERRARIUM demo -> http://127.0.0.1:3000  (Ctrl-C stops both)"
 	@trap 'kill 0' INT TERM; \
-	RANGEWATCH_DEMO=1 $(VENV)/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000 & \
+	TERRARIUM_DEMO=1 $(VENV)/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000 & \
 	(cd frontend && npm run dev) & \
 	wait
 

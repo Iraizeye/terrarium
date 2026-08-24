@@ -1,5 +1,5 @@
 """
-RANGEWATCH — FastAPI backend on :8000.
+TERRARIUM — FastAPI backend on :8000.
 
 Watches three things: Claude (hook feed), the range-trader stack (ledgers,
 heartbeats, alerts), and this machine (vitals, service ports). Read-only over
@@ -87,12 +87,12 @@ async def _lifespan(app: FastAPI):
         seed_demo_sessions(SESSIONS_DB)
         asyncio.create_task(run_demo_crew())
         print("[startup] DEMO MODE — every panel is scripted fiction", flush=True)
-    print(f"[startup] RANGEWATCH backend on :8000 — polling every {POLL_INTERVAL}s", flush=True)
+    print(f"[startup] TERRARIUM backend on :8000 — polling every {POLL_INTERVAL}s", flush=True)
     yield
 
 
 app = FastAPI(
-    title="RANGEWATCH API",
+    title="TERRARIUM API",
     description="Single-agent mission control: Claude, the trader, the machine.",
     version="0.7.0",
     lifespan=_lifespan,
