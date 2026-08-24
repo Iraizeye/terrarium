@@ -8,13 +8,13 @@ import { useState } from 'react'
 import { useDashboardStore } from '../store/dashboardStore'
 import type { BoardArm, BoardCandidate } from '../types'
 
-const INK = { text: '#f2f1f7', soft: '#a29db8', dim: '#575370' }
-const GREEN = '#79ff98'
-const AMBER = '#f0c040'
-const RED = '#ff7060'
-const MONO = '"Fira Code", monospace'
-const HAIRLINE = '1px solid rgba(150,146,172,0.10)'
-const GOLD_DIM_HEADER = 'rgba(245,180,81,0.7)'
+import { EmptyState, MONO, Panel, PanelHeader, PillButton, UI } from '../ui'
+
+const INK = { text: UI.text, soft: UI.soft, dim: UI.dim }
+const GREEN = UI.green
+const AMBER = UI.amber
+const RED = UI.red
+const HAIRLINE = UI.hairline
 
 function moveColor(pct: number) {
   return pct > 0.001 ? GREEN : pct < -0.001 ? RED : INK.soft
@@ -49,7 +49,7 @@ function CandidateRow({ c }: { c: BoardCandidate }) {
         </span>
       </div>
       {c.tech && (
-        <div style={{
+        <div title={c.tech} style={{
           fontSize: 9, color: INK.soft, fontFamily: MONO, paddingLeft: 2,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
@@ -57,7 +57,7 @@ function CandidateRow({ c }: { c: BoardCandidate }) {
         </div>
       )}
       {c.earn && (
-        <div style={{
+        <div title={c.earn} style={{
           fontSize: 9, color: AMBER, fontFamily: MONO, paddingLeft: 2,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
@@ -81,40 +81,26 @@ export default function BoardPanel() {
     : ''
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, paddingBottom: 4 }}>
-        <span style={{
-          fontSize: 10, color: GOLD_DIM_HEADER, letterSpacing: '0.22em',
-          textTransform: 'uppercase',
-        }}>
-          The Board
-        </span>
-        <div style={{ display: 'flex', gap: 2, marginLeft: 'auto' }}>
-          {(['live', 'paper'] as const).map((m) => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              style={{
-                fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase',
-                padding: '1px 7px', cursor: 'pointer', fontFamily: MONO,
-                background: 'transparent',
-                border: HAIRLINE,
-                borderRadius: 3,
-                color: mode === m ? INK.text : INK.dim,
-              }}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
-      </div>
+    <Panel style={{ height: '100%' }}>
+      <PanelHeader
+        label="The board"
+        title="what the trading engine saw last cycle, and what it did — PASS is a decision too"
+        right={
+          <div style={{ display: 'flex', gap: 4 }}>
+            {(['live', 'paper'] as const).map((m) => (
+              <PillButton key={m} active={mode === m} onClick={() => setMode(m)}>{m}</PillButton>
+            ))}
+          </div>
+        }
+      />
 
       {!arm || arm.candidates.length === 0 ? (
-        <div style={{ fontSize: 10, color: INK.dim, fontFamily: MONO, padding: '6px 0' }}>
-          no cycle yet today
-        </div>
+        <EmptyState>
+          no scan cycle yet today — during market hours the engine's judged
+          candidates land here with the verdict on each.
+        </EmptyState>
       ) : (
-        <>
+        <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, padding: '4px 14px 8px' }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', paddingBottom: 2 }}>
             {badge && (
               <span style={{
@@ -140,8 +126,8 @@ export default function BoardPanel() {
           <div style={{ overflowY: 'auto', minHeight: 0 }}>
             {arm.candidates.map((c) => <CandidateRow key={c.symbol} c={c} />)}
           </div>
-        </>
+        </div>
       )}
-    </div>
+    </Panel>
   )
 }

@@ -1,25 +1,28 @@
 import { useEffect, useRef, useState } from 'react'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useDashboardStore } from './store/dashboardStore'
-import CrewStage, { OpsLog, buildBoardCells } from './components/CrewStage'
+import { OpsLog, buildBoardCells } from './components/CrewStage'
+import RangeFloor from './components/RangeFloor'
 import BoardPanel from './components/BoardPanel'
 import ClaudeHomePanel from './components/ClaudeHomePanel'
+import DeskPanel from './components/DeskPanel'
 import FleetPanel from './components/FleetPanel'
 import TradingPanel from './components/TradingPanel'
-import { GOLD, THEME_NAMES, getPhase, getTheme, palette, setTheme, type Phase, type ThemeName } from './theme'
+import { THEME_NAMES, getPhase, getTheme, palette, setTheme, type Phase, type ThemeName } from './theme'
+import IntroOverlay, { introSeen, markIntroSeen } from './components/IntroOverlay'
+import { MONO, UI } from './ui'
 
-// ── Color palette ────────────────────────────────────────────────────────────
+// ── Color palette (rails/chrome — see ui.tsx) ────────────────────────────────
 
 const C = {
-  text: '#f2f1f7',
-  soft: '#a29db8',
-  dim: '#575370',
-  teal: '#b580ff',
-  green: '#79ff98',
-  amber: '#f0c040',
-  red: '#ff7060',
+  text: UI.text,
+  soft: UI.soft,
+  dim: UI.dim,
+  teal: UI.accent,
+  green: UI.green,
+  amber: UI.amber,
+  red: UI.red,
 }
-const MONO = '"Fira Code", monospace'
 
 // ── Floating particles (canvas) ──────────────────────────────────────────────
 
@@ -102,7 +105,7 @@ function VolumetricFog({ phase }: { phase: Phase }) {
       }} />
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
-        background: 'radial-gradient(ellipse 80% 30% at 50% 90%, rgba(30,10,70,0.22), transparent)',
+        background: 'radial-gradient(ellipse 80% 30% at 50% 90%, rgba(10,45,32,0.22), transparent)',
       }} />
     </>
   )
@@ -171,11 +174,11 @@ function CommandHeader() {
       <div style={{ fontSize: 11, color: C.dim, letterSpacing: '0.18em', textTransform: 'uppercase' }}>
         Mission Control
       </div>
-      <div style={{ fontSize: 19, color: GOLD, letterSpacing: '0.09em', textTransform: 'uppercase' }}>
-        Rangewatch
+      <div style={{ fontSize: 19, color: UI.accent, letterSpacing: '0.09em', textTransform: 'uppercase' }}>
+        Terrarium
       </div>
       <div style={{ fontSize: 11, color: C.dim, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-        one agent · one trader · one machine
+        your agents, under glass
       </div>
     </div>
   )
@@ -213,13 +216,13 @@ function AlertBar() {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6,
-      padding: '5px 10px',
-      border: `1px solid ${anyStale || alerts.some(a => a.tone === C.red) ? 'rgba(255,112,96,0.28)' : 'rgba(240,192,64,0.28)'}`,
-      background: 'rgba(10,4,18,0.55)',
+      padding: '5px 12px', borderRadius: 999,
+      border: `1px solid ${anyStale || alerts.some(a => a.tone === C.red) ? 'rgba(240,113,106,0.32)' : 'rgba(224,179,77,0.30)'}`,
+      background: UI.surfaceSoft,
       maxWidth: 680,
     }}>
       {alerts.slice(0, 3).map((alert, i) => (
-        <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <span key={i} title={alert.text} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{ width: 4, height: 4, borderRadius: '50%', background: alert.tone, flexShrink: 0 }} />
           <span style={{ fontSize: 11, color: alert.tone, letterSpacing: '0.06em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 260 }}>
             {alert.text}
@@ -241,7 +244,7 @@ function StatPill({ label, value, sub, warn }: { label: string; value: string; s
   const pctMatch = value.match(/^(\d+(\.\d+)?)%$/)
   const numericPct = pctMatch ? parseFloat(pctMatch[1]) : null
   const accent = warn || (numericPct != null && numericPct > 85)
-    ? '#ffb04d'
+    ? UI.amber
     : numericPct != null && numericPct > 70
       ? C.amber
       : C.text
@@ -260,8 +263,10 @@ function StatPill({ label, value, sub, warn }: { label: string; value: string; s
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
       padding: '5px 12px 6px',
-      border: `1px solid ${warn || (numericPct != null && numericPct > 85) ? 'rgba(255,176,77,0.44)' : numericPct != null && numericPct > 70 ? 'rgba(240,192,64,0.4)' : 'rgba(150,146,172,0.22)'}`,
-      background: 'rgba(10,7,20,0.74)',
+      border: `1px solid ${warn || (numericPct != null && numericPct > 85) ? 'rgba(224,179,77,0.5)' : numericPct != null && numericPct > 70 ? 'rgba(224,179,77,0.34)' : 'rgba(148,163,184,0.16)'}`,
+      background: UI.surface,
+      borderRadius: UI.radius,
+      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
       backdropFilter: 'blur(14px)',
       WebkitBackdropFilter: 'blur(14px)',
       minWidth: 96,
@@ -281,10 +286,10 @@ function ThemeToggle({ theme, onCycle }: { theme: ThemeName; onCycle: () => void
   return (
     <button
       onClick={onCycle}
-      title="Cycle the sky theme (?theme=mesa|observatory|embers also works)"
+      title="Cycle the sky theme (?theme=greenhouse|observatory|embers also works)"
       style={{
-        background: 'none', border: `1px solid ${C.dim}`, color: C.dim,
-        borderRadius: 4, padding: '3px 9px', fontSize: 9, letterSpacing: '0.18em',
+        background: 'none', border: '1px solid rgba(148,163,184,0.22)', color: C.dim,
+        borderRadius: 999, padding: '3px 10px', fontSize: 9, letterSpacing: '0.18em',
         textTransform: 'uppercase', cursor: 'pointer', fontFamily: MONO,
       }}
     >
@@ -298,6 +303,8 @@ export default function App() {
   const [theme, setThemeState] = useState<ThemeName>(getTheme())
   // Center-stage view: the crew canvas, or the agent's home page.
   const [view, setView] = useState<'stage' | 'home'>('stage')
+  const [showIntro, setShowIntro] = useState(() => !introSeen())
+  const closeIntro = () => { markIntroSeen(); setShowIntro(false) }
   const cycleTheme = () => {
     const next = THEME_NAMES[(THEME_NAMES.indexOf(theme) + 1) % THEME_NAMES.length]
     setTheme(next)
@@ -330,6 +337,7 @@ export default function App() {
       }} />
       <VolumetricFog phase={phase} />
       <FloatingParticles rgb={sky.particle} />
+      {showIntro && <IntroOverlay onClose={closeIntro} />}
 
       <div style={{
         position: 'relative', zIndex: 4,
@@ -354,12 +362,24 @@ export default function App() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <button
+              onClick={() => setShowIntro(true)}
+              style={{
+                fontFamily: MONO, fontSize: 10,
+                color: C.dim, background: 'transparent',
+                border: '1px solid rgba(148,163,184,0.22)',
+                borderRadius: 999, padding: '3px 9px', cursor: 'pointer',
+              }}
+              title="what am I looking at?"
+            >
+              ?
+            </button>
+            <button
               onClick={() => setView(view === 'stage' ? 'home' : 'stage')}
               style={{
-                fontFamily: '"Fira Code", monospace', fontSize: 10, letterSpacing: 1.5,
-                color: view === 'home' ? '#a78bfa' : '#a29db8',
-                background: 'transparent', border: '1px solid rgba(150,146,172,0.18)',
-                borderRadius: 4, padding: '3px 9px', cursor: 'pointer',
+                fontFamily: MONO, fontSize: 10, letterSpacing: 1.5,
+                color: view === 'home' ? UI.accent : UI.soft,
+                background: 'transparent', border: '1px solid rgba(148,163,184,0.22)',
+                borderRadius: 999, padding: '3px 10px', cursor: 'pointer',
               }}
               title="the agent's own page"
             >
@@ -378,6 +398,9 @@ export default function App() {
           <div style={{ flexShrink: 0, maxHeight: '38%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             <FleetPanel />
           </div>
+          <div style={{ flexShrink: 0 }}>
+            <DeskPanel />
+          </div>
           <div style={{ flex: 1, minHeight: 0 }}>
             <OpsLog />
           </div>
@@ -385,7 +408,7 @@ export default function App() {
 
         {/* Center — the stage, or the agent's home */}
         <div style={{ gridArea: 'stage', minWidth: 0, minHeight: 0 }}>
-          {view === 'stage' ? <CrewStage /> : <ClaudeHomePanel />}
+          {view === 'stage' ? <RangeFloor /> : <ClaudeHomePanel />}
         </div>
 
         {/* Right rail — trading desk over the decision board */}

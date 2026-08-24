@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useDashboardStore } from '../store/dashboardStore'
 import type { CrewEvent, CrewMember, CrewStatus, MarketClock } from '../types'
 import { GOLD, getPhase, palette, type Phase } from '../theme'
+import { Panel as UIPanel, PanelHeader as UIPanelHeader, PillButton as UIPillButton, UI as UISTYLE } from '../ui'
 
 // ── THE MESA ─────────────────────────────────────────────────────────────────
 // A silhouette landscape where the sun IS the market: it climbs toward the
@@ -680,58 +681,42 @@ export function OpsLog() {
     : filter === 'tools' ? allEvents.filter((e) => e.kind === 'tool')
     : allEvents.filter((e) => e.kind !== 'tool')
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0,
-      padding: '10px 0 6px',
-      background: 'rgba(9,7,15,0.72)',
-      backdropFilter: 'blur(12px)',
-      WebkitBackdropFilter: 'blur(12px)',
-      border: PANEL_BORDER,
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 14px 8px', borderBottom: '1px solid rgba(150,146,172,0.10)', flexShrink: 0 }}>
-        <span style={{ fontSize: 10, letterSpacing: '0.22em', color: INK.dim, textTransform: 'uppercase' }}>
-          Ops log — live
-        </span>
-        <span style={{ display: 'flex', gap: 4 }}>
-          {OPS_FILTERS.map((f) => (
-            <button
-              key={f}
-              onClick={() => setOpsFilter(f)}
-              style={{
-                background: 'none', padding: '1px 6px', cursor: 'pointer',
-                border: `1px solid ${filter === f ? 'rgba(150,146,172,0.4)' : 'transparent'}`,
-                color: filter === f ? VIOLET : INK.dim,
-                fontSize: 8.5, letterSpacing: '0.12em', textTransform: 'uppercase',
-              }}
-            >
-              {f}
-            </button>
-          ))}
-        </span>
-      </div>
+    <UIPanel style={{ height: '100%' }}>
+      <UIPanelHeader
+        label="Ops log — live"
+        title="every tool call and lifecycle event from agent sessions, as it happens"
+        right={
+          <span style={{ display: 'flex', gap: 4 }}>
+            {OPS_FILTERS.map((f) => (
+              <UIPillButton key={f} active={filter === f} onClick={() => setOpsFilter(f)}>{f}</UIPillButton>
+            ))}
+          </span>
+        }
+      />
       <div style={{ padding: '6px 0', overflowY: 'auto', minHeight: 0 }}>
         {events.length === 0 && (
-          <div style={{ padding: '10px 14px', fontSize: 11, color: INK.dim }}>
-            waiting for Claude activity…
+          <div style={{ padding: '10px 14px', fontSize: 10.5, lineHeight: 1.55, color: UISTYLE.dim, fontFamily: '"JetBrains Mono", "Fira Code", monospace' }}>
+            no agent activity yet — tool calls and session events stream in
+            here live once an agent is working.
           </div>
         )}
         {events.slice(0, 60).map((e) => (
           <div key={e.id} style={{ display: 'flex', gap: 8, padding: '3px 14px', alignItems: 'baseline' }}>
-            <span style={{ fontSize: 9, color: INK.dim, fontVariantNumeric: 'tabular-nums', fontFamily: '"Fira Code", monospace', flexShrink: 0 }}>
+            <span style={{ fontSize: 9, color: UISTYLE.dim, fontVariantNumeric: 'tabular-nums', fontFamily: '"JetBrains Mono", "Fira Code", monospace', flexShrink: 0 }}>
               {new Date(e.ts).toLocaleTimeString([], { hour12: false })}
             </span>
-            <span style={{ color: VIOLET, fontSize: 10, flexShrink: 0 }}>{KIND_GLYPH[e.kind] ?? '·'}</span>
-            <span style={{
-              fontSize: 11, color: INK.soft,
+            <span style={{ color: UISTYLE.accent, fontSize: 10, flexShrink: 0 }}>{KIND_GLYPH[e.kind] ?? '·'}</span>
+            <span title={e.text} style={{
+              fontSize: 11, color: UISTYLE.soft,
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              fontFamily: '"Fira Code", monospace',
+              fontFamily: '"JetBrains Mono", "Fira Code", monospace',
             }}>
               {e.text}
             </span>
           </div>
         ))}
       </div>
-    </div>
+    </UIPanel>
   )
 }
 

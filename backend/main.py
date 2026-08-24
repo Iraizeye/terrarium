@@ -1,5 +1,5 @@
 """
-RANGEWATCH — FastAPI backend on :8000.
+TERRARIUM — FastAPI backend on :8000.
 
 Watches three things: Claude (hook feed), the range-trader stack (ledgers,
 heartbeats, alerts), and this machine (vitals, service ports). Read-only over
@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import state as _st
 from .config import DEMO, MAX_WS_CONNECTIONS, POLL_INTERVAL, SESSIONS_DB
-from .routers import crew, home, sessions
+from .routers import crew, desk, home, sessions
 from .state import _now_iso, _state, broadcast_status, status_payload
 
 if DEMO:
@@ -87,12 +87,12 @@ async def _lifespan(app: FastAPI):
         seed_demo_sessions(SESSIONS_DB)
         asyncio.create_task(run_demo_crew())
         print("[startup] DEMO MODE — every panel is scripted fiction", flush=True)
-    print(f"[startup] RANGEWATCH backend on :8000 — polling every {POLL_INTERVAL}s", flush=True)
+    print(f"[startup] TERRARIUM backend on :8000 — polling every {POLL_INTERVAL}s", flush=True)
     yield
 
 
 app = FastAPI(
-    title="RANGEWATCH API",
+    title="TERRARIUM API",
     description="Single-agent mission control: Claude, the trader, the machine.",
     version="0.7.0",
     lifespan=_lifespan,
@@ -106,7 +106,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for router_module in (crew, home, sessions):
+for router_module in (crew, desk, home, sessions):
     app.include_router(router_module.router)
 
 

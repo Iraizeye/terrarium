@@ -1,15 +1,15 @@
 import { useDashboardStore } from '../store/dashboardStore'
 import type { OpenPosition, TradingMode } from '../types'
 
-const INK = { text: '#f2f1f7', soft: '#a29db8', dim: '#575370' }
-const ACCENT = '#8f5cff'
-const GOLD = '#f5b451'
-const GREEN = '#79ff98'
-const AMBER = '#f0c040'
-const RED = '#ff7060'
-const MONO = '"Fira Code", monospace'
-const HAIRLINE = '1px solid rgba(150,146,172,0.10)'
-const GOLD_DIM_HEADER = 'rgba(245,180,81,0.7)'
+import { Clamp2, EmptyState, MONO, Panel, PanelHeader, UI } from '../ui'
+
+const INK = { text: UI.text, soft: UI.soft, dim: UI.dim }
+const ACCENT = UI.accent
+const GOLD = UI.accent
+const GREEN = UI.green
+const AMBER = UI.amber
+const RED = UI.red
+const HAIRLINE = UI.hairline
 
 function pnlColor(v: number) {
   return v > 0 ? GREEN : v < 0 ? RED : INK.soft
@@ -141,19 +141,11 @@ export default function TradingPanel() {
   const trading = useDashboardStore((s) => s.trading)
 
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0,
-      background: 'rgba(9,7,15,0.72)',
-      backdropFilter: 'blur(12px)',
-      WebkitBackdropFilter: 'blur(12px)',
-      border: '1px solid rgba(150,146,172,0.16)',
-    }}>
-      {/* Header with market chip */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px 8px', borderBottom: HAIRLINE, flexShrink: 0 }}>
-        <span style={{ fontSize: 10, letterSpacing: '0.22em', color: GOLD_DIM_HEADER, textTransform: 'uppercase' }}>
-          Trading desk
-        </span>
-        {trading && (
+    <Panel style={{ height: '100%' }}>
+      <PanelHeader
+        label="Trading desk"
+        title="both trading books — live and paper — with the engine's actual reasoning"
+        right={trading ? (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <span style={{
               width: 5, height: 5, borderRadius: '50%',
@@ -164,13 +156,15 @@ export default function TradingPanel() {
               {trading.market.is_open ? 'OPEN' : 'CLOSED'} · {trading.market.et} ET
             </span>
           </span>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       {!trading && (
-        <div style={{ padding: '14px', fontSize: 11, color: INK.dim }}>
-          waiting for telemetry…
-        </div>
+        <EmptyState>
+          no trading telemetry — connect a trading agent (or run demo mode:
+          <span style={{ color: UI.soft }}> make demo</span>) and both books
+          render here with positions, stops, and reasoning.
+        </EmptyState>
       )}
 
       {trading && (
@@ -227,16 +221,13 @@ export default function TradingPanel() {
               <div style={{ fontSize: 10, color: INK.dim, fontFamily: MONO }}>quiet — nothing to report</div>
             )}
             {trading.alerts.slice().reverse().map((line, i) => (
-              <div key={i} style={{
-                fontSize: 9.5, color: i === 0 ? INK.soft : INK.dim, fontFamily: MONO,
-                padding: '2px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              }}>
-                {line.replace(/^\S+\s/, '')}
+              <div key={i} style={{ padding: '2px 0' }}>
+                <Clamp2 text={line.replace(/^\S+\s/, '')} color={i === 0 ? INK.soft : INK.dim} />
               </div>
             ))}
           </div>
         </div>
       )}
-    </div>
+    </Panel>
   )
 }

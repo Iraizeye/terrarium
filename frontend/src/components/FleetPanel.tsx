@@ -1,24 +1,24 @@
 // FLEET — every Claude Code session on this machine, one card each.
 //
-// Watch-only by design: rangewatch observes agents, it does not command
+// Watch-only by design: Terrarium observes agents, it does not command
 // them. The action line carries tool names and file basenames only — the
 // backend guarantees no session content can reach this panel, because the
 // dashboard gets screenshotted and this repo is public.
 
 import { useDashboardStore } from '../store/dashboardStore'
 import type { FleetAgent } from '../types'
-
-const INK = { text: '#f2f1f7', soft: '#a29db8', dim: '#575370' }
-const GREEN = '#79ff98'
-const AMBER = '#f0c040'
-const MONO = '"Fira Code", monospace'
-const HAIRLINE = '1px solid rgba(150,146,172,0.10)'
-const GOLD_DIM_HEADER = 'rgba(245,180,81,0.7)'
+import { EmptyState, Led, MONO, Panel, PanelHeader, UI } from '../ui'
 
 const STATE_COLOR: Record<FleetAgent['state'], string> = {
-  live: GREEN,
-  idle: AMBER,
-  done: INK.dim,
+  live: UI.green,
+  idle: UI.amber,
+  done: UI.dim,
+}
+
+const STATE_TITLE: Record<FleetAgent['state'], string> = {
+  live: 'session active right now',
+  idle: 'session open, currently idle',
+  done: 'session closed',
 }
 
 function fmtAge(s: number): string {
@@ -41,33 +41,28 @@ function shortModel(model: string | null): string | null {
 }
 
 function AgentCard({ agent }: { agent: FleetAgent }) {
-  const color = STATE_COLOR[agent.state]
   return (
-    <div style={{ padding: '5px 0', borderTop: HAIRLINE }}>
+    <div style={{ padding: '5px 14px', borderTop: UI.hairline }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, minWidth: 0 }}>
+        <Led color={STATE_COLOR[agent.state]} pulse={agent.state === 'live'} title={STATE_TITLE[agent.state]} />
         <span style={{
-          width: 6, height: 6, borderRadius: '50%', background: color,
-          flexShrink: 0, alignSelf: 'center',
-          animation: agent.state === 'live' ? 'led-pulse 2s ease-in-out infinite' : undefined,
-        }} />
-        <span style={{
-          fontSize: 11.5, fontWeight: 700, color: INK.text, fontFamily: MONO,
+          fontSize: 11.5, fontWeight: 700, color: UI.text, fontFamily: MONO,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {agent.project}
         </span>
-        <span style={{ fontSize: 9, color: INK.dim, fontFamily: MONO, marginLeft: 'auto', flexShrink: 0 }}>
+        <span style={{ fontSize: 9, color: UI.dim, fontFamily: MONO, marginLeft: 'auto', flexShrink: 0 }}>
           {fmtAge(agent.age_s)}
         </span>
       </div>
       <div style={{ display: 'flex', gap: 6, alignItems: 'baseline', paddingLeft: 12, minWidth: 0 }}>
         <span style={{
-          fontSize: 10, color: agent.state === 'done' ? INK.dim : INK.soft, fontFamily: MONO,
+          fontSize: 10, color: agent.state === 'done' ? UI.dim : UI.soft, fontFamily: MONO,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {agent.action ?? (agent.state === 'done' ? 'session closed' : 'waiting')}
         </span>
-        <span style={{ fontSize: 9, color: INK.dim, fontFamily: MONO, marginLeft: 'auto', flexShrink: 0 }}>
+        <span style={{ fontSize: 9, color: UI.dim, fontFamily: MONO, marginLeft: 'auto', flexShrink: 0 }}>
           {shortModel(agent.model) ? `${shortModel(agent.model)} · ` : ''}{fmtTokens(agent.tokens)} tok
         </span>
       </div>
@@ -81,25 +76,21 @@ export default function FleetPanel() {
   const liveCount = agents.filter((a) => a.state === 'live').length
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-        paddingBottom: 4,
-      }}>
-        <span style={{
-          fontSize: 10, color: GOLD_DIM_HEADER, letterSpacing: '0.22em',
-          textTransform: 'uppercase',
-        }}>
-          Fleet
-        </span>
-        <span style={{ fontSize: 9, color: INK.dim, fontFamily: MONO }}>
-          {agents.length === 0 ? '' : `${liveCount} live · ${agents.length} today`}
-        </span>
-      </div>
+    <Panel style={{ height: '100%' }}>
+      <PanelHeader
+        label="Fleet"
+        title="every Claude Code session on this machine today"
+        right={
+          <span style={{ fontSize: 9, color: UI.dim, fontFamily: MONO }}>
+            {agents.length === 0 ? '' : `${liveCount} live · ${agents.length} today`}
+          </span>
+        }
+      />
       {agents.length === 0 ? (
-        <div style={{ fontSize: 10, color: INK.dim, fontFamily: MONO, padding: '6px 0' }}>
-          no agents today
-        </div>
+        <EmptyState>
+          no agent sessions yet today — start a Claude Code session on this
+          machine and it appears here as a card.
+        </EmptyState>
       ) : (
         <div style={{ overflowY: 'auto', minHeight: 0 }}>
           {agents.map((a) => (
@@ -107,6 +98,6 @@ export default function FleetPanel() {
           ))}
         </div>
       )}
-    </div>
+    </Panel>
   )
 }

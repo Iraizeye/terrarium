@@ -1,5 +1,5 @@
 """
-RANGEWATCH configuration — every path and constant in one place.
+TERRARIUM configuration — every path and constant in one place.
 
 The dashboard watches exactly three things: Claude, the range-trader stack,
 and this machine. Nothing else.
@@ -19,7 +19,7 @@ ET = ZoneInfo("America/New_York")
 
 # Demo mode: every collector is swapped for a scripted synthetic day
 # (backend/demo.py) — zero config, zero personal data, full MESA.
-DEMO = os.getenv("RANGEWATCH_DEMO", "") == "1"
+DEMO = (os.getenv("TERRARIUM_DEMO") or os.getenv("RANGEWATCH_DEMO", "")) == "1"
 
 RANGE_TRADER_DIR   = Path(os.getenv("RANGE_TRADER_DIR", str(Path.home() / ".range-trader")))
 CLAUDE_PROJECTS_DIR = Path(os.getenv("CLAUDE_PROJECTS_DIR",
@@ -30,10 +30,10 @@ LAUNCH_AGENTS_DIR  = Path(os.getenv("LAUNCH_AGENTS_DIR",
 # Session log DB — long-lived local file; the name is historical. Demo mode
 # keeps its fiction in a separate throwaway DB, never the real log.
 _default_sessions_db = (
-    "/tmp/rangewatch-demo-sessions.db" if DEMO
+    "/tmp/terrarium-demo-sessions.db" if DEMO
     else str(Path.home() / ".claude" / "atlas-sessions.db")
 )
-SESSIONS_DB        = Path(os.getenv("RANGEWATCH_SESSIONS_DB", _default_sessions_db))
+SESSIONS_DB        = Path(os.getenv("TERRARIUM_SESSIONS_DB") or os.getenv("RANGEWATCH_SESSIONS_DB", _default_sessions_db))
 
 # ---------------------------------------------------------------------------
 # Services worth a GO/NO-GO cell (checked by TCP port, localhost only)
