@@ -75,14 +75,6 @@ function phaseText(phase: Phase): string {
   return phase === 'day' ? 'MARKET OPEN' : phase === 'dawn' ? 'DAWN RUN' : phase === 'dusk' ? 'AFTER CLOSE' : 'NIGHT WATCH'
 }
 
-function coverRect(cw: number, ch: number, iw: number, ih: number) {
-  const s = Math.max(cw / iw, ch / ih)
-  const dw = iw * s
-  const dh = ih * s
-  // vertical overflow crops mostly ceiling-side but keeps the desks
-  return { dx: (cw - dw) / 2, dy: (ch - dh) * 0.72, dw, dh }
-}
-
 function fleetBusy(fleet: AgentFleet | null): boolean {
   return !!fleet?.agents?.some(a => a.state === 'live')
 }
@@ -206,6 +198,17 @@ function drawScreen(
   const scan = ((now / 45) % (h + 10)) - 5
   ctx.fillStyle = 'rgba(120,230,160,0.05)'
   ctx.fillRect(x, y + scan, w, 2)
+  // faint screen grid so an idle panel still reads as glass, not a hole
+  ctx.strokeStyle = 'rgba(120,230,160,0.06)'
+  ctx.lineWidth = 1
+  for (const fy of [0.33, 0.55]) {
+    ctx.beginPath(); ctx.moveTo(x + 3, y + h * fy); ctx.lineTo(x + w - 3, y + h * fy); ctx.stroke()
+  }
+  if (!q) {
+    ctx.fillStyle = 'rgba(120,200,160,0.30)'
+    ctx.font = `${Math.max(6, h * 0.12)}px ${MONO}`
+    ctx.fillText('awaiting tape…', x + w * 0.08, y + h * 0.5)
+  }
   if (q) {
     const up = q.move >= 0
     const line = up ? '#56d98f' : '#e0837c'
@@ -213,13 +216,15 @@ function drawScreen(
     const series = hist.length > 2 ? hist : [q.last * 0.996, q.last]
     const min = Math.min(...series)
     const max = Math.max(...series)
-    const span = max - min || 1
+    const flat = (max - min) < Math.max(0.01, (q.last || 1) * 0.0008)
+    const span = flat ? Math.max(0.02, (q.last || 1) * 0.004) : (max - min)
+    const base = flat ? (min + max) / 2 - span / 2 : min
     const chartY = y + h * 0.14
     const chartH = h * 0.58
     ctx.beginPath()
     series.forEach((v, i) => {
       const px = x + pad + (i / Math.max(1, series.length - 1)) * (w - pad * 2)
-      const py = chartY + chartH - ((v - min) / span) * chartH
+      const py = chartY + chartH - ((v - base) / span) * chartH
       if (i === 0) ctx.moveTo(px, py)
       else ctx.lineTo(px, py)
     })
@@ -329,9 +334,11 @@ export default function RangeFloor() {
         return
       }
 
-      const { dx, dy, dw, dh } = coverRect(rect.width, rect.height, 1280, 720)
-      const X = (fx: number) => dx + fx * dw
-      const Y = (fy: number) => dy + fy * dh
+      const dx = 0, dy = 0, dw = rect.width, dh = rect.height
+      const X = (fx: number) => fx * dw
+      const Y = (fy: number) => fy * dh
+      // sprites keep sane proportions at any aspect
+      const S = Math.min(dh, dw * 0.60)
       const phase = getPhase(trading?.market)
       const room = ROOM[phase]
 
@@ -456,6 +463,23 @@ export default function RangeFloor() {
         ctx.fillRect(lx - dh * 0.024, ly - dh * 0.048, dh * 0.048, dh * 0.004)
       }
 
+      // counter dressing: paper tray left, potted plant right
+      {
+        const ty = Y(0.560)
+        ctx.fillStyle = '#d9d4c4'
+        ctx.fillRect(X(0.030), ty - dh * 0.016, S * 0.075, dh * 0.006)
+        ctx.fillRect(X(0.033), ty - dh * 0.026, S * 0.068, dh * 0.006)
+        ctx.fillStyle = '#3b3f45'
+        ctx.fillRect(X(0.028), ty - dh * 0.010, S * 0.082, dh * 0.010)
+        const px2 = X(0.958)
+        ctx.fillStyle = '#7a5230'
+        ctx.fillRect(px2 - S * 0.020, ty - dh * 0.030, S * 0.040, dh * 0.030)
+        ctx.fillStyle = '#4f8f4a'
+        ctx.beginPath(); ctx.ellipse(px2, ty - dh * 0.048, S * 0.030, dh * 0.024, 0, 0, Math.PI * 2); ctx.fill()
+        ctx.fillStyle = '#356534'
+        ctx.beginPath(); ctx.ellipse(px2 - S * 0.018, ty - dh * 0.040, S * 0.016, dh * 0.014, 0, 0, Math.PI * 2); ctx.fill()
+      }
+
       // ── live tape on the board ──
       const quotes = quotesFrom(board, trading)
       if (now - lastPush > 400) {
@@ -502,7 +526,7 @@ export default function RangeFloor() {
         const st = stations.find(s => s.key === key)
         const spot = SPOTS[key]
         if (!st || !spot) continue
-        const mw = dw * 0.070, mh = dh * 0.082
+        const mw = S * 0.125, mh = S * 0.100
         const mx = X(spot.x) - mw / 2, my = Y(0.560) - mh - dh * 0.012
         ctx.fillStyle = '#232a30'
         ctx.beginPath(); ctx.roundRect(mx - 3, my - 3, mw + 6, mh + 6, 5); ctx.fill()
@@ -553,7 +577,7 @@ export default function RangeFloor() {
         else sprite = working ? frames.chair[frameN] : stills.idle
         const frac = SPRITE_FRAC[s.action]
         if (sprite) {
-          const th = dh * frac
+          const th = S * frac
           const tw = sprite.width * (th / sprite.height)
           const ax = ANCHOR_X[s.action]
           shadow(ctx, x, y, tw)
@@ -584,7 +608,7 @@ export default function RangeFloor() {
         const w = Math.min(ctx.measureText(pick.bubble!).width + 14, 220)
         const cxb = X(pick.x)
         const bx = Math.max(dx + 4, Math.min(dx + dw - w - 4, cxb - w / 2))
-        const by = Math.max(dy + 6, Y(pick.y - SPRITE_FRAC[pick.action] - 0.05))
+        const by = Math.max(dy + 6, Y(pick.y) - S * SPRITE_FRAC[pick.action] - dh * 0.05)
         ctx.fillStyle = pick.down ? P.red : P.gold
         ctx.fillRect(bx, by, w, 18)
         ctx.fillStyle = P.bubble
