@@ -101,24 +101,55 @@ function drawShelfArchive(ctx: CanvasRenderingContext2D, x: number, y: number) {
 
 // ── the cast ────────────────────────────────────────────────────────────────
 
-function drawWorker(ctx: CanvasRenderingContext2D, s: Station, t: number, i: number) {
-  const deskY = s.row === 0 ? 152 : 210
-  const x = s.x + 10
-  const y = deskY - 30
-  const bob = s.present ? 0 : Math.round(Math.sin(t / 380 + i * 2) * 1)
-  if (!s.present) {
-    px(ctx, x + 3, y + 24 + bob, 4, 8, s.pants); px(ctx, x + 10, y + 24 + bob, 4, 8, s.pants)
+function drawFigure(ctx: CanvasRenderingContext2D, x: number, y: number, s: Station,
+                    t: number, i: number, pose: 'seated' | 'stand' | 'walk') {
+  // (x, y) anchors the feet; head is ~34px above
+  const top = y - 34
+  const bob = pose === 'seated' ? 0 : Math.round(Math.sin(t / 300 + i * 2) * 1)
+  if (pose === 'walk') {
+    const step = Math.floor(t / 140) % 2
+    px(ctx, x + 3 + (step ? 1 : -1), y - 8, 4, 8, s.pants)
+    px(ctx, x + 10 - (step ? 1 : -1), y - 8, 4, 8, s.pants)
+  } else if (pose === 'stand') {
+    px(ctx, x + 3, y - 8 + bob, 4, 8, s.pants); px(ctx, x + 10, y - 8 + bob, 4, 8, s.pants)
   }
-  px(ctx, x + 1, y + 12 + bob, 15, 13, s.shirt)
-  px(ctx, x - 1, y + 13 + bob, 3, 8, s.shirt); px(ctx, x + 15, y + 13 + bob, 3, 8, s.shirt)
-  px(ctx, x, y + 14 + bob, 1, 6, s.skin); px(ctx, x + 17, y + 14 + bob, 1, 6, s.skin)
-  px(ctx, x + 3, y - 2 + bob, 12, 13, s.skin)
-  px(ctx, x + 2, y - 4 + bob, 14, 5, s.hair)
-  px(ctx, x + 2, y - 1 + bob, 2, 4, s.hair); px(ctx, x + 14, y - 1 + bob, 2, 4, s.hair)
+  const by = pose === 'seated' ? top + 12 : y - 21 + bob
+  px(ctx, x + 1, by, 15, 13, s.shirt)
+  px(ctx, x - 1, by + 1, 3, 8, s.shirt); px(ctx, x + 15, by + 1, 3, 8, s.shirt)
+  px(ctx, x, by + 2, 1, 6, s.skin); px(ctx, x + 17, by + 2, 1, 6, s.skin)
+  const hy = by - 14
+  px(ctx, x + 3, hy, 12, 13, s.skin)
+  px(ctx, x + 2, hy - 2, 14, 5, s.hair)
+  px(ctx, x + 2, hy + 1, 2, 4, s.hair); px(ctx, x + 14, hy + 1, 2, 4, s.hair)
   const blink = Math.floor((t + i * 900) / 180) % 24 === 0
-  if (!blink) { px(ctx, x + 5, y + 3 + bob, 2, 2, P.ink); px(ctx, x + 11, y + 3 + bob, 2, 2, P.ink) }
-  if (s.down) { px(ctx, x + 4, y + 1 + bob, 4, 1, P.ink); px(ctx, x + 10, y + 1 + bob, 4, 1, P.ink) }
-  px(ctx, x + 7, y + 8 + bob, 4, 1, s.down ? P.red : P.ink)
+  if (!blink) { px(ctx, x + 5, hy + 5, 2, 2, P.ink); px(ctx, x + 11, hy + 5, 2, 2, P.ink) }
+  if (s.down) { px(ctx, x + 4, hy + 3, 4, 1, P.ink); px(ctx, x + 10, hy + 3, 4, 1, P.ink) }
+  px(ctx, x + 7, hy + 10, 4, 1, s.down ? P.red : P.ink)
+}
+
+// Where a worker is right now. Deterministic stroll: each 18s block, a present
+// worker either stays seated or walks to a hangout and back. Continuous at
+// block edges because every trip starts and ends at the desk.
+const HANGOUTS: [number, number][] = [[46, 250], [230, 248], [434, 246]]
+function ease(u: number): number { return u < 0.5 ? 2 * u * u : 1 - 2 * (1 - u) * (1 - u) }
+function workerPose(s: Station, i: number, t: number): { x: number; y: number; pose: 'seated' | 'stand' | 'walk' } {
+  const deskY = s.row === 0 ? 152 : 210
+  const home = { x: s.x + 10, y: deskY + 4, pose: 'seated' as const }
+  if (s.down) return { x: s.x + 10, y: deskY + 4, pose: 'seated' }
+  if (!s.present) return home
+  const BLOCK = 18000
+  const block = Math.floor(t / BLOCK)
+  const r = seeded(i * 131 + block * 17)
+  if (r < 0.7) return home                       // most blocks: heads-down work
+  const dest = HANGOUTS[Math.floor(seeded(i * 77 + block * 13) * HANGOUTS.length)]
+  const u = (t % BLOCK) / BLOCK
+  const feet: [number, number] = [s.x + 10, deskY + 26]  // step out beside the desk
+  let fx: number, fy: number, pose: 'stand' | 'walk'
+  if (u < 0.3) { const k = ease(u / 0.3); fx = feet[0] + (dest[0] - feet[0]) * k; fy = feet[1] + (dest[1] - feet[1]) * k; pose = 'walk' }
+  else if (u < 0.7) { fx = dest[0]; fy = dest[1]; pose = 'stand' }
+  else { const k = ease((u - 0.7) / 0.3); fx = dest[0] + (feet[0] - dest[0]) * k; fy = dest[1] + (feet[1] - dest[1]) * k; pose = 'walk' }
+  if (u > 0.97) return home
+  return { x: fx, y: fy, pose }
 }
 
 function drawScreen(ctx: CanvasRenderingContext2D, kind: Station['screen'], x: number, y: number,
@@ -388,10 +419,13 @@ export default function RangeFloor() {
         })
       })
 
-      for (let i = 0; i < stations.length; i++) {
-        const s = stations[i]
-        if (s.present || s.down) drawWorker(ctx, s, t, i)
-        drawDeskRow(ctx, s, t, i * 17 + 3)
+      const poses = stations.map((s, i) => ({ s, i, p: workerPose(s, i, t) }))
+      for (const { s, i, p } of poses) {
+        if ((s.present || s.down) && p.pose === 'seated') drawFigure(ctx, p.x, p.y, s, t, i, 'seated')
+      }
+      for (let i = 0; i < stations.length; i++) drawDeskRow(ctx, stations[i], t, i * 17 + 3)
+      for (const { s, i, p } of poses) {
+        if (s.present && p.pose !== 'seated') drawFigure(ctx, p.x, p.y, s, t, i, p.pose)
       }
 
       // one speech bubble at a time, rotating through stations that have one
