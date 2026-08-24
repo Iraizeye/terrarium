@@ -300,7 +300,7 @@ export default function App() {
 
   return (
     <div
-      className="h-screen overflow-hidden"
+      className="app-root"
       style={{
         background: sky.sky.join(', '),
         transition: 'background 3s ease',
@@ -317,23 +317,10 @@ export default function App() {
       <FloatingParticles rgb={sky.particle} />
       {showIntro && <IntroOverlay onClose={closeIntro} />}
 
-      <div style={{
-        position: 'relative', zIndex: 4,
-        display: 'grid',
-        width: '100%', height: '100%',
-        gridTemplateColumns: 'minmax(280px, 320px) 1fr minmax(300px, 340px)',
-        gridTemplateRows: '60px 1fr 64px',
-        gridTemplateAreas: `
-          "header header header"
-          "log    stage  desk"
-          "footer footer footer"
-        `,
-        gap: '0 12px',
-        padding: '0 16px',
-      }}>
+      <div className="shell">
 
         {/* Header — identity | alerts | clock */}
-        <div style={{ gridArea: 'header', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, minWidth: 0 }}>
+        <div className="shell-header">
           <CommandHeader />
           <div style={{ flex: 1, display: 'flex', justifyContent: 'center', minWidth: 0 }}>
             <AlertBar />
@@ -363,15 +350,14 @@ export default function App() {
             >
               {'\u2302'} home
             </button>
-            <ClockDot isConnected={isConnected} />
+            <div className="clock-block">
+              <ClockDot isConnected={isConnected} />
+            </div>
           </div>
         </div>
 
         {/* Left rail — fleet board over the ops log */}
-        <div style={{
-          gridArea: 'log', minHeight: 0, padding: '4px 0 8px',
-          display: 'flex', flexDirection: 'column', gap: 10,
-        }}>
+        <div className="shell-log">
           <div style={{ flexShrink: 0, maxHeight: '38%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             <FleetPanel />
           </div>
@@ -384,15 +370,12 @@ export default function App() {
         </div>
 
         {/* Center — the stage, or the agent's home */}
-        <div style={{ gridArea: 'stage', minWidth: 0, minHeight: 0 }}>
+        <div className="shell-stage">
           {view === 'stage' ? <RangeFloor /> : <ClaudeHomePanel />}
         </div>
 
         {/* Right rail — trading desk over the decision board */}
-        <div style={{
-          gridArea: 'desk', minHeight: 0, padding: '4px 0 8px',
-          display: 'flex', flexDirection: 'column', gap: 10,
-        }}>
+        <div className="shell-desk">
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
             <TradingPanel />
           </div>
@@ -402,7 +385,7 @@ export default function App() {
         </div>
 
         {/* Footer — vitals + usage */}
-        <div style={{ gridArea: 'footer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, flexWrap: 'nowrap', minWidth: 0, overflow: 'hidden' }}>
+        <div className="shell-footer">
           <StatPill label="Memory" value={system?.ram_pct != null ? `${Math.round(system.ram_pct)}%` : '—'} sub={system ? `${system.ram_used_gb}/${system.ram_total_gb} GB` : undefined} />
           <StatPill label="CPU" value={system?.cpu_pct != null ? `${Math.round(system.cpu_pct)}%` : '—'} sub={system?.load_1m ? `${system.load_1m} avg` : undefined} />
           <StatPill label="Disk" value={system?.disk_pct != null ? `${Math.round(system.disk_pct)}%` : '—'} sub={system ? `${system.disk_used_gb}/${system.disk_total_gb} GB` : undefined} warn={system?.disk_pct != null && system.disk_pct > 85} />

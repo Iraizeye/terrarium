@@ -1,32 +1,46 @@
-// THE TERRARIUM FLOOR — side-view pixel glasshouse (Office-style cutaway). Every
-// worker is real: the five desk seats from /api/desk plus both trading
-// daemons from the store. Nothing is simulated — a quiet floor looks quiet.
-//
-// 480x270 logical canvas scaled with smoothing off for chunky pixels.
+// THE TERRARIUM — a closed glass tank. Agents live in the garden.
+// Every worker is real: five desk seats from /api/desk plus both trading
+// daemons. Pending seats still show (dim, amber) so the crew is visible.
+// 480x270 logical canvas, nearest-neighbor scale.
 
 import { useEffect, useRef, useState } from 'react'
+import { getPhase, type Phase } from '../theme'
 import { useDashboardStore } from '../store/dashboardStore'
 import type { BoardState, MarketClock, TradingStatus } from '../types'
 
 const LW = 480
 const LH = 270
-const MONO = '"Fira Code", monospace'
+const MONO = '"JetBrains Mono", "Fira Code", monospace'
+const GLASS_L = 22
+const GLASS_R = 458
+const GLASS_T = 22
+const GLASS_B = 236
+const SOIL = 206
+const BACK_Y = 146
+const FRONT_Y = 182
 
 const P = {
-  bg: '#0b1310', wainscot: '#16241c',
-  frame: '#182620', mullion: '#24382e', sheen: 'rgba(220,255,235,0.05)',
-  skyNight: '#08130e', skyDawn: '#142516', skyDay: '#22331f', skyDusk: '#171f12',
-  floor: '#121b15',
-  desk: '#55655a', deskTop: '#b7c4b2', deskShadow: '#39463e', deskGlow: 'rgba(62,207,154,0.55)',
-  screenBg: '#0e1410', mint: '#7de8a8', red: '#f0716a', amber: '#e0b34d',
-  board: '#efe9d8', boardTxt: '#3a3a44', gold: '#d9a441', goldDim: '#8a6a2a',
+  room: '#070d0a',
+  wood: '#3a2414', woodD: '#24160c', woodL: '#5a3820',
+  brass: '#c4a05a', brassD: '#8a6a32',
+  glass: 'rgba(210,240,225,0.07)',
+  sheen: 'rgba(230,255,240,0.16)',
+  soil: '#3a2a18', soilD: '#24180c', moss: '#3d6a38', mossL: '#5a8f4a',
+  gravel: '#6a5a48',
+  plant: '#4f8f4a', plantD: '#356534', plantL: '#6fae5c',
+  mint: '#7de8a8', red: '#f0716a', amber: '#e0b34d', gold: '#d9a441',
   emerald: '#3ecf9a',
   text: '#eaf0e8', dim: '#93a396', ink: '#141414',
-  bubble: '#f2f6ea', plant: '#4f8f4a', plantD: '#356534', plantL: '#6fae5c',
-  pot: '#7a5230', vine: '#2e5238',
-  shelf: '#3e4f38', archive: '#c8a04a',
-  skins: ['#b9c4cb', '#9aa9b2', '#84939d', '#6e7d88'],
-  hairs: ['#26333b', '#3ecf9a', '#e0b34d', '#43525c', '#7a8a94'],
+  bubble: '#f2f6ea', board: '#efe9d8', boardTxt: '#3a3a44',
+  screenBg: '#0e1410',
+  skins: ['#c5d0d6', '#a8b6be', '#8fa0aa', '#7a8b96'],
+}
+
+const SKY: Record<Phase, string> = {
+  night: '#06120e',
+  dawn: '#1c2a16',
+  day: '#2e4024',
+  dusk: '#1c2414',
 }
 
 type SeatStatus = 'ok' | 'failed' | 'pending'
@@ -39,25 +53,26 @@ interface Station {
   key: string
   label: string
   shirt: string
-  pants: string
   skin: string
-  hair: string
-  x: number            // desk left edge
-  row: number          // 0 = back row, 1 = front row
+  accent: string
+  x: number
+  row: number
   present: boolean
   down: boolean
+  pending: boolean
   chip: string
   bubble: string | null
   screen: 'bars' | 'candles' | 'wave' | 'film' | 'list'
+  kit: 'scan' | 'dish' | 'cam' | 'lamp' | 'live' | 'paper'
 }
 
-const STYLE: Record<string, { shirt: string; pants: string; screen: Station['screen'] }> = {
-  premarket: { shirt: '#4a7ab0', pants: '#26364a', screen: 'list' },
-  ops: { shirt: '#5a9a5a', pants: '#2c4a2c', screen: 'bars' },
-  content: { shirt: '#c05a8a', pants: '#4a2438', screen: 'film' },
-  projects: { shirt: '#c8a04a', pants: '#4a3a1c', screen: 'list' },
-  live: { shirt: '#e07050', pants: '#4a2a20', screen: 'candles' },
-  paper: { shirt: '#7a9ab0', pants: '#2c3c4a', screen: 'candles' },
+const STYLE: Record<string, { shirt: string; screen: Station['screen']; kit: Station['kit']; accent: string }> = {
+  premarket: { shirt: '#4a7ab0', screen: 'list', kit: 'scan', accent: '#7eb4e8' },
+  ops: { shirt: '#5a9a5a', screen: 'bars', kit: 'dish', accent: '#8fd48f' },
+  content: { shirt: '#c05a8a', screen: 'film', kit: 'cam', accent: '#e890b8' },
+  projects: { shirt: '#c8a04a', screen: 'list', kit: 'lamp', accent: '#e8c56a' },
+  live: { shirt: '#e07050', screen: 'candles', kit: 'live', accent: '#f0a080' },
+  paper: { shirt: '#7a9ab0', screen: 'candles', kit: 'paper', accent: '#a8c8d8' },
 }
 
 function px(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, c: string) {
@@ -65,190 +80,371 @@ function px(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: n
   ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h))
 }
 
-function seeded(n: number): number { // deterministic 0..1, stable across frames
+function seeded(n: number): number {
   const s = Math.sin(n * 127.1) * 43758.5453
   return s - Math.floor(s)
 }
 
-// ── set dressing ─────────────────────────────────────────────────────────────
+function shade(hex: string, toward: string, t: number): string {
+  const parse = (h: string) => [
+    parseInt(h.slice(1, 3), 16),
+    parseInt(h.slice(3, 5), 16),
+    parseInt(h.slice(5, 7), 16),
+  ]
+  const a = parse(hex), b = parse(toward)
+  const m = (i: number) => Math.round(a[i] + (b[i] - a[i]) * t)
+  return `rgb(${m(0)},${m(1)},${m(2)})`
+}
 
-// Glass back wall: the market sky shows through the panes, mullions frame it,
-// leaf silhouettes press against the glass from outside, fireflies at night.
-function drawGlassWall(ctx: CanvasRenderingContext2D, sky: string, night: boolean, t: number) {
-  px(ctx, 0, 13, LW, 105, sky)
-  // outside foliage silhouettes along the bottom of the glass
-  for (let i = 0; i < 24; i++) {
-    const lx = i * 21 + (seeded(i * 3.7) * 8 - 4)
-    const lh = 8 + Math.floor(seeded(i * 9.1) * 18)
-    px(ctx, lx, 118 - lh, 12, lh, night ? '#0c1b12' : '#1a3320')
-    px(ctx, lx + 3, 118 - lh - 5, 6, 6, night ? '#0c1b12' : '#1a3320')
+function deskY(row: number) { return row === 0 ? BACK_Y : FRONT_Y }
+
+function shiftOf(phase: Phase): { txt: string; c: string } {
+  if (phase === 'day') return { txt: 'MARKET OPEN', c: P.mint }
+  if (phase === 'dawn') return { txt: 'DAWN RUN', c: P.amber }
+  if (phase === 'dusk') return { txt: 'DUSK', c: '#e08a58' }
+  return { txt: 'NIGHT', c: '#7ac0a0' }
+}
+
+function drawFern(ctx: CanvasRenderingContext2D, x: number, y: number, h: number, seed: number, dark = false) {
+  const stem = dark ? '#2a4a28' : P.plantD
+  const leaf = dark ? '#3a6a38' : P.plant
+  const tip = dark ? P.plantD : P.plantL
+  px(ctx, x + 2, y - h, 2, h, stem)
+  const n = 4 + Math.floor(seeded(seed) * 3)
+  for (let i = 0; i < n; i++) {
+    const yy = y - 4 - i * Math.max(3, Math.floor(h / (n + 1)))
+    const span = 4 + Math.floor((1 - i / n) * 8)
+    px(ctx, x + 2 - span, yy, span, 2, i % 2 ? tip : leaf)
+    px(ctx, x + 4, yy + 1, span - 1, 2, i % 2 ? leaf : stem)
   }
-  // mullion grid
-  for (let mx = 0; mx <= 12; mx++) px(ctx, mx * 40, 13, 2, 105, P.mullion)
-  px(ctx, 0, 48, LW, 2, P.mullion)
-  px(ctx, 0, 84, LW, 2, P.mullion)
-  px(ctx, 0, 116, LW, 2, P.mullion)
-  // one diagonal sheen band per pane row
-  ctx.fillStyle = P.sheen
-  for (let mx = 0; mx < 12; mx += 3) ctx.fillRect(mx * 40 + 6, 16, 8, 100)
-  // fireflies drift outside the glass at night
-  if (night) {
-    for (let f = 0; f < 9; f++) {
-      const fx = (seeded(f * 17.3) * LW + t / (900 + f * 90)) % LW
-      const fy = 24 + seeded(f * 31.7) * 80 + Math.sin(t / 700 + f * 2) * 4
-      const on = Math.sin(t / 380 + f * 5) > 0.15
-      if (on) px(ctx, fx, fy, 1.6, 1.6, '#d8f0a0')
+}
+
+function drawMossClump(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, seed: number) {
+  px(ctx, x, y, w, 5, P.moss)
+  px(ctx, x + 2, y - 3, w - 4, 4, P.mossL)
+  if (seeded(seed) > 0.35) px(ctx, x + 3, y - 5, 4, 3, P.plantL)
+  if (seeded(seed + 2) > 0.55) px(ctx, x + w - 8, y - 4, 3, 3, P.plant)
+}
+
+function drawVine(ctx: CanvasRenderingContext2D, t: number) {
+  let x = GLASS_L + 4, y = GLASS_T + 6
+  for (let i = 0; i < 18; i++) {
+    x += Math.round(Math.sin(i / 2.4 + t / 4000) * 2)
+    y += 8
+    px(ctx, x, y, 2, 8, P.plantD)
+    if (i % 2 === 0) px(ctx, x - 5, y + 2, 5, 3, P.plant)
+    if (i % 3 === 0) px(ctx, x + 2, y + 1, 6, 3, P.plantL)
+  }
+}
+
+function drawDriftwood(ctx: CanvasRenderingContext2D) {
+  px(ctx, 148, SOIL - 8, 86, 6, '#6a4a2c')
+  px(ctx, 150, SOIL - 12, 70, 5, '#8a6240')
+  px(ctx, 168, SOIL - 18, 18, 8, '#5a3a20')
+  px(ctx, 200, SOIL - 14, 12, 6, '#4a2e18')
+}
+
+function drawPool(ctx: CanvasRenderingContext2D, t: number) {
+  const x = 392, y = SOIL - 6, w = 52, h = 12
+  px(ctx, x, y, w, h, '#1a3a48')
+  px(ctx, x + 2, y + 2, w - 4, h - 4, '#245a68')
+  const ripple = Math.round(Math.sin(t / 700) * 2)
+  px(ctx, x + 8 + ripple, y + 4, 18, 1, 'rgba(180,230,240,0.35)')
+  px(ctx, x + 20 - ripple, y + 7, 14, 1, 'rgba(180,230,240,0.22)')
+}
+
+function drawMushrooms(ctx: CanvasRenderingContext2D, x: number, y: number) {
+  px(ctx, x + 2, y - 6, 2, 6, '#d8c8a0')
+  px(ctx, x, y - 10, 6, 4, '#c45a48')
+  px(ctx, x + 8, y - 5, 2, 5, '#d8c8a0')
+  px(ctx, x + 6, y - 8, 6, 3, '#e07060')
+}
+
+function drawTank(ctx: CanvasRenderingContext2D, phase: Phase, t: number) {
+  px(ctx, 0, 0, LW, LH, P.room)
+
+  // stand
+  px(ctx, 10, GLASS_B + 4, LW - 20, 14, P.wood)
+  px(ctx, 10, GLASS_B + 4, LW - 20, 3, P.woodL)
+  px(ctx, 16, GLASS_B + 16, 12, 10, P.woodD)
+  px(ctx, LW - 28, GLASS_B + 16, 12, 10, P.woodD)
+  px(ctx, 6, LH - 6, LW - 12, 6, P.woodD)
+
+  // sky through the back pane
+  px(ctx, GLASS_L, GLASS_T, GLASS_R - GLASS_L, SOIL - GLASS_T, SKY[phase])
+  if (phase === 'dawn' || phase === 'day') {
+    const g = ctx.createLinearGradient(GLASS_L, GLASS_T, GLASS_L + 120, SOIL)
+    g.addColorStop(0, phase === 'day' ? 'rgba(255,220,140,0.18)' : 'rgba(255,170,70,0.22)')
+    g.addColorStop(1, 'rgba(255,200,90,0)')
+    ctx.fillStyle = g
+    ctx.fillRect(GLASS_L, GLASS_T, GLASS_R - GLASS_L, SOIL - GLASS_T)
+    ctx.fillStyle = phase === 'day' ? 'rgba(255,230,160,0.06)' : 'rgba(255,180,80,0.08)'
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath()
+      ctx.moveTo(GLASS_L + 30 + i * 18, GLASS_T)
+      ctx.lineTo(GLASS_L + 70 + i * 28, SOIL)
+      ctx.lineTo(GLASS_L + 78 + i * 28, SOIL)
+      ctx.lineTo(GLASS_L + 36 + i * 18, GLASS_T)
+      ctx.fill()
     }
   }
-}
-
-function drawPlant(ctx: CanvasRenderingContext2D, x: number, y: number) {
-  px(ctx, x + 2, y - 14, 6, 8, P.plant); px(ctx, x, y - 9, 10, 5, P.plantD)
-  px(ctx, x + 1, y - 4, 8, 6, P.pot); px(ctx, x + 2, y + 2, 6, 1, '#161008')
-}
-
-function drawTallPlant(ctx: CanvasRenderingContext2D, x: number, y: number, s: number) {
-  px(ctx, x + 4, y - 26, 4, 20, P.plantD)
-  px(ctx, x, y - 30, 6, 9, P.plant); px(ctx, x + 7, y - 33, 6, 10, P.plantL)
-  px(ctx, x + 3, y - 37, 6, 8, P.plant); px(ctx, x - 2 + (s % 3), y - 22, 5, 7, P.plantD)
-  px(ctx, x + 1, y - 7, 10, 8, P.pot); px(ctx, x + 2, y + 1, 8, 1, '#161008')
-}
-
-function drawHangingPlant(ctx: CanvasRenderingContext2D, x: number, t: number, i: number) {
-  const sway = Math.round(Math.sin(t / 1400 + i * 2.1) * 1)
-  px(ctx, x + 5, 13, 1, 9, '#4a5a4c')
-  px(ctx, x + sway, 22, 11, 6, P.pot)
-  px(ctx, x - 2 + sway, 27, 4, 9, P.plant); px(ctx, x + 3 + sway, 27, 4, 13, P.plantL)
-  px(ctx, x + 9 + sway, 27, 4, 10, P.plantD)
-}
-
-function drawShelfArchive(ctx: CanvasRenderingContext2D, x: number, y: number) {
-  px(ctx, x, y, 66, 22, P.shelf)
-  for (let r = 0; r < 2; r++) for (let b = 0; b < 9; b++) {
-    px(ctx, x + 3 + b * 7, y + 2 + r * 10, 5, 8,
-      ['#b05a4a', '#4a7ab0', '#c8a04a', '#5a9a5a', '#8a5aa0'][(r * 5 + b * 3) % 5])
+  if (phase === 'dusk') {
+    const g = ctx.createLinearGradient(0, SOIL - 70, 0, SOIL)
+    g.addColorStop(0, 'rgba(240,90,40,0)')
+    g.addColorStop(1, 'rgba(220,90,50,0.26)')
+    ctx.fillStyle = g
+    ctx.fillRect(GLASS_L, SOIL - 70, GLASS_R - GLASS_L, 70)
   }
-  px(ctx, x + 18, y + 23, 30, 7, '#20160c')
-  ctx.font = `5px ${MONO}`; ctx.fillStyle = P.archive
-  ctx.fillText('ARCHIVE', x + 21, y + 28.5)
+
+  // interior fog
+  ctx.fillStyle = phase === 'night' ? 'rgba(40,80,60,0.10)' : 'rgba(200,230,210,0.06)'
+  ctx.fillRect(GLASS_L, GLASS_T, GLASS_R - GLASS_L, 36)
+
+  // substrate: gravel, charcoal, soil, moss cap
+  px(ctx, GLASS_L, SOIL + 18, GLASS_R - GLASS_L, GLASS_B - SOIL - 18, '#5a4a38')
+  px(ctx, GLASS_L, SOIL + 10, GLASS_R - GLASS_L, 10, '#2a2218')
+  px(ctx, GLASS_L, SOIL, GLASS_R - GLASS_L, 14, P.soil)
+  px(ctx, GLASS_L, SOIL, GLASS_R - GLASS_L, 3, P.moss)
+  for (let i = 0; i < 30; i++) {
+    px(ctx, GLASS_L + 4 + i * 14 + seeded(i * 4.1) * 5, SOIL + 16 + seeded(i) * 6, 3, 2, P.gravel)
+  }
+
+  drawMossClump(ctx, 28, SOIL - 2, 28, 1)
+  drawMossClump(ctx, 118, SOIL - 1, 22, 2)
+  drawMossClump(ctx, 250, SOIL - 3, 30, 3)
+  drawMossClump(ctx, 400, SOIL - 1, 24, 4)
+  drawDriftwood(ctx)
+  drawPool(ctx, t)
+  drawMushrooms(ctx, 70, SOIL)
+  drawMushrooms(ctx, 330, SOIL + 2)
+
+  // back ferns (darker, against the glass) — leave a clearing under the cloche and traders
+  for (let i = 0; i < 12; i++) {
+    const fx = 26 + i * 36 + seeded(i * 2.2) * 6
+    if (fx > 200 && fx < 280) continue
+    if (fx > 300 && fx < 450) continue
+    drawFern(ctx, fx, SOIL, 22 + seeded(i * 7) * 28, i * 3, true)
+  }
+  drawVine(ctx, t)
+  // a few brighter front ferns on the far left
+  drawFern(ctx, 40, SOIL, 36, 21)
+  drawFern(ctx, 58, SOIL, 24, 22)
+
+  // hanging moss from the lid
+  for (let i = 0; i < 8; i++) {
+    const hx = 36 + i * 52 + Math.round(Math.sin(t / 1600 + i) * 1)
+    const len = 12 + seeded(i * 9) * 16
+    px(ctx, hx, GLASS_T, 2, len, P.plantD)
+    px(ctx, hx - 3, GLASS_T + len - 3, 8, 5, i % 2 ? P.plant : P.plantL)
+  }
+
+  // dripping condensation
+  for (let i = 0; i < 18; i++) {
+    const dx = GLASS_L + 10 + seeded(i * 11.3) * (GLASS_R - GLASS_L - 20)
+    const fall = (t / (40 + i * 7) + seeded(i * 3) * 80) % (SOIL - GLASS_T - 12)
+    const dy = GLASS_T + 8 + fall
+    px(ctx, dx, dy, 1, 3, 'rgba(220,255,240,0.32)')
+  }
+
+  if (phase === 'night') {
+    for (let f = 0; f < 14; f++) {
+      const span = GLASS_R - GLASS_L - 24
+      const fx = GLASS_L + 12 + (seeded(f * 17.3) * span + t / (800 + f * 70)) % span
+      const fy = GLASS_T + 18 + seeded(f * 31.7) * 100 + Math.sin(t / 700 + f * 2) * 4
+      if (Math.sin(t / 380 + f * 5) > 0.05) {
+        px(ctx, fx - 1, fy - 1, 3, 3, 'rgba(216,240,160,0.32)')
+        px(ctx, fx, fy, 2, 2, '#e8f8b0')
+      }
+    }
+  }
+
+  // brass frame + rivets + latch
+  px(ctx, GLASS_L - 7, GLASS_T - 7, GLASS_R - GLASS_L + 14, 7, P.brass)
+  px(ctx, GLASS_L - 7, GLASS_B - 3, GLASS_R - GLASS_L + 14, 7, P.brass)
+  px(ctx, GLASS_L - 7, GLASS_T - 7, 7, GLASS_B - GLASS_T + 11, P.brass)
+  px(ctx, GLASS_R, GLASS_T - 7, 7, GLASS_B - GLASS_T + 11, P.brass)
+  px(ctx, GLASS_L - 7, GLASS_T - 7, GLASS_R - GLASS_L + 14, 2, '#e8d090')
+  const rivets = [
+    [GLASS_L - 4, GLASS_T - 4], [GLASS_R + 1, GLASS_T - 4],
+    [GLASS_L - 4, GLASS_B], [GLASS_R + 1, GLASS_B],
+  ]
+  for (const [rx, ry] of rivets) px(ctx, rx, ry, 3, 3, '#8a6a32')
+  px(ctx, GLASS_R - 18, GLASS_T - 3, 10, 4, '#e8d090')
+  px(ctx, GLASS_R - 16, GLASS_T + 1, 6, 6, P.brassD)
+
+  // glass sheen
+  ctx.fillStyle = P.sheen
+  ctx.fillRect(GLASS_L + 8, GLASS_T + 4, 7, GLASS_B - GLASS_T - 10)
+  ctx.fillStyle = 'rgba(255,255,255,0.05)'
+  ctx.fillRect(GLASS_L, GLASS_T, GLASS_R - GLASS_L, 3)
+  ctx.fillStyle = 'rgba(0,0,0,0.12)'
+  ctx.fillRect(GLASS_R - 4, GLASS_T, 4, GLASS_B - GLASS_T)
 }
 
-// ── the cast ────────────────────────────────────────────────────────────────
+function drawCloche(ctx: CanvasRenderingContext2D, t: number, ok: boolean, pending: boolean) {
+  const cx = 240, cy = 72
+  px(ctx, cx - 26, cy + 22, 52, 4, P.brass)
+  px(ctx, cx - 22, cy + 26, 44, 7, '#5a3a1c')
+  px(ctx, cx - 16, cy + 32, 32, 3, P.moss)
+  ctx.beginPath(); ctx.arc(cx, cy + 22, 30, Math.PI, 0)
+  ctx.fillStyle = 'rgba(190,235,215,0.16)'; ctx.fill()
+  ctx.beginPath(); ctx.arc(cx, cy + 22, 30, Math.PI, 0)
+  ctx.strokeStyle = 'rgba(230,255,240,0.6)'; ctx.lineWidth = 1.6; ctx.stroke()
+  px(ctx, cx - 5, cy - 12, 10, 2, 'rgba(230,255,240,0.7)')
+  const sway = Math.round(Math.sin(t / 1100) * 1)
+  px(ctx, cx - 1 + sway, cy + 4, 3, 18, P.plantD)
+  px(ctx, cx - 12 + sway, cy + 2, 10, 7, P.plant)
+  px(ctx, cx + 2 + sway, cy - 8, 10, 7, P.plantL)
+  px(ctx, cx - 6 + sway, cy - 14, 8, 6, P.plant)
+  px(ctx, cx + 6 + sway, cy + 6, 8, 6, P.plantD)
+  const fx = cx + Math.cos(t / 800) * 16, fy = cy + 6 + Math.sin(t / 620) * 8
+  if (Math.sin(t / 420) > -0.25) {
+    px(ctx, fx - 2, fy - 2, 5, 5, ok ? 'rgba(125,232,168,0.45)' : 'rgba(224,179,77,0.38)')
+    px(ctx, fx, fy, 2, 2, ok ? P.mint : pending ? P.amber : P.amber)
+  }
+  ctx.textAlign = 'center'
+  ctx.font = `6px ${MONO}`
+  ctx.fillStyle = P.gold
+  ctx.fillText('CHIEF OF STAFF', cx, cy + 42)
+  ctx.textAlign = 'left'
+}
+
+function drawKit(ctx: CanvasRenderingContext2D, kit: Station['kit'], hx: number, hy: number, t: number, idle: boolean) {
+  if (kit === 'scan') {
+    const y = hy + 5 + (idle ? 0 : Math.floor((t / 180) % 4))
+    px(ctx, hx + 4, y, 8, 1, idle ? '#3a5a4a' : '#9fffd8')
+  } else if (kit === 'dish') {
+    px(ctx, hx + 14, hy - 2, 5, 2, '#8aa')
+    px(ctx, hx + 16, hy - 6, 2, 4, '#8aa')
+  } else if (kit === 'cam') {
+    px(ctx, hx + 2, hy + 4, 3, 3, '#2a1a22')
+    px(ctx, hx + 11, hy + 4, 3, 3, '#2a1a22')
+    if (!idle) px(ctx, hx + 3, hy + 5, 1, 1, P.red)
+  } else if (kit === 'lamp') {
+    px(ctx, hx + 3, hy - 2, 10, 2, '#c8a04a')
+  } else if (kit === 'live') {
+    px(ctx, hx + 1, hy + 1, 2, 10, P.red)
+  } else {
+    px(ctx, hx + 1, hy + 1, 2, 10, '#4a7ab0')
+  }
+}
 
 function drawFigure(ctx: CanvasRenderingContext2D, x: number, y: number, s: Station,
                     t: number, i: number, pose: 'seated' | 'stand' | 'walk') {
-  // (x, y) anchors the feet; a little AI robot, ~34px tall with antenna
-  const top = y - 34
+  const idle = s.pending || s.down
+  const fade = idle ? 0.22 : 0
+  const metal = shade(s.skin, '#1a2018', fade)
+  const shirt = shade(s.shirt, '#1a2018', fade)
   const bob = pose === 'seated' ? 0 : Math.round(Math.sin(t / 300 + i * 2) * 1)
+  const type = !idle && pose === 'seated' && Math.floor(t / 140 + i) % 2 === 0 ? 1 : 0
+
   if (pose === 'walk') {
     const step = Math.floor(t / 140) % 2
-    px(ctx, x + 3 + (step ? 1 : -1), y - 8, 4, 8, s.skin)
-    px(ctx, x + 10 - (step ? 1 : -1), y - 8, 4, 8, s.skin)
-    px(ctx, x + 2, y - 1, 6, 1, P.deskShadow); px(ctx, x + 9, y - 1, 6, 1, P.deskShadow)
+    px(ctx, x + 3 + (step ? 1 : -1), y - 8, 4, 8, metal)
+    px(ctx, x + 10 - (step ? 1 : -1), y - 8, 4, 8, metal)
   } else if (pose === 'stand') {
-    px(ctx, x + 3, y - 8 + bob, 4, 8, s.skin); px(ctx, x + 10, y - 8 + bob, 4, 8, s.skin)
+    px(ctx, x + 3, y - 8 + bob, 4, 8, metal); px(ctx, x + 10, y - 8 + bob, 4, 8, metal)
   }
-  const by = pose === 'seated' ? top + 12 : y - 21 + bob
-  // torso: station-colored chassis, metal shoulder arms, blinking chest light
-  px(ctx, x + 1, by, 15, 13, s.shirt)
-  px(ctx, x + 1, by, 15, 2, s.skin)
-  px(ctx, x - 1, by + 1, 3, 8, s.skin); px(ctx, x + 15, by + 1, 3, 8, s.skin)
-  px(ctx, x - 1, by + 9, 3, 2, s.hair); px(ctx, x + 15, by + 9, 3, 2, s.hair)
-  const chestOn = Math.sin(t / 650 + i * 1.7) > -0.2
-  px(ctx, x + 7, by + 4, 4, 3, s.down ? P.red : chestOn ? P.mint : '#2a3a32')
-  // head: metal box, visor stripe, antenna with status tip
+
+  const by = pose === 'seated' ? y - 22 : y - 21 + bob
+  px(ctx, x + 1, by, 15, 13, shirt)
+  px(ctx, x + 1, by, 15, 2, metal)
+  px(ctx, x - 1, by + 1, 3, 8, metal); px(ctx, x + 15, by + 1, 3, 8, metal)
+  if (pose === 'seated' && !s.down) {
+    px(ctx, x - 1, by + 9, 5, 2, metal)
+    px(ctx, x + 12, by + 9 + type, 5, 2, metal)
+  }
+  const chestOn = !idle && Math.sin(t / 520 + i * 1.7) > -0.15
+  px(ctx, x + 7, by + 4, 4, 3, s.down ? P.red : s.pending ? P.amber : chestOn ? P.mint : '#2a3a32')
+
   const hy = by - 14
-  px(ctx, x + 3, hy, 12, 12, s.skin)
-  px(ctx, x + 3, hy, 12, 3, s.hair)
-  px(ctx, x + 8, hy - 4, 2, 4, s.skin)
-  const aOn = Math.floor((t + i * 700) / 900) % 2 === 0
-  px(ctx, x + 7, hy - 7, 4, 4, s.down ? P.red : aOn ? P.mint : '#3a4a40')
-  // LED eyes; a downed bot shows flat red eyes
+  px(ctx, x + 3, hy, 12, 12, metal)
+  px(ctx, x + 3, hy, 12, 3, shade(s.accent, '#1a2018', fade))
+  px(ctx, x + 8, hy - 4, 2, 4, metal)
+  const aOn = !idle && Math.floor((t + i * 700) / 900) % 2 === 0
+  px(ctx, x + 7, hy - 7, 4, 4, s.down ? P.red : s.pending ? P.amber : aOn ? P.mint : '#3a4a40')
   const blink = Math.floor((t + i * 900) / 180) % 24 === 0
-  if (s.down) { px(ctx, x + 5, hy + 6, 3, 1, P.red); px(ctx, x + 10, hy + 6, 3, 1, P.red) }
-  else if (!blink) { px(ctx, x + 5, hy + 5, 2, 2, '#9fffd8'); px(ctx, x + 11, hy + 5, 2, 2, '#9fffd8') }
-  // speaker grill
+  if (s.down) {
+    px(ctx, x + 5, hy + 6, 3, 1, P.red); px(ctx, x + 10, hy + 6, 3, 1, P.red)
+  } else if (s.pending) {
+    px(ctx, x + 5, hy + 5, 2, 2, P.amber); px(ctx, x + 11, hy + 5, 2, 2, P.amber)
+  } else if (!blink) {
+    px(ctx, x + 5, hy + 5, 2, 2, '#9fffd8'); px(ctx, x + 11, hy + 5, 2, 2, '#9fffd8')
+    if (pose === 'seated') px(ctx, x + 4, hy + 4, 10, 5, 'rgba(127,232,168,0.12)')
+  }
   px(ctx, x + 6, hy + 9, 6, 1, s.down ? P.red : '#1c2a22')
-  px(ctx, x + 7, hy + 11, 4, 1, '#1c2a22')
+  drawKit(ctx, s.kit, x + 3, hy, t, idle)
 }
 
-// Where a worker is right now. Deterministic stroll: each 18s block, a present
-// worker either stays seated or walks to a hangout and back. Continuous at
-// block edges because every trip starts and ends at the desk.
-const HANGOUTS: [number, number][] = [[46, 250], [230, 248], [434, 246]]
+const HANGOUTS: [number, number][] = [[56, 214], [240, 214], [400, 214]]
 function ease(u: number): number { return u < 0.5 ? 2 * u * u : 1 - 2 * (1 - u) * (1 - u) }
-function workerPose(s: Station, i: number, t: number): { x: number; y: number; pose: 'seated' | 'stand' | 'walk' } {
-  const deskY = s.row === 0 ? 152 : 210
-  const home = { x: s.x + 10, y: deskY + 4, pose: 'seated' as const }
-  if (s.down) return { x: s.x + 10, y: deskY + 4, pose: 'seated' }
+
+function workerPose(s: Station, i: number, t: number, reduced: boolean): { x: number; y: number; pose: 'seated' | 'stand' | 'walk' } {
+  const dy = deskY(s.row)
+  const home = { x: s.x + 10, y: dy + 4, pose: 'seated' as const }
+  if (s.down || s.pending || reduced) return home
   if (!s.present) return home
-  const BLOCK = 18000
+  const BLOCK = 22000
   const block = Math.floor(t / BLOCK)
   const r = seeded(i * 131 + block * 17)
-  if (r < 0.7) return home                       // most blocks: heads-down work
+  if (r < 0.82) return home
   const dest = HANGOUTS[Math.floor(seeded(i * 77 + block * 13) * HANGOUTS.length)]
   const u = (t % BLOCK) / BLOCK
-  const feet: [number, number] = [s.x + 10, deskY + 26]  // step out beside the desk
+  const feet: [number, number] = [s.x + 10, dy + 22]
   let fx: number, fy: number, pose: 'stand' | 'walk'
-  if (u < 0.3) { const k = ease(u / 0.3); fx = feet[0] + (dest[0] - feet[0]) * k; fy = feet[1] + (dest[1] - feet[1]) * k; pose = 'walk' }
-  else if (u < 0.7) { fx = dest[0]; fy = dest[1]; pose = 'stand' }
-  else { const k = ease((u - 0.7) / 0.3); fx = dest[0] + (feet[0] - dest[0]) * k; fy = dest[1] + (feet[1] - dest[1]) * k; pose = 'walk' }
+  if (u < 0.28) { const k = ease(u / 0.28); fx = feet[0] + (dest[0] - feet[0]) * k; fy = feet[1] + (dest[1] - feet[1]) * k; pose = 'walk' }
+  else if (u < 0.72) { fx = dest[0]; fy = dest[1]; pose = 'stand' }
+  else { const k = ease((u - 0.72) / 0.28); fx = dest[0] + (feet[0] - dest[0]) * k; fy = dest[1] + (feet[1] - dest[1]) * k; pose = 'walk' }
   if (u > 0.97) return home
   return { x: fx, y: fy, pose }
 }
 
 function drawScreen(ctx: CanvasRenderingContext2D, kind: Station['screen'], x: number, y: number,
                     t: number, alive: boolean, seed: number) {
-  px(ctx, x, y, 30, 18, '#101418'); px(ctx, x + 1, y + 1, 28, 16, P.screenBg)
-  if (!alive) { px(ctx, x + 13, y + 8, 4, 2, '#31414a'); return }
+  px(ctx, x, y, 28, 16, '#101418'); px(ctx, x + 1, y + 1, 26, 14, P.screenBg)
+  if (!alive) {
+    px(ctx, x + 4, y + 6, 20, 2, '#24322c')
+    return
+  }
   const c = P.mint
   if (kind === 'candles') {
-    for (let b = 0; b < 7; b++) {
-      const h = 3 + Math.floor(seeded(seed + b + Math.floor(t / 2400)) * 9)
+    for (let b = 0; b < 6; b++) {
+      const h = 3 + Math.floor(seeded(seed + b + Math.floor(t / 2400)) * 8)
       const up = seeded(seed * 2 + b + Math.floor(t / 2400)) > 0.45
-      px(ctx, x + 3 + b * 4, y + 15 - h, 2, h, up ? P.mint : P.red)
+      px(ctx, x + 3 + b * 4, y + 13 - h, 2, h, up ? P.mint : P.red)
     }
   } else if (kind === 'bars') {
-    for (let b = 0; b < 6; b++) {
-      const h = 3 + Math.floor(seeded(seed + b) * 10 + Math.sin(t / 900 + b) * 2)
-      px(ctx, x + 3 + b * 4.5, y + 15 - h, 3, h, c)
-    }
-  } else if (kind === 'wave') {
-    for (let wx = 0; wx < 26; wx++) {
-      const wy = 9 + Math.round(Math.sin((wx + t / 160) / 2.4) * 4)
-      px(ctx, x + 2 + wx, y + wy, 1, 2, c)
+    for (let b = 0; b < 5; b++) {
+      const h = 3 + Math.floor(seeded(seed + b) * 9 + Math.sin(t / 900 + b) * 2)
+      px(ctx, x + 3 + b * 4.5, y + 13 - h, 3, h, c)
     }
   } else if (kind === 'film') {
-    for (let f = 0; f < 3; f++) px(ctx, x + 3 + f * 9, y + 4, 7, 10, ['#c05a8a', '#d9a441', '#4a7ab0'][f])
-    px(ctx, x + 2, y + 2, 26, 1, '#333'); px(ctx, x + 2, y + 15, 26, 1, '#333')
+    for (let f = 0; f < 3; f++) px(ctx, x + 3 + f * 8, y + 3, 6, 9, ['#c05a8a', '#d9a441', '#4a7ab0'][f])
   } else {
-    for (let l = 0; l < 4; l++) px(ctx, x + 3, y + 3 + l * 4, 12 + seeded(seed + l) * 12, 2, l ? '#41616a' : c)
+    for (let l = 0; l < 4; l++) px(ctx, x + 3, y + 3 + l * 3, 10 + seeded(seed + l) * 10, 2, l ? '#41616a' : c)
   }
 }
 
-function drawDeskRow(ctx: CanvasRenderingContext2D, s: Station, t: number, seed: number) {
-  const deskY = s.row === 0 ? 152 : 210
-  px(ctx, s.x - 2, deskY, 42, 3, P.deskTop)
-  px(ctx, s.x - 2, deskY + 3, 42, 1, P.deskGlow)
-  px(ctx, s.x - 2, deskY + 4, 42, 14, P.desk)
-  px(ctx, s.x - 1, deskY + 6, 2, 10, P.deskShadow)
-  px(ctx, s.x + 37, deskY + 6, 2, 10, P.deskShadow)
-  px(ctx, s.x - 2, deskY + 18, 42, 2, P.deskShadow)
-  drawScreen(ctx, s.screen, s.x + 4, deskY - 19, t, s.present && !s.down, seed)
+function drawSlab(ctx: CanvasRenderingContext2D, s: Station, t: number, seed: number) {
+  const dy = deskY(s.row)
+  const glow = s.present && !s.down
+  px(ctx, s.x - 2, dy, 42, 10, '#5a4a38')
+  px(ctx, s.x, dy - 2, 38, 4, glow ? '#6a8a58' : '#4a5a40')
+  px(ctx, s.x + 4, dy + 8, 8, 4, P.moss)
+  drawScreen(ctx, s.screen, s.x + 6, dy - 18, t, glow, seed)
   ctx.textAlign = 'center'
-  ctx.font = `6px ${MONO}`
-  ctx.fillStyle = s.down ? P.red : P.text
-  ctx.fillText(s.label, s.x + 19, deskY + 11)
   ctx.font = `5px ${MONO}`
-  ctx.fillStyle = s.down ? P.red : P.dim
-  ctx.fillText(s.chip, s.x + 19, deskY + 17)
+  ctx.fillStyle = s.down ? P.red : s.pending ? P.amber : P.text
+  ctx.fillText(s.label, s.x + 19, dy + 18)
+  ctx.fillStyle = s.down ? P.red : s.pending ? P.amber : P.dim
+  ctx.fillText(s.chip, s.x + 19, dy + 24)
   ctx.textAlign = 'left'
 }
 
 function drawBubble(ctx: CanvasRenderingContext2D, cx: number, y: number, text: string, accent: string) {
   ctx.font = `6px ${MONO}`
-  const w = Math.min(ctx.measureText(text).width + 10, 170)
-  const x = Math.max(4, Math.min(LW - w - 4, cx - w / 2))
+  const w = Math.min(ctx.measureText(text).width + 10, 160)
+  const x = Math.max(GLASS_L + 4, Math.min(GLASS_R - w - 4, cx - w / 2))
   px(ctx, x - 1, y - 1, w + 2, 13, accent)
   px(ctx, x, y, w, 11, P.bubble)
   px(ctx, cx - 2, y + 11, 4, 3, accent)
@@ -256,35 +452,25 @@ function drawBubble(ctx: CanvasRenderingContext2D, cx: number, y: number, text: 
   ctx.fillText(text, x + 5, y + 8)
 }
 
-function drawChief(ctx: CanvasRenderingContext2D, t: number, ok: boolean, chip: string) {
-  // the chief IS a terrarium: a glass dome with a living sprout, gold-banded base
-  const cx = 240, cy = 74
-  // base: clay pot on a gold band
-  px(ctx, cx - 17, cy + 8, 34, 2, P.gold)
-  px(ctx, cx - 15, cy + 10, 30, 7, P.pot)
-  px(ctx, cx - 12, cy + 17, 24, 2, '#4a3018')
-  // glass dome
-  ctx.beginPath(); ctx.arc(cx, cy + 9, 17, Math.PI, 0)
-  ctx.fillStyle = 'rgba(190,235,215,0.13)'; ctx.fill()
-  ctx.beginPath(); ctx.arc(cx, cy + 9, 17, Math.PI, 0)
-  ctx.strokeStyle = 'rgba(225,255,240,0.45)'; ctx.lineWidth = 1.2; ctx.stroke()
-  px(ctx, cx - 4, cy - 10, 8, 2, 'rgba(225,255,240,0.5)')
-  // the sprout breathes
-  const sway = Math.round(Math.sin(t / 1100) * 1)
-  px(ctx, cx - 1 + sway, cy - 2, 2, 11, P.plantD)
-  px(ctx, cx - 6 + sway, cy - 2, 5, 4, P.plant)
-  px(ctx, cx + 1 + sway, cy - 6, 5, 4, P.plantL)
-  px(ctx, cx - 2 + sway, cy - 9, 4, 3, P.plant)
-  // status firefly circles inside the glass
-  const fx = cx + Math.cos(t / 800) * 10, fy = cy + 1 + Math.sin(t / 620) * 5
-  const on = Math.sin(t / 420) > -0.3
-  if (on) px(ctx, fx, fy, 2, 2, ok ? P.mint : P.amber)
-  ctx.textAlign = 'center'
-  ctx.font = `7px ${MONO}`; ctx.fillStyle = P.gold
-  ctx.fillText('CHIEF OF STAFF', cx, cy + 32)
-  ctx.font = `5px ${MONO}`; ctx.fillStyle = P.dim
-  ctx.fillText(chip, cx, cy + 40)
-  ctx.textAlign = 'left'
+function drawMarker(ctx: CanvasRenderingContext2D, trading: TradingStatus | null, board: BoardState | null) {
+  px(ctx, 84, SOIL - 22, 3, 22, '#5a3a1c')
+  px(ctx, 36, 52, 86, 38, '#efe4c8')
+  px(ctx, 36, 52, 86, 2, '#5a3a1c')
+  ctx.font = `5px ${MONO}`; ctx.fillStyle = '#6a4a28'
+  ctx.fillText('THESIS', 42, 62)
+  const raw = trading?.last_decision?.thesis ?? ''
+  const gist = (raw.length > 14 ? raw : board?.arms?.live?.gist ?? (raw || 'no ruling yet')).slice(0, 42)
+  ctx.fillStyle = '#3a3a28'
+  let line = ''; let ln = 0
+  for (const w of gist.split(' ')) {
+    if (ctx.measureText(line + ' ' + w).width > 74 && line) {
+      ctx.fillText(line, 42, 70 + ln * 6); line = w; ln++
+      if (ln > 2) break
+    } else line = (line ? line + ' ' : '') + w
+  }
+  if (ln <= 2 && line) ctx.fillText(line, 42, 70 + ln * 6)
+  ctx.fillStyle = trading?.kill_switch ? '#b04a3a' : '#8a6a2a'
+  ctx.fillText(trading?.kill_switch ? 'KILL ON' : 'flat by close', 42, 86)
 }
 
 function fmtClock(mkt: MarketClock | null): string {
@@ -293,30 +479,57 @@ function fmtClock(mkt: MarketClock | null): string {
   return m ? m[0] : '--:--'
 }
 
-function shiftLabel(mkt: MarketClock | null): { txt: string; c: string } {
-  if (!mkt) return { txt: 'OFFLINE', c: P.dim }
-  if (mkt.is_open) return { txt: 'MARKET OPEN', c: P.mint }
-  const h = mkt.seconds_to_change / 3600
-  return h < 3 ? { txt: 'DAWN RUN', c: P.amber } : { txt: 'NIGHT', c: '#7ac0a0' }
-}
-
 function tickerCells(trading: TradingStatus | null, board: BoardState | null): { txt: string; c: string }[] {
   const cells: { txt: string; c: string }[] = []
   for (const mode of ['live', 'paper'] as const) {
     for (const p of trading?.modes?.[mode]?.open_positions ?? []) cells.push({ txt: `${p.symbol} HELD`, c: P.gold })
   }
   for (const c of board?.arms?.live?.candidates ?? []) {
-    cells.push({
-      txt: `${c.symbol} ${c.move_pct >= 0 ? '▲' : '▼'}${Math.abs(c.move_pct).toFixed(1)}%`,
-      c: c.move_pct >= 0 ? P.mint : P.red,
-    })
+    const up = c.move_pct >= 0
+    cells.push({ txt: `${c.symbol} ${up ? '+' : ''}${c.move_pct.toFixed(1)}%`, c: up ? P.mint : P.red })
   }
-  for (const a of (trading?.alerts ?? []).slice(0, 3)) cells.push({ txt: a.slice(0, 60), c: P.dim })
+  for (const a of (trading?.alerts ?? []).slice(0, 3)) cells.push({ txt: a.slice(0, 42), c: P.dim })
   if (!cells.length) cells.push({ txt: trading?.market?.is_open ? 'quiet tape' : 'market closed — night crew on', c: P.dim })
   return cells
 }
 
-// ── component ───────────────────────────────────────────────────────────────
+function stationsFrom(seats: DeskSeat[], trading: TradingStatus | null): Station[] {
+  const out: Station[] = []
+  const seatNames = ['premarket', 'ops', 'content', 'projects'] as const
+  seatNames.forEach((name, i) => {
+    const seat = seats.find(s => s.name === name)
+    const st: SeatStatus = seat?.status ?? 'pending'
+    out.push({
+      key: name, label: name.toUpperCase(),
+      shirt: STYLE[name].shirt, skin: P.skins[i % P.skins.length],
+      accent: STYLE[name].accent, kit: STYLE[name].kit,
+      x: (i < 2 ? 36 + i * 68 : 312 + (i - 2) * 68), row: 0,
+      present: st === 'ok', down: st === 'failed', pending: st === 'pending',
+      chip: st === 'ok' ? 'on shift' : st === 'failed' ? 'SEAT DOWN' : 'scheduled',
+      bubble: st === 'failed' ? 'SEAT DOWN' : null,
+      screen: STYLE[name].screen,
+    })
+  })
+  ;(['live', 'paper'] as const).forEach((mode, i) => {
+    const m = trading?.modes?.[mode]
+    const aliveHb = m?.status === 'alive'
+    const last = trading?.last_decision
+    out.push({
+      key: mode, label: mode === 'live' ? 'TRADER·LIVE' : 'TRADER·PAPER',
+      shirt: STYLE[mode].shirt, skin: P.skins[(i + 2) % P.skins.length],
+      accent: STYLE[mode].accent, kit: STYLE[mode].kit,
+      x: 268 + i * 80, row: 1,
+      present: aliveHb, down: m?.status === 'stale', pending: !aliveHb && m?.status !== 'stale',
+      chip: aliveHb
+        ? (m?.open_positions.length ? `${m.open_positions.length} open` : 'flat')
+        : m?.status === 'stale' ? 'stale' : 'off shift',
+      bubble: mode === 'live' && last?.action
+        ? `${last.action.toUpperCase()}${last.symbol ? ' ' + last.symbol : ''}` : null,
+      screen: 'candles',
+    })
+  })
+  return out
+}
 
 export default function RangeFloor() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -330,8 +543,8 @@ export default function RangeFloor() {
     const load = () => fetch('/api/desk').then(r => r.json())
       .then(d => { if (alive) setSeats(d.seats) }).catch(() => {})
     load()
-    const t = setInterval(load, 60_000)
-    return () => { alive = false; clearInterval(t) }
+    const id = setInterval(load, 60_000)
+    return () => { alive = false; clearInterval(id) }
   }, [])
 
   const dataRef = useRef({ seats, trading, board, system })
@@ -343,6 +556,7 @@ export default function RangeFloor() {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     let raf = 0
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
     const draw = (t: number) => {
       const { seats, trading, board, system } = dataRef.current
@@ -356,169 +570,65 @@ export default function RangeFloor() {
         (canvas.width - LW * scale) / 2, (canvas.height - LH * scale) / 2)
 
       const mkt = trading?.market ?? null
-      const shift = shiftLabel(mkt)
+      const phase = getPhase(mkt)
+      const shift = shiftOf(phase)
 
-      // ── room ──
-      px(ctx, 0, 0, LW, LH, P.bg)
-      const skyColor = mkt?.is_open ? P.skyDay
-        : shift.txt === 'DAWN RUN' ? P.skyDawn
-        : shift.txt === 'NIGHT' ? P.skyNight : P.skyDusk
-      drawGlassWall(ctx, skyColor, shift.txt === 'NIGHT', t)
-      px(ctx, 0, 112, LW, 6, P.wainscot)
-      px(ctx, 0, 118, LW, LH - 118, P.floor)
-      for (let y = 126; y < LH; y += 12) px(ctx, 0, y, LW, 1, '#182419')
+      drawTank(ctx, phase, t)
+      drawMarker(ctx, trading, board)
+      drawCloche(ctx, t, seats.find(s => s.name === 'chief')?.status === 'ok',
+        seats.find(s => s.name === 'chief')?.status === 'pending')
 
-      // in-scene header strip
-      px(ctx, 0, 0, LW, 13, '#081009')
+      px(ctx, 0, 0, LW, 16, '#081009')
       ctx.font = `7px ${MONO}`
-      ctx.fillStyle = P.emerald; ctx.fillText('TERRARIUM', 6, 9.5)
-      ctx.fillStyle = P.dim; ctx.fillText('FLOOR', 66, 9.5)
-      px(ctx, 100, 2.5, ctx.measureText(shift.txt).width + 8, 9, '#12211a')
-      ctx.fillStyle = shift.c; ctx.fillText(shift.txt, 104, 9.5)
-      const inToday = seats.filter(s => s.status === 'ok').length
-      const openPos = (trading?.modes.live.open_positions.length ?? 0)
-        + (trading?.modes.paper.open_positions.length ?? 0)
-      const realized = trading
-        ? trading.modes.live.realized_today + trading.modes.paper.realized_today : 0
-      const stats: [string, string][] = [
-        ['SEATS', `${inToday}/${seats.length || 5}`],
-        ['OPEN', `${openPos}`],
-        ['P&L', `${realized >= 0 ? '+' : ''}${realized.toFixed(2)}`],
-        ['CPU', system ? `${system.cpu_pct.toFixed(0)}%` : '—'],
-      ]
-      let sx = LW - 196
-      for (const [k, v] of stats) {
-        ctx.fillStyle = P.dim; ctx.fillText(k, sx, 9.5)
-        ctx.fillStyle = k === 'P&L' ? (realized >= 0 ? P.mint : P.red) : P.text
-        const kw = ctx.measureText(k).width
-        ctx.fillText(v, sx + kw + 3, 9.5)
-        sx += kw + ctx.measureText(v).width + 12
-      }
+      ctx.fillStyle = P.emerald; ctx.fillText('TERRARIUM', 8, 11)
+      ctx.fillStyle = P.dim; ctx.fillText('UNDER GLASS', 72, 11)
+      px(ctx, 140, 4, ctx.measureText(shift.txt).width + 8, 8, '#12211a')
+      ctx.fillStyle = shift.c; ctx.fillText(shift.txt, 144, 11)
       ctx.font = `8px ${MONO}`; ctx.fillStyle = P.text
-      ctx.fillText(fmtClock(mkt), LW - 32, 9.5)
+      ctx.fillText(fmtClock(mkt), LW - 36, 12)
 
-      // thesis whiteboard: last decision gist + kill switch (all real)
-      px(ctx, 8, 22, 96, 52, P.board)
-      px(ctx, 6, 20, 100, 2, P.frame); px(ctx, 6, 74, 100, 2, P.frame)
-      ctx.font = `6px ${MONO}`; ctx.fillStyle = P.boardTxt
-      ctx.fillText('THESIS', 13, 31)
-      const rawThesis = trading?.last_decision?.thesis ?? ''
-      const gist = (rawThesis.length > 14 ? rawThesis
-        : board?.arms?.live?.gist ?? (rawThesis || 'no ruling yet')).slice(0, 60)
+      // ticker lives on the wooden stand, not in the garden
       ctx.font = `5px ${MONO}`
-      let line = ''; let ln = 0
-      for (const w of gist.split(' ')) {
-        if (ctx.measureText(line + ' ' + w).width > 86 && line) {
-          ctx.fillText(line, 13, 39 + ln * 7); line = w; ln++
-          if (ln > 2) break
-        } else line = (line ? line + ' ' : '') + w
-      }
-      if (ln <= 2 && line) ctx.fillText(line, 13, 39 + ln * 7)
-      ctx.fillStyle = trading?.kill_switch ? '#b04a3a' : P.goldDim
-      ctx.fillText(trading?.kill_switch ? '• KILL SWITCH ON' : '• flat by the close', 13, 68)
-
-      drawHangingPlant(ctx, 130, t, 0)
-      drawHangingPlant(ctx, 296, t, 1)
-      drawHangingPlant(ctx, 352, t, 2)
-      drawShelfArchive(ctx, 400, 30)
-      drawTallPlant(ctx, 112, 118, 1); drawTallPlant(ctx, 462, 118, 2)
-      drawPlant(ctx, 216, 112); drawPlant(ctx, 380, 112)
-
-      const chiefSeat = seats.find(s => s.name === 'chief')
-      drawChief(ctx, t, chiefSeat?.status === 'ok',
-        chiefSeat?.status === 'ok' ? 'brief sent · runs the floor'
-          : chiefSeat?.status === 'failed' ? 'SEAT DOWN' : 'runs the floor')
-
-      // ── ticker ──
-      px(ctx, 0, 118, LW, 11, '#0a120d')
-      ctx.font = `6px ${MONO}`
       const cells = tickerCells(trading, board)
       let total = 0
-      for (const c of cells) total += ctx.measureText(c.txt).width + 16
-      total = Math.max(total, LW)
-      const off = -((t / 1000) * 18) % total
+      for (const c of cells) total += ctx.measureText(c.txt).width + 14
+      total = Math.max(total, LW - 24)
+      const off = reduced ? 0 : -((t / 1000) * 16) % total
       for (let loop = 0; loop < 2; loop++) {
-        let cx2 = off + loop * total
+        let cx2 = 16 + off + loop * total
         for (const cell of cells) {
-          ctx.fillStyle = P.goldDim; ctx.fillText('◆', cx2 - 10, 126)
-          ctx.fillStyle = cell.c; ctx.fillText(cell.txt, cx2, 126)
-          cx2 += ctx.measureText(cell.txt).width + 16
+          ctx.fillStyle = '#8a6a2a'; ctx.fillText('+', cx2 - 8, GLASS_B + 13)
+          ctx.fillStyle = cell.c; ctx.fillText(cell.txt, cx2, GLASS_B + 13)
+          cx2 += ctx.measureText(cell.txt).width + 14
         }
       }
 
-      // ── stations ──
-      const stations: Station[] = []
-      const seatNames = ['premarket', 'ops', 'content', 'projects'] as const
-      seatNames.forEach((name, i) => {
-        const seat = seats.find(s => s.name === name)
-        const st: SeatStatus = seat?.status ?? 'pending'
-        const brief = (seat?.brief ?? '').split('\n').find(l => l.trim()) ?? ''
-        stations.push({
-          key: name, label: name.toUpperCase(),
-          shirt: STYLE[name].shirt, pants: STYLE[name].pants,
-          skin: P.skins[i % P.skins.length], hair: P.hairs[i % P.hairs.length],
-          x: 22 + i * 56, row: 0,
-          present: st === 'ok', down: st === 'failed',
-          chip: st === 'ok' ? 'in today' : st === 'failed' ? 'SEAT DOWN' : 'scheduled',
-          bubble: st === 'failed' ? 'SEAT DOWN' : brief ? brief.slice(0, 34) : null,
-          screen: STYLE[name].screen,
-        })
-      })
-      ;(['live', 'paper'] as const).forEach((mode, i) => {
-        const m = trading?.modes?.[mode]
-        const aliveHb = m?.status === 'alive'
-        const last = trading?.last_decision
-        stations.push({
-          key: mode, label: mode === 'live' ? 'TRADER·LIVE' : 'TRADER·PAPER',
-          shirt: STYLE[mode].shirt, pants: STYLE[mode].pants,
-          skin: P.skins[(i + 2) % P.skins.length], hair: P.hairs[(i + 3) % P.hairs.length],
-          x: 300 + i * 70, row: 1,
-          present: aliveHb, down: m?.status === 'stale',
-          chip: aliveHb
-            ? (m?.open_positions.length ? `${m.open_positions.length} open` : 'flat')
-            : m?.status === 'stale' ? 'heartbeat stale' : 'off shift',
-          bubble: mode === 'live' && last?.action
-            ? `${last.action.toUpperCase()}${last.symbol ? ' ' + last.symbol : ''}` : null,
-          screen: 'candles',
-        })
-      })
-
-      const poses = stations.map((s, i) => ({ s, i, p: workerPose(s, i, t) }))
+      const stations = stationsFrom(seats, trading)
+      const poses = stations.map((s, i) => ({ s, i, p: workerPose(s, i, t, reduced) }))
       for (const { s, i, p } of poses) {
-        if ((s.present || s.down) && p.pose === 'seated') drawFigure(ctx, p.x, p.y, s, t, i, 'seated')
+        if (p.pose === 'seated') drawFigure(ctx, p.x, p.y, s, t, i, 'seated')
       }
-      for (let i = 0; i < stations.length; i++) drawDeskRow(ctx, stations[i], t, i * 17 + 3)
+      for (let i = 0; i < stations.length; i++) drawSlab(ctx, stations[i], t, i * 17 + 3)
       for (const { s, i, p } of poses) {
-        if (s.present && p.pose !== 'seated') drawFigure(ctx, p.x, p.y, s, t, i, p.pose)
+        if (p.pose !== 'seated') drawFigure(ctx, p.x, p.y, s, t, i, p.pose)
       }
 
-      // one speech bubble at a time, rotating through stations that have one
       const withBubbles = stations.filter(s => s.bubble)
       if (withBubbles.length) {
         const pick = withBubbles[Math.floor(t / 5000) % withBubbles.length]
-        const deskY = pick.row === 0 ? 152 : 210
-        const by = pick.row === 0 ? deskY - 62 : deskY - 58
-        drawBubble(ctx, pick.x + 19, Math.max(by, 132), pick.bubble!, pick.down ? P.red : P.gold)
+        const pose = poses.find(x => x.s.key === pick.key)?.p
+        const bx = pose?.x ?? pick.x + 10
+        const by = Math.max(GLASS_T + 8, (pose?.y ?? deskY(pick.row)) - 46)
+        drawBubble(ctx, bx + 8, by, pick.bubble!, pick.down ? P.red : P.gold)
       }
 
-      // garden bench + water cooler
-      px(ctx, 20, 236, 66, 16, '#4a5a3c'); px(ctx, 20, 228, 66, 10, '#5a6c48')
-      px(ctx, 16, 236, 6, 16, '#3c4a30'); px(ctx, 84, 236, 6, 16, '#3c4a30')
-      px(ctx, 442, 232, 10, 8, '#d8d8e0'); px(ctx, 443, 222, 8, 10, '#a8c8e0')
-      px(ctx, 444, 240, 6, 12, '#8a8a94')
-
-      // footer: next shift + health, day progress bar (real clock)
-      px(ctx, 0, LH - 12, LW, 12, '#0a120d')
+      const onShift = stations.filter(s => s.present && !s.down).length
+      const waiting = stations.filter(s => s.pending).length
+      const failedN = stations.filter(s => s.down).length
       ctx.font = `5px ${MONO}`; ctx.fillStyle = P.dim
-      const pendingSeat = seats.find(s => s.status === 'pending')
-      const failedN = seats.filter(s => s.status === 'failed').length
       ctx.fillText(
-        `${pendingSeat ? `next shift: ${pendingSeat.name}` : 'all seats reported'}`
-        + `   failed ${failedN}   disk ${system ? system.disk_pct.toFixed(0) + '%' : '—'}`,
-        6, LH - 4)
-      const dayFrac = (Date.now() / 86400000) % 1
-      px(ctx, LW - 110, LH - 8, 100, 3, '#182419')
-      px(ctx, LW - 110, LH - 8, 100 * dayFrac, 3, P.goldDim)
+        `on shift ${onShift}   waiting ${waiting}   failed ${failedN}   disk ${system ? system.disk_pct.toFixed(0) + '%' : '—'}`,
+        10, LH - 3)
 
       raf = requestAnimationFrame(draw)
     }
@@ -532,8 +642,8 @@ export default function RangeFloor() {
   }, [])
 
   return (
-    <div style={{ width: '100%', height: '100%', minHeight: 0, background: P.bg, borderRadius: 8, overflow: 'hidden' }}>
-      <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
+    <div className="floor-frame">
+      <canvas ref={canvasRef} />
     </div>
   )
 }

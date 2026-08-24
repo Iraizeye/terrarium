@@ -9,6 +9,8 @@ from pathlib import Path
 
 from fastapi import APIRouter
 
+from ..config import DEMO
+
 router = APIRouter()
 
 OUT = Path.home() / ".the-range-desk" / "out"
@@ -38,6 +40,9 @@ def _mtime(p: Path) -> str:
 
 @router.get("/api/desk")
 async def desk():
+    if DEMO:
+        from ..demo import demo_desk
+        return demo_desk()
     day_dir = OUT / date.today().isoformat()
     return {
         "date": date.today().isoformat(),

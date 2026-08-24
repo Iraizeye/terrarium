@@ -18,7 +18,7 @@ import asyncio
 import os
 import sqlite3
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 DEMO_DAY_S = int(os.getenv("TERRARIUM_DEMO_DAY_S") or os.getenv("RANGEWATCH_DEMO_DAY_S", "300"))
@@ -294,6 +294,42 @@ async def run_demo_crew() -> None:
             print(f"[demo] crew emit error: {exc}", flush=True)
         step += 1
         await asyncio.sleep(9 + (step * 7) % 8)
+
+
+_DESK_RUNS = {
+    "premarket": (8 * 60 + 15, "[demo] Tape is thin. HELIO is the only dated name — watching VWAP."),
+    "ops": (8 * 60 + 40, "[demo] All stations green. Watchdogs armed. Disk 41%."),
+    "content": (8 * 60 + 45, "[demo] Queue has 4 clips. Nothing posts until you say so."),
+    "projects": (8 * 60 + 50, "[demo] No Monday ship. PRs quiet."),
+    "chief": (9 * 60 + 5, "[demo] Dawn brief sent. Floor is yours."),
+}
+
+
+def _demo_ran_at(run_min: int) -> str:
+    """Stable UTC timestamp for a synthetic ET minute on today's calendar."""
+    from zoneinfo import ZoneInfo
+    et = ZoneInfo("America/New_York")
+    day = datetime.now(tz=et).date()
+    hour, minute = divmod(int(run_min) % (24 * 60), 60)
+    return datetime(day.year, day.month, day.day, hour, minute, tzinfo=et).astimezone(timezone.utc).isoformat()
+
+
+def demo_desk(now: float | None = None) -> dict[str, Any]:
+    """Scheduled seats for the synthetic day — labeled fiction, clock-driven."""
+    from .routers.desk import SEATS
+
+    minute = _demo_minute(now)
+    seats = []
+    for seat in SEATS:
+        run_min, brief = _DESK_RUNS[seat["name"]]
+        done = minute >= run_min
+        seats.append({
+            **seat,
+            "status": "ok" if done else "pending",
+            "ran_at": _demo_ran_at(run_min) if done else None,
+            "brief": brief if done else None,
+        })
+    return {"date": datetime.now().strftime("%Y-%m-%d"), "seats": seats}
 
 
 def seed_demo_sessions(db_path) -> None:

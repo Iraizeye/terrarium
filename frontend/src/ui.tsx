@@ -38,7 +38,7 @@ export function Panel({ children, style }: { children: ReactNode; style?: CSSPro
       background: UI.surface,
       backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
       border: UI.border, borderRadius: UI.radius,
-      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 24px rgba(0,0,0,0.24)',
+      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 24px rgba(4,16,11,0.32)',
       overflow: 'hidden',
       ...style,
     }}>

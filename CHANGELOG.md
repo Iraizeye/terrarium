@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.8.1 - 2026-08-24 — the tank
+
+- Center stage is a closed terrarium: brass-framed glass, soil, moss,
+  ferns, condensation, fireflies at night. Agents work at stone slabs
+  in the garden; the chief of staff is the inner cloche.
+- Pending seats render as dim amber robots instead of empty desks.
+  Canvas sky follows `?phase=` / the real session clock.
+- Shell is responsive: the tank stays the hero on tablet and phone.
+- Demo mode scripts the desk roster so `make demo` shows a full house.
+
 ## v0.8.0 - 2026-08-24 — TERRARIUM
 
 - Renamed RANGEWATCH -> TERRARIUM ("your agents, under glass"); old

@@ -256,6 +256,24 @@ class TestDemoMode:
         for line in demo_trading_status()["alerts"]:
             assert line.startswith("[demo]")
 
+    def test_demo_desk_is_clock_driven_and_labeled(self):
+        from backend.demo import demo_desk
+
+        dawn = demo_desk(now=0.0)  # loop start = 08:15 ET
+        names = [s["name"] for s in dawn["seats"]]
+        assert names == ["premarket", "ops", "content", "projects", "chief"]
+        # Premarket fires at 08:15; the rest of the roster is still waiting.
+        assert dawn["seats"][0]["status"] == "ok"
+        assert all(s["status"] == "pending" for s in dawn["seats"][1:])
+        from backend.demo import DEMO_DAY_S
+        day = demo_desk(now=DEMO_DAY_S * 0.5)
+        for seat in day["seats"]:
+            assert seat["status"] == "ok"
+            assert seat["brief"].startswith("[demo]")
+            assert seat["ran_at"].endswith("+00:00") or seat["ran_at"].endswith("Z")
+        dawn2 = demo_desk(now=0.0)
+        assert dawn["seats"][0]["ran_at"] == dawn2["seats"][0]["ran_at"]
+
 
 # ---------------------------------------------------------------------------
 # Agent fleet

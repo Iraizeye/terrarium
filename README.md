@@ -4,9 +4,9 @@
 
 ![Terrarium at dawn — live telemetry, real agents](docs/media/terrarium-hero.jpg)
 
-*Dawn run, live: agents at their desks under the glass wall, the trading
-books flat before the open, a PASS ruling fresh off the engine, and the
-ops log streaming the very session that took this screenshot.*
+*Dawn run: every agent on a bench (mint visor on shift, amber waiting on
+the clock), the chief of staff as the dome at center, a PASS on the live
+book, and the sky living the real session.*
 
 ## What am I looking at?
 
@@ -51,11 +51,11 @@ Health checks run over the *real* stack — daemons, watchdogs, heartbeats,
 kill switch, disk — and feed the header status bar. Red means something is
 actually wrong; a healthy machine reads **ALL STATIONS GO**.
 
-The stage is a pixel glasshouse: the market day is the light through the
-panes — deep green night with fireflies outside the glass, amber climbing
-at dawn, warm gold while the session runs. Agents work at wooden desks
-among hanging planters; the ticker runs across the glass; a quiet floor
-looks quiet, because nothing on it is simulated.
+The stage is a closed terrarium. Light through the glass is the real
+market day — fireflies at night, amber at dawn, gold while the session
+runs. Every agent lives in the garden (mint visor on shift, amber waiting
+on the clock); the chief of staff is the inner cloche. A quiet tank still
+looks quiet — pending bots sit idle rather than vanish.
 
 ## Architecture
 

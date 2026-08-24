@@ -14,7 +14,7 @@ export function markIntroSeen(): void {
 }
 
 const ZONES: { name: string; desc: string }[] = [
-  { name: 'The floor', desc: 'center stage — every agent on this machine is a robot at a bench inside the glasshouse. The light through the glass lives the real market session; the terrarium dome at center is the chief of staff, its firefly glowing mint once the morning brief is in.' },
+  { name: 'The tank', desc: 'center stage — a closed terrarium. Every agent lives in the garden: mint visor on shift, amber waiting on the clock, red down. The inner cloche is the chief of staff. Light through the glass is the real market day.' },
   { name: 'Fleet & ops', desc: 'left rail — each running Claude session as a card (tool names only, never content), the scheduled desk seats, and a live log of agent activity.' },
   { name: 'Trading desk', desc: 'right rail — both trading books (live + paper) with positions, stops, and the engine’s actual reasoning for its last decision, verbatim.' },
   { name: 'The board', desc: 'bottom right — what the trading engine saw last cycle and what it did. PASS means it judged a candidate and declined: discipline is the product.' },
@@ -35,7 +35,7 @@ export default function IntroOverlay({ onClose }: { onClose: () => void }) {
         style={{
           width: 'min(560px, 92vw)', padding: '28px 30px 24px',
           background: 'rgba(17,19,24,0.97)', border: UI.border, borderRadius: 14,
-          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05), 0 24px 64px rgba(0,0,0,0.5)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05), 0 24px 64px rgba(3,12,8,0.55)',
         }}
       >
         <div style={{ fontSize: 10, letterSpacing: '0.24em', color: UI.dim, textTransform: 'uppercase' }}>
