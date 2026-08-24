@@ -17,7 +17,7 @@ const P = {
   frame: '#182620', mullion: '#24382e', sheen: 'rgba(220,255,235,0.05)',
   skyNight: '#08130e', skyDawn: '#142516', skyDay: '#22331f', skyDusk: '#171f12',
   floor: '#121b15',
-  desk: '#5d452c', deskTop: '#7a5a36', deskShadow: '#44311e',
+  desk: '#55655a', deskTop: '#b7c4b2', deskShadow: '#39463e', deskGlow: 'rgba(62,207,154,0.55)',
   screenBg: '#0e1410', mint: '#7de8a8', red: '#f0716a', amber: '#e0b34d',
   board: '#efe9d8', boardTxt: '#3a3a44', gold: '#d9a441', goldDim: '#8a6a2a',
   emerald: '#3ecf9a',
@@ -25,8 +25,8 @@ const P = {
   bubble: '#f2f6ea', plant: '#4f8f4a', plantD: '#356534', plantL: '#6fae5c',
   pot: '#7a5230', vine: '#2e5238',
   shelf: '#3e4f38', archive: '#c8a04a',
-  skins: ['#e8b890', '#c89068', '#a87850', '#8a6040'],
-  hairs: ['#2a1c14', '#584030', '#c8a04a', '#101018', '#7a3a2a'],
+  skins: ['#b9c4cb', '#9aa9b2', '#84939d', '#6e7d88'],
+  hairs: ['#26333b', '#3ecf9a', '#e0b34d', '#43525c', '#7a8a94'],
 }
 
 type SeatStatus = 'ok' | 'failed' | 'pending'
@@ -137,28 +137,39 @@ function drawShelfArchive(ctx: CanvasRenderingContext2D, x: number, y: number) {
 
 function drawFigure(ctx: CanvasRenderingContext2D, x: number, y: number, s: Station,
                     t: number, i: number, pose: 'seated' | 'stand' | 'walk') {
-  // (x, y) anchors the feet; head is ~34px above
+  // (x, y) anchors the feet; a little AI robot, ~34px tall with antenna
   const top = y - 34
   const bob = pose === 'seated' ? 0 : Math.round(Math.sin(t / 300 + i * 2) * 1)
   if (pose === 'walk') {
     const step = Math.floor(t / 140) % 2
-    px(ctx, x + 3 + (step ? 1 : -1), y - 8, 4, 8, s.pants)
-    px(ctx, x + 10 - (step ? 1 : -1), y - 8, 4, 8, s.pants)
+    px(ctx, x + 3 + (step ? 1 : -1), y - 8, 4, 8, s.skin)
+    px(ctx, x + 10 - (step ? 1 : -1), y - 8, 4, 8, s.skin)
+    px(ctx, x + 2, y - 1, 6, 1, P.deskShadow); px(ctx, x + 9, y - 1, 6, 1, P.deskShadow)
   } else if (pose === 'stand') {
-    px(ctx, x + 3, y - 8 + bob, 4, 8, s.pants); px(ctx, x + 10, y - 8 + bob, 4, 8, s.pants)
+    px(ctx, x + 3, y - 8 + bob, 4, 8, s.skin); px(ctx, x + 10, y - 8 + bob, 4, 8, s.skin)
   }
   const by = pose === 'seated' ? top + 12 : y - 21 + bob
+  // torso: station-colored chassis, metal shoulder arms, blinking chest light
   px(ctx, x + 1, by, 15, 13, s.shirt)
-  px(ctx, x - 1, by + 1, 3, 8, s.shirt); px(ctx, x + 15, by + 1, 3, 8, s.shirt)
-  px(ctx, x, by + 2, 1, 6, s.skin); px(ctx, x + 17, by + 2, 1, 6, s.skin)
+  px(ctx, x + 1, by, 15, 2, s.skin)
+  px(ctx, x - 1, by + 1, 3, 8, s.skin); px(ctx, x + 15, by + 1, 3, 8, s.skin)
+  px(ctx, x - 1, by + 9, 3, 2, s.hair); px(ctx, x + 15, by + 9, 3, 2, s.hair)
+  const chestOn = Math.sin(t / 650 + i * 1.7) > -0.2
+  px(ctx, x + 7, by + 4, 4, 3, s.down ? P.red : chestOn ? P.mint : '#2a3a32')
+  // head: metal box, visor stripe, antenna with status tip
   const hy = by - 14
-  px(ctx, x + 3, hy, 12, 13, s.skin)
-  px(ctx, x + 2, hy - 2, 14, 5, s.hair)
-  px(ctx, x + 2, hy + 1, 2, 4, s.hair); px(ctx, x + 14, hy + 1, 2, 4, s.hair)
+  px(ctx, x + 3, hy, 12, 12, s.skin)
+  px(ctx, x + 3, hy, 12, 3, s.hair)
+  px(ctx, x + 8, hy - 4, 2, 4, s.skin)
+  const aOn = Math.floor((t + i * 700) / 900) % 2 === 0
+  px(ctx, x + 7, hy - 7, 4, 4, s.down ? P.red : aOn ? P.mint : '#3a4a40')
+  // LED eyes; a downed bot shows flat red eyes
   const blink = Math.floor((t + i * 900) / 180) % 24 === 0
-  if (!blink) { px(ctx, x + 5, hy + 5, 2, 2, P.ink); px(ctx, x + 11, hy + 5, 2, 2, P.ink) }
-  if (s.down) { px(ctx, x + 4, hy + 3, 4, 1, P.ink); px(ctx, x + 10, hy + 3, 4, 1, P.ink) }
-  px(ctx, x + 7, hy + 10, 4, 1, s.down ? P.red : P.ink)
+  if (s.down) { px(ctx, x + 5, hy + 6, 3, 1, P.red); px(ctx, x + 10, hy + 6, 3, 1, P.red) }
+  else if (!blink) { px(ctx, x + 5, hy + 5, 2, 2, '#9fffd8'); px(ctx, x + 11, hy + 5, 2, 2, '#9fffd8') }
+  // speaker grill
+  px(ctx, x + 6, hy + 9, 6, 1, s.down ? P.red : '#1c2a22')
+  px(ctx, x + 7, hy + 11, 4, 1, '#1c2a22')
 }
 
 // Where a worker is right now. Deterministic stroll: each 18s block, a present
@@ -217,8 +228,11 @@ function drawScreen(ctx: CanvasRenderingContext2D, kind: Station['screen'], x: n
 
 function drawDeskRow(ctx: CanvasRenderingContext2D, s: Station, t: number, seed: number) {
   const deskY = s.row === 0 ? 152 : 210
-  px(ctx, s.x - 2, deskY, 42, 4, P.deskTop)
+  px(ctx, s.x - 2, deskY, 42, 3, P.deskTop)
+  px(ctx, s.x - 2, deskY + 3, 42, 1, P.deskGlow)
   px(ctx, s.x - 2, deskY + 4, 42, 14, P.desk)
+  px(ctx, s.x - 1, deskY + 6, 2, 10, P.deskShadow)
+  px(ctx, s.x + 37, deskY + 6, 2, 10, P.deskShadow)
   px(ctx, s.x - 2, deskY + 18, 42, 2, P.deskShadow)
   drawScreen(ctx, s.screen, s.x + 4, deskY - 19, t, s.present && !s.down, seed)
   ctx.textAlign = 'center'
@@ -243,14 +257,28 @@ function drawBubble(ctx: CanvasRenderingContext2D, cx: number, y: number, text: 
 }
 
 function drawChief(ctx: CanvasRenderingContext2D, t: number, ok: boolean, chip: string) {
+  // the chief IS a terrarium: a glass dome with a living sprout, gold-banded base
   const cx = 240, cy = 74
-  ctx.fillStyle = '#f4f0e2'
-  ctx.beginPath(); ctx.arc(cx, cy, 17, 0, Math.PI * 2); ctx.fill()
-  px(ctx, cx - 19, cy - 4, 4, 10, P.gold); px(ctx, cx + 15, cy - 4, 4, 10, P.gold)
-  px(ctx, cx - 17, cy - 14, 34, 4, P.gold)
-  const blink = Math.floor(t / 210) % 22 === 0
-  if (!blink) { px(ctx, cx - 7, cy - 3, 3, 5, P.ink); px(ctx, cx + 4, cy - 3, 3, 5, P.ink) }
-  px(ctx, cx + 9, cy + 8, 5, 5, ok ? P.mint : P.amber)
+  // base: clay pot on a gold band
+  px(ctx, cx - 17, cy + 8, 34, 2, P.gold)
+  px(ctx, cx - 15, cy + 10, 30, 7, P.pot)
+  px(ctx, cx - 12, cy + 17, 24, 2, '#4a3018')
+  // glass dome
+  ctx.beginPath(); ctx.arc(cx, cy + 9, 17, Math.PI, 0)
+  ctx.fillStyle = 'rgba(190,235,215,0.13)'; ctx.fill()
+  ctx.beginPath(); ctx.arc(cx, cy + 9, 17, Math.PI, 0)
+  ctx.strokeStyle = 'rgba(225,255,240,0.45)'; ctx.lineWidth = 1.2; ctx.stroke()
+  px(ctx, cx - 4, cy - 10, 8, 2, 'rgba(225,255,240,0.5)')
+  // the sprout breathes
+  const sway = Math.round(Math.sin(t / 1100) * 1)
+  px(ctx, cx - 1 + sway, cy - 2, 2, 11, P.plantD)
+  px(ctx, cx - 6 + sway, cy - 2, 5, 4, P.plant)
+  px(ctx, cx + 1 + sway, cy - 6, 5, 4, P.plantL)
+  px(ctx, cx - 2 + sway, cy - 9, 4, 3, P.plant)
+  // status firefly circles inside the glass
+  const fx = cx + Math.cos(t / 800) * 10, fy = cy + 1 + Math.sin(t / 620) * 5
+  const on = Math.sin(t / 420) > -0.3
+  if (on) px(ctx, fx, fy, 2, 2, ok ? P.mint : P.amber)
   ctx.textAlign = 'center'
   ctx.font = `7px ${MONO}`; ctx.fillStyle = P.gold
   ctx.fillText('CHIEF OF STAFF', cx, cy + 32)
