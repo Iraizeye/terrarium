@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.9.2 - 2026-08-24 — the crew, drawn in code
+
+- Robot sprites retired; the copper crew is now drawn procedurally in the
+  room's own art language. Chibi proportions, big status-lit visor eyes,
+  per-bot copper tints, and real animation: typing hands, walking legs,
+  blinks, bobs, a pointing chief with his red marker.
+- Zero raster assets remain — the whole stage is code, crisp at any DPI.
+
 ## v0.9.1 - 2026-08-24 — the room, drawn in code
 
 - The painted backdrop is retired; the room is now drawn on canvas around

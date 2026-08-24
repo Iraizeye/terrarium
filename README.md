@@ -51,7 +51,7 @@ Health checks run over the *real* stack — daemons, watchdogs, heartbeats,
 kill switch, disk — and feed the header status bar. Red means something is
 actually wrong; a healthy machine reads **ALL STATIONS GO**.
 
-The stage is a room drawn in code around hand-drawn copper robots, and
+The stage is a room drawn in code, staffed by a code-drawn copper crew, and
 every element of it is live: the big board charts the names the engine
 actually judged this session, the LED sign is the real session clock, the
 wall clock reads ET, each desk monitor glows with its seat's true status,

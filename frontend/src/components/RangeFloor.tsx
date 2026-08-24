@@ -43,10 +43,9 @@ const SPOTS: Record<string, { x: number; y: number; action: Action; flip?: boole
   live:      { x: 0.62, y: 0.91, action: 'walk' },
 }
 const DESK_SEATS = ['projects', 'premarket', 'ops', 'content', 'paper'] as const
-const FRAMES = 6
 const WALK = { x0: 0.56, x1: 0.68, y: 0.91, period: 14000 }
-const ANCHOR_X: Record<Action, number> = { sit: 0.42, work: 0.66, walk: 0.50, point: 0.50 }
-const SPRITE_FRAC: Record<Action, number> = { sit: 0.50, work: 0.50, walk: 0.36, point: 0.50 }
+// bot height per pose, as a fraction of the scene scale S
+const POSE_H: Record<Action, number> = { sit: 0.44, work: 0.44, walk: 0.30, point: 0.50 }
 
 // the big board on the wall houses the live tape
 const BOARD = { x: 0.180, y: 0.014, w: 0.348, h: 0.336 }
@@ -141,21 +140,237 @@ function walkAt(now: number): { x: number; y: number; flip: boolean } {
   return { x: WALK.x0 + (WALK.x1 - WALK.x0) * u, y: WALK.y, flip: !goingRight }
 }
 
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => resolve(img)
-    img.onerror = reject
-    img.src = src
-  })
-}
-
 function shadow(ctx: CanvasRenderingContext2D, x: number, y: number, w: number) {
   ctx.save()
-  ctx.fillStyle = 'rgba(8, 10, 14, 0.38)'
+  ctx.fillStyle = 'rgba(8, 10, 14, 0.34)'
   ctx.beginPath()
-  ctx.ellipse(x, y - 2, w * 0.32, 7, 0, 0, Math.PI * 2)
+  ctx.ellipse(x, y - 2, w * 0.5, w * 0.10, 0, 0, Math.PI * 2)
   ctx.fill()
+  ctx.restore()
+}
+
+// ── the copper crew, drawn in code ───────────────────────────────────────────
+// chibi proportions: big head, big eyes, stubby limbs — charm by geometry.
+
+const COPPERS = [
+  { hi: '#eeb98c', mid: '#cf9058', dk: '#a06a38' },
+  { hi: '#e6ab7a', mid: '#c48350', dk: '#946130' },
+  { hi: '#f2c49a', mid: '#d89a64', dk: '#aa7440' },
+]
+const LINE = 'rgba(52,30,14,0.55)'
+const CHAIR = { dark: '#2b3036', mid: '#3a4048', metal: '#8a939c' }
+
+interface BotState { working: boolean; pending: boolean; down: boolean }
+
+function eyeColor(st: BotState): string {
+  return st.down ? '#f0716a' : st.pending ? '#e0b34d' : '#8df0c0'
+}
+
+function rr(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number, fill: string, stroke = true) {
+  ctx.beginPath()
+  ctx.roundRect(x, y, w, h, Math.min(r, w / 2, h / 2))
+  ctx.fillStyle = fill
+  ctx.fill()
+  if (stroke) { ctx.strokeStyle = LINE; ctx.stroke() }
+}
+
+function plate(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], x: number, y: number, w: number, h: number, r: number) {
+  rr(ctx, x, y, w, h, r, c.mid)
+  ctx.save()
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, Math.min(r, w / 2, h / 2)); ctx.clip()
+  ctx.fillStyle = c.hi
+  ctx.fillRect(x, y, w, h * 0.24)
+  ctx.globalAlpha = 0.5
+  ctx.fillStyle = c.dk
+  ctx.fillRect(x, y + h * 0.76, w, h * 0.24)
+  ctx.restore()
+}
+
+function limb(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], pts: [number, number][], w: number) {
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.strokeStyle = LINE
+  ctx.lineWidth = w + 2.5
+  ctx.beginPath()
+  pts.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y))
+  ctx.stroke()
+  ctx.strokeStyle = c.mid
+  ctx.lineWidth = w
+  ctx.beginPath()
+  pts.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y))
+  ctx.stroke()
+  ctx.lineCap = 'butt'
+}
+
+function hand(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], x: number, y: number, r: number) {
+  ctx.fillStyle = c.hi
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill()
+  ctx.strokeStyle = LINE; ctx.stroke()
+}
+
+/** big friendly head, bottom of head at yBot (negative up), width w */
+function drawHead(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], u: number, yBot: number, t: number, seed: number, st: BotState) {
+  const hw = u * 0.46, hh = u * 0.34
+  const topY = yBot - hh
+  // antenna
+  ctx.strokeStyle = c.dk
+  ctx.lineWidth = Math.max(1.2, u * 0.02)
+  ctx.beginPath(); ctx.moveTo(0, topY); ctx.lineTo(0, topY - u * 0.07); ctx.stroke()
+  const tipOn = st.down ? true : Math.floor((t + seed * 700) / 900) % 2 === 0
+  ctx.fillStyle = tipOn ? eyeColor(st) : '#3a4a40'
+  ctx.beginPath(); ctx.arc(0, topY - u * 0.088, u * 0.026, 0, Math.PI * 2); ctx.fill()
+  ctx.strokeStyle = LINE; ctx.stroke()
+  // head + ear bolts
+  plate(ctx, c, -hw / 2, topY, hw, hh, u * 0.09)
+  rr(ctx, -hw / 2 - u * 0.028, topY + hh * 0.32, u * 0.032, hh * 0.34, u * 0.012, c.dk)
+  rr(ctx, hw / 2 - u * 0.004, topY + hh * 0.32, u * 0.032, hh * 0.34, u * 0.012, c.dk)
+  // visor fills most of the face
+  rr(ctx, -hw / 2 + u * 0.045, topY + hh * 0.18, hw - u * 0.09, hh * 0.52, u * 0.07, '#141b1e')
+  // big eyes
+  const blink = Math.floor((t + seed * 900) / 190) % 26 === 0
+  const ec = eyeColor(st)
+  const eyeY = topY + hh * 0.44
+  if (st.down) {
+    ctx.fillStyle = ec
+    ctx.fillRect(-u * 0.115, eyeY - u * 0.008, u * 0.075, u * 0.016)
+    ctx.fillRect(u * 0.04, eyeY - u * 0.008, u * 0.075, u * 0.016)
+  } else {
+    const er = blink ? u * 0.008 : u * 0.042
+    ctx.fillStyle = ec
+    ctx.beginPath(); ctx.ellipse(-u * 0.085, eyeY, u * 0.042, er, 0, 0, Math.PI * 2); ctx.fill()
+    ctx.beginPath(); ctx.ellipse(u * 0.085, eyeY, u * 0.042, er, 0, 0, Math.PI * 2); ctx.fill()
+    if (!blink) {
+      ctx.fillStyle = 'rgba(255,255,255,0.75)'
+      ctx.beginPath(); ctx.arc(-u * 0.098, eyeY - u * 0.014, u * 0.011, 0, Math.PI * 2); ctx.fill()
+      ctx.beginPath(); ctx.arc(u * 0.072, eyeY - u * 0.014, u * 0.011, 0, Math.PI * 2); ctx.fill()
+    }
+  }
+  // mouth grill under the visor
+  ctx.fillStyle = st.down ? 'rgba(240,113,106,0.7)' : c.dk
+  for (const mx of [-u * 0.045, -u * 0.005, u * 0.035]) {
+    ctx.fillRect(mx, topY + hh * 0.80, u * 0.024, u * 0.014)
+  }
+}
+
+function drawTorso(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], u: number, yTop: number, hgt: number, t: number, seed: number, st: BotState) {
+  const w = u * 0.40
+  plate(ctx, c, -w / 2, yTop, w, hgt, u * 0.08)
+  rr(ctx, -u * 0.10, yTop + hgt * 0.22, u * 0.20, hgt * 0.42, u * 0.035, c.dk)
+  const on = st.working && Math.sin(t / 600 + seed * 2) > -0.2
+  ctx.fillStyle = st.down ? '#f0716a' : on ? '#8df0c0' : '#3a4a40'
+  ctx.beginPath(); ctx.arc(0, yTop + hgt * 0.80, u * 0.022, 0, Math.PI * 2); ctx.fill()
+  ctx.strokeStyle = LINE; ctx.stroke()
+}
+
+function drawChair(ctx: CanvasRenderingContext2D, u: number) {
+  ctx.strokeStyle = CHAIR.metal
+  ctx.lineWidth = Math.max(1.5, u * 0.022)
+  for (const a of [-1, -0.5, 0, 0.5, 1]) {
+    ctx.beginPath(); ctx.moveTo(0, -u * 0.09)
+    ctx.lineTo(Math.sin(a) * u * 0.19, -u * 0.015); ctx.stroke()
+    ctx.fillStyle = '#20242a'
+    ctx.beginPath(); ctx.arc(Math.sin(a) * u * 0.19, -u * 0.012, u * 0.022, 0, Math.PI * 2); ctx.fill()
+  }
+  ctx.strokeStyle = CHAIR.metal
+  ctx.lineWidth = Math.max(2, u * 0.032)
+  ctx.beginPath(); ctx.moveTo(0, -u * 0.08); ctx.lineTo(0, -u * 0.30); ctx.stroke()
+  rr(ctx, -u * 0.205, -u * 0.66, u * 0.41, u * 0.38, u * 0.07, CHAIR.dark)
+  rr(ctx, -u * 0.25, -u * 0.345, u * 0.50, u * 0.075, u * 0.035, CHAIR.mid)
+}
+
+function drawSeated(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], u: number, t: number, seed: number, st: BotState) {
+  drawChair(ctx, u)
+  const bob = st.working ? Math.sin(t / 420 + seed * 7) * u * 0.008 : 0
+  // stubby legs off the seat, feet dangling near the base
+  limb(ctx, c, [[-u * 0.10, -u * 0.30], [-u * 0.185, -u * 0.22], [-u * 0.165, -u * 0.055]], u * 0.062)
+  limb(ctx, c, [[u * 0.10, -u * 0.30], [u * 0.185, -u * 0.22], [u * 0.165, -u * 0.055]], u * 0.062)
+  rr(ctx, -u * 0.225, -u * 0.06, u * 0.12, u * 0.05, u * 0.025, c.dk)
+  rr(ctx, u * 0.105, -u * 0.06, u * 0.12, u * 0.05, u * 0.025, c.dk)
+  // torso
+  drawTorso(ctx, c, u, -u * 0.62 + bob, u * 0.30, t, seed, st)
+  // laptop on lap, screen back to us with a mint logo
+  rr(ctx, -u * 0.16, -u * 0.475, u * 0.32, u * 0.15, u * 0.025, '#3a4048')
+  ctx.fillStyle = '#8df0c0'
+  ctx.globalAlpha = st.working ? 0.9 : 0.25
+  ctx.beginPath(); ctx.arc(0, -u * 0.40, u * 0.02, 0, Math.PI * 2); ctx.fill()
+  ctx.globalAlpha = st.down ? 0.6 : st.pending ? 0.8 : 1
+  // arms typing on the laptop rim
+  const lt = st.working ? Math.sin(t / 130 + seed * 3) * u * 0.014 : 0
+  const rt2 = st.working ? Math.sin(t / 130 + seed * 3 + Math.PI) * u * 0.014 : 0
+  limb(ctx, c, [[-u * 0.20, -u * 0.56 + bob], [-u * 0.27, -u * 0.44], [-u * 0.12, -u * 0.345 + lt]], u * 0.052)
+  limb(ctx, c, [[u * 0.20, -u * 0.56 + bob], [u * 0.27, -u * 0.44], [u * 0.12, -u * 0.345 + rt2]], u * 0.052)
+  hand(ctx, c, -u * 0.105, -u * 0.335 + lt, u * 0.036)
+  hand(ctx, c, u * 0.105, -u * 0.335 + rt2, u * 0.036)
+  drawHead(ctx, c, u, -u * 0.63 + bob, t, seed, st)
+}
+
+function drawStandingPoint(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], u: number, t: number, seed: number, st: BotState) {
+  const sway = st.working ? Math.sin(t / 900 + seed) * u * 0.008 : 0
+  limb(ctx, c, [[-u * 0.085, -u * 0.34], [-u * 0.095, -u * 0.055]], u * 0.062)
+  limb(ctx, c, [[u * 0.085, -u * 0.34], [u * 0.095, -u * 0.055]], u * 0.062)
+  rr(ctx, -u * 0.165, -u * 0.06, u * 0.13, u * 0.05, u * 0.025, c.dk)
+  rr(ctx, u * 0.035, -u * 0.06, u * 0.13, u * 0.05, u * 0.025, c.dk)
+  rr(ctx, -u * 0.14, -u * 0.375, u * 0.28, u * 0.06, u * 0.03, c.dk)
+  drawTorso(ctx, c, u, -u * 0.66 + sway, u * 0.30, t, seed, st)
+  // left arm relaxed
+  limb(ctx, c, [[-u * 0.20, -u * 0.60 + sway], [-u * 0.245, -u * 0.46], [-u * 0.19, -u * 0.38]], u * 0.052)
+  hand(ctx, c, -u * 0.185, -u * 0.37, u * 0.034)
+  // right arm up, pointing at the board with a red marker
+  const lift = st.working ? Math.sin(t / 700 + seed * 5) * u * 0.018 : 0
+  limb(ctx, c, [[u * 0.19, -u * 0.62 + sway], [u * 0.31, -u * 0.76 + lift], [u * 0.43, -u * 0.83 + lift]], u * 0.052)
+  hand(ctx, c, u * 0.445, -u * 0.835 + lift, u * 0.036)
+  ctx.strokeStyle = '#d84a3a'
+  ctx.lineWidth = Math.max(1.5, u * 0.024)
+  ctx.lineCap = 'round'
+  ctx.beginPath()
+  ctx.moveTo(u * 0.465, -u * 0.85 + lift)
+  ctx.lineTo(u * 0.525, -u * 0.90 + lift)
+  ctx.stroke()
+  ctx.lineCap = 'butt'
+  drawHead(ctx, c, u, -u * 0.67 + sway, t, seed, st)
+}
+
+function drawWalker(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], u: number, t: number, seed: number, st: BotState) {
+  const step = Math.sin(t / 150 + seed)
+  const bob = Math.abs(Math.cos(t / 150 + seed)) * u * 0.022
+  limb(ctx, c, [[-u * 0.055, -u * 0.32 - bob], [-u * 0.065 + step * u * 0.10, -u * 0.05]], u * 0.06)
+  limb(ctx, c, [[u * 0.055, -u * 0.32 - bob], [u * 0.065 - step * u * 0.10, -u * 0.05]], u * 0.06)
+  rr(ctx, -u * 0.125 + step * u * 0.10, -u * 0.055, u * 0.12, u * 0.05, u * 0.025, c.dk)
+  rr(ctx, u * 0.005 - step * u * 0.10, -u * 0.055, u * 0.12, u * 0.05, u * 0.025, c.dk)
+  rr(ctx, -u * 0.125, -u * 0.355 - bob, u * 0.25, u * 0.055, u * 0.027, c.dk)
+  drawTorso(ctx, c, u, -u * 0.63 - bob, u * 0.28, t, seed, st)
+  // clipboard held with both hands
+  limb(ctx, c, [[-u * 0.185, -u * 0.56 - bob], [-u * 0.185, -u * 0.42 - bob]], u * 0.05)
+  limb(ctx, c, [[u * 0.185, -u * 0.56 - bob], [u * 0.185, -u * 0.42 - bob]], u * 0.05)
+  rr(ctx, -u * 0.14, -u * 0.50 - bob, u * 0.28, u * 0.18, u * 0.02, '#d9d4c4')
+  rr(ctx, -u * 0.045, -u * 0.525 - bob, u * 0.09, u * 0.03, u * 0.012, '#8a939c')
+  ctx.strokeStyle = 'rgba(60,60,70,0.5)'
+  ctx.lineWidth = 1
+  for (const ly of [0.455, 0.415, 0.375]) {
+    ctx.beginPath(); ctx.moveTo(-u * 0.105, -u * ly - bob); ctx.lineTo(u * 0.105, -u * ly - bob); ctx.stroke()
+  }
+  hand(ctx, c, -u * 0.18, -u * 0.41 - bob, u * 0.034)
+  hand(ctx, c, u * 0.18, -u * 0.41 - bob, u * 0.034)
+  drawHead(ctx, c, u, -u * 0.64 - bob, t, seed, st)
+}
+
+function drawBot(
+  ctx: CanvasRenderingContext2D,
+  x: number, groundY: number, H: number,
+  pose: Action, t: number, seed: number,
+  st: BotState, flip: boolean,
+) {
+  const c = COPPERS[seed % COPPERS.length]
+  ctx.save()
+  ctx.translate(x, groundY)
+  if (flip) ctx.scale(-1, 1)
+  ctx.globalAlpha = st.down ? 0.6 : st.pending ? 0.8 : 1
+  ctx.lineWidth = Math.max(1, H * 0.014)
+  if (st.down) ctx.rotate(0.05)
+  const u = H
+  if (pose === 'walk') drawWalker(ctx, c, u, t, seed, st)
+  else if (pose === 'point') drawStandingPoint(ctx, c, u, t, seed, st)
+  else drawSeated(ctx, c, u, t, seed, st)
   ctx.restore()
 }
 
@@ -252,37 +467,11 @@ function drawScreen(
 
 export default function RangeFloor() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const stillsRef = useRef<Record<string, HTMLImageElement>>({})
-  const framesRef = useRef<Record<string, HTMLImageElement[]>>({ chair: [], walk: [], point: [], type: [] })
   const sparkRef = useRef<Record<string, number[]>>({})
-  const [ready, setReady] = useState(false)
   const [seats, setSeats] = useState<DeskSeat[]>([])
   const trading = useDashboardStore(s => s.trading)
   const fleet = useDashboardStore(s => s.fleet)
   const board = useDashboardStore(s => s.board)
-
-  useEffect(() => {
-    let cancelled = false
-    const stills = Promise.all([
-      loadImage('/bots/idle-chair.png').then(img => ['idle', img] as const),
-      loadImage('/bots/work-chair.png').then(img => ['work', img] as const),
-      loadImage('/bots/stand.png').then(img => ['stand', img] as const),
-    ])
-    const packs = (['chair', 'walk', 'point', 'type'] as const).map(kind =>
-      Promise.all(
-        Array.from({ length: FRAMES }, (_, i) => loadImage(`/bots/${kind}/${i}.png`)),
-      ).then(imgs => [kind, imgs] as const),
-    )
-    Promise.all([stills, Promise.all(packs)]).then(([stillPairs, packs]) => {
-      if (cancelled) return
-      stillsRef.current = Object.fromEntries(stillPairs)
-      const bag: Record<string, HTMLImageElement[]> = { chair: [], walk: [], point: [], type: [] }
-      for (const [kind, imgs] of packs) bag[kind] = imgs
-      framesRef.current = bag
-      setReady(true)
-    }).catch(() => {})
-    return () => { cancelled = true }
-  }, [])
 
   useEffect(() => {
     let alive = true
@@ -315,24 +504,6 @@ export default function RangeFloor() {
       ctx.imageSmoothingQuality = 'high'
       ctx.fillStyle = '#0b1116'
       ctx.fillRect(0, 0, rect.width, rect.height)
-
-      if (!stillsRef.current.idle) {
-        // skeleton: the office warming up — shimmer band over dark glass
-        const shim = ((now / 6) % (rect.width * 1.6)) - rect.width * 0.3
-        const g = ctx.createLinearGradient(shim - 140, 0, shim + 140, 0)
-        g.addColorStop(0, 'rgba(120,200,160,0)')
-        g.addColorStop(0.5, 'rgba(120,200,160,0.05)')
-        g.addColorStop(1, 'rgba(120,200,160,0)')
-        ctx.fillStyle = g
-        ctx.fillRect(0, 0, rect.width, rect.height)
-        ctx.fillStyle = 'rgba(140,170,155,0.55)'
-        ctx.font = `10px ${MONO}`
-        ctx.textAlign = 'center'
-        ctx.fillText('warming up the office…', rect.width / 2, rect.height / 2)
-        ctx.textAlign = 'left'
-        raf = requestAnimationFrame(draw)
-        return
-      }
 
       const dx = 0, dy = 0, dw = rect.width, dh = rect.height
       const X = (fx: number) => fx * dw
@@ -552,8 +723,6 @@ export default function RangeFloor() {
         ctx.fillRect(X(spot.x) - dw * 0.004, my + mh + 3, dw * 0.008, dh * 0.008)
       }
 
-      const frames = framesRef.current
-      const stills = stillsRef.current
       const order = [...stations].sort((a, b) => a.y - b.y)
 
       for (const [i, s] of order.entries()) {
@@ -566,28 +735,10 @@ export default function RangeFloor() {
           y = Y(wpos.y)
           flip = wpos.flip
         }
-        const working = s.present && !s.down
-        const frameN = working
-          ? Math.floor(now / (s.action === 'walk' ? 100 : 90) + i * 2) % FRAMES
-          : 0
-        let sprite: HTMLImageElement | undefined
-        if (s.action === 'walk') sprite = frames.walk[frameN]
-        else if (s.action === 'point') sprite = working ? frames.point[frameN] : stills.stand
-        else if (s.action === 'work') sprite = working ? (frames.type[frameN] ?? stills.work) : stills.work
-        else sprite = working ? frames.chair[frameN] : stills.idle
-        const frac = SPRITE_FRAC[s.action]
-        if (sprite) {
-          const th = S * frac
-          const tw = sprite.width * (th / sprite.height)
-          const ax = ANCHOR_X[s.action]
-          shadow(ctx, x, y, tw)
-          ctx.save()
-          ctx.globalAlpha = s.down ? 0.5 : s.pending ? 0.78 : 1
-          ctx.translate(x, y)
-          if (flip) ctx.scale(-1, 1)
-          ctx.drawImage(sprite, -ax * tw, -th, tw, th)
-          ctx.restore()
-        }
+        const H = S * POSE_H[s.action]
+        const st = { working: s.present && !s.down, pending: s.pending, down: s.down }
+        shadow(ctx, x, y, H * 0.55)
+        drawBot(ctx, x, y, H, s.action, now, i, st, flip)
         ctx.font = `8px ${MONO}`
         ctx.textAlign = 'center'
         ctx.save()
@@ -608,7 +759,7 @@ export default function RangeFloor() {
         const w = Math.min(ctx.measureText(pick.bubble!).width + 14, 220)
         const cxb = X(pick.x)
         const bx = Math.max(dx + 4, Math.min(dx + dw - w - 4, cxb - w / 2))
-        const by = Math.max(dy + 6, Y(pick.y) - S * SPRITE_FRAC[pick.action] - dh * 0.05)
+        const by = Math.max(dy + 6, Y(pick.y) - S * POSE_H[pick.action] * 1.14 - dh * 0.05)
         ctx.fillStyle = pick.down ? P.red : P.gold
         ctx.fillRect(bx, by, w, 18)
         ctx.fillStyle = P.bubble
@@ -635,7 +786,7 @@ export default function RangeFloor() {
     }
     raf = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(raf)
-  }, [ready])
+  }, [])
 
   return (
     <div className="floor-frame">
