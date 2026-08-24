@@ -4,6 +4,7 @@ import { useDashboardStore } from './store/dashboardStore'
 import CrewStage, { OpsLog, buildBoardCells } from './components/CrewStage'
 import BoardPanel from './components/BoardPanel'
 import ClaudeHomePanel from './components/ClaudeHomePanel'
+import DeskPanel from './components/DeskPanel'
 import FleetPanel from './components/FleetPanel'
 import TradingPanel from './components/TradingPanel'
 import { GOLD, THEME_NAMES, getPhase, getTheme, palette, setTheme, type Phase, type ThemeName } from './theme'
@@ -377,6 +378,9 @@ export default function App() {
         }}>
           <div style={{ flexShrink: 0, maxHeight: '38%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             <FleetPanel />
+          </div>
+          <div style={{ flexShrink: 0 }}>
+            <DeskPanel />
           </div>
           <div style={{ flex: 1, minHeight: 0 }}>
             <OpsLog />
