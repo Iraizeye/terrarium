@@ -51,14 +51,16 @@ Health checks run over the *real* stack — daemons, watchdogs, heartbeats,
 kill switch, disk — and feed the header status bar. Red means something is
 actually wrong; a healthy machine reads **ALL STATIONS GO**.
 
-The stage is a hand-drawn trading office. The painting is set dressing;
-everything rendered onto it is live: the wall of four monitors charts the
-names the engine actually judged this session, the LED sign is the real
-session clock, and every copper robot is a real seat or book — typing
+The stage is a room drawn in code around hand-drawn copper robots, and
+every element of it is live: the big board charts the names the engine
+actually judged this session, the LED sign is the real session clock, the
+wall clock reads ET, each desk monitor glows with its seat's true status,
+and the room re-lights itself with the market phase — dawn amber, open
+daylight, dusk ember, night. Every robot is a real seat or book: typing
 when its session is working, walking the aisle when the live book is up,
-pointing at the wall when the chief's brief is in, dim while waiting, red
-when down. Fleet, seats, ops log, both books, the board, the tape, and
-vitals stay on screen — nothing is behind a pill.
+pointing at the board when the chief's brief is in, dim while waiting,
+red when down. Fleet, seats, ops log, both books, the board, the tape,
+and vitals stay on screen — nothing is behind a pill.
 
 ## Architecture
 

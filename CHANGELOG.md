@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.9.1 - 2026-08-24 — the room, drawn in code
+
+- The painted backdrop is retired; the room is now drawn on canvas around
+  the robot sprites. Crisp at any aspect ratio, no cover-crop drift.
+- Everything in the room works: the big board houses the live tape, the
+  LED sign and analog wall clock tell real session time, desk monitors
+  glow with each seat's actual status, and the walls re-light with the
+  market phase (dawn / open / dusk / night).
+
 ## v0.9.0 - 2026-08-24 — the office
 
 - Center stage is a hand-drawn night trading office (art by a guest

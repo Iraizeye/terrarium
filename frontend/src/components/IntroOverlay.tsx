@@ -14,7 +14,7 @@ export function markIntroSeen(): void {
 }
 
 const ZONES: { name: string; desc: string }[] = [
-  { name: 'The floor', desc: 'center — a hand-drawn trading office. Every robot is a real seat or book: typing on shift, dim while waiting, red when down. The chief of staff points at the wall once the morning brief is in; the LED sign and the lit wall monitors are the real session clock and tape.' },
+  { name: 'The floor', desc: 'center — the office. Every robot is a real seat or book: typing on shift, dim while waiting, red when down. The big board charts what the engine judged, the LED sign and wall clock are the real session time, and each desk monitor glows with its robot\u2019s true status.' },
   { name: 'Fleet', desc: 'left rail — sessions, scheduled seats, and the ops log. Always on. Tool names only, never content.' },
   { name: 'Books', desc: 'right rail — live and paper books, positions, stops, and the last decision verbatim. Always on.' },
   { name: 'The tape', desc: 'under the office — what the engine saw last cycle. PASS means it judged a candidate and declined.' },

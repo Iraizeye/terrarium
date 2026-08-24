@@ -1,4 +1,8 @@
-// Night office. Robots sit IN rolling chairs. CRT glass shows live tape.
+// The floor — a room drawn in code around Grok's copper robots.
+// Every element is functional: the board carries the live tape, the LED
+// sign is the real session clock, each desk monitor glows with its seat's
+// actual status, and the wall clock reads ET. The room re-lights itself
+// with the market phase. No raster backdrop; crisp at any size.
 
 import { useEffect, useRef, useState } from 'react'
 import { useDashboardStore } from '../store/dashboardStore'
@@ -9,7 +13,7 @@ const MONO = '"JetBrains Mono", "Fira Code", monospace'
 const P = {
   red: '#f0716a', amber: '#e0b34d', gold: '#d9a441',
   text: '#eaf0e8', ink: '#1a1814', bubble: '#f2f6ea',
-  crt: '#07140e', green: '#3dff7a', dim: '#1a3d28',
+  crt: '#07140e', mint: '#7de8a8',
 }
 
 type SeatStatus = 'ok' | 'failed' | 'pending'
@@ -38,46 +42,44 @@ const SPOTS: Record<string, { x: number; y: number; action: Action; flip?: boole
   chief:     { x: 0.400, y: 0.875, action: 'point' },
   live:      { x: 0.62, y: 0.91, action: 'walk' },
 }
+const DESK_SEATS = ['projects', 'premarket', 'ops', 'content', 'paper'] as const
 const FRAMES = 6
 const WALK = { x0: 0.56, x1: 0.68, y: 0.91, period: 14000 }
 const ANCHOR_X: Record<Action, number> = { sit: 0.42, work: 0.66, walk: 0.50, point: 0.50 }
 const SPRITE_FRAC: Record<Action, number> = { sit: 0.50, work: 0.50, walk: 0.36, point: 0.50 }
 
-// the painted sign lies; this LED panel tells the truth (fractions of office.jpg)
-const SIGN = { x: 0.547, y: 0.099, w: 0.181, h: 0.047 }
-// one of the painted wall monitors is switched on with live data
-const WALLMON = { x: 0.192, y: 0.034, w: 0.140, h: 0.134 }
-// the tilted corner monitor painted with a fake ticker — live now, tilt matched
-const WALLMON2 = { cx: 0.110, cy: 0.160, w: 0.142, h: 0.220, rot: -0.09 }
+// the big board on the wall houses the live tape
+const BOARD = { x: 0.180, y: 0.014, w: 0.348, h: 0.336 }
+const WALL_PANELS: { x: number; y: number; w: number; h: number }[] = [
+  { x: 0.196, y: 0.032, w: 0.152, h: 0.140 },
+  { x: 0.360, y: 0.032, w: 0.152, h: 0.140 },
+  { x: 0.196, y: 0.188, w: 0.152, h: 0.140 },
+  { x: 0.360, y: 0.188, w: 0.152, h: 0.140 },
+]
+const SIGN = { x: 0.560, y: 0.096, w: 0.180, h: 0.052 }
+const SIGN_HOUSE = { x: 0.548, y: 0.082, w: 0.204, h: 0.080 }
+const CLOCK = { x: 0.845, y: 0.135, r: 0.075 }
 
-const GRADE: Record<Phase, string | null> = {
-  night: null,
-  dawn: 'rgba(255,176,80,0.10)',
-  day: 'rgba(255,228,170,0.09)',
-  dusk: 'rgba(250,130,70,0.08)',
+// room light per market phase — walls, floor, and lamp warmth move with it
+const ROOM: Record<Phase, {
+  wallTop: string; wallBot: string; floorA: string; floorB: string
+  counterTop: string; counterFace: string; wash: string | null
+}> = {
+  night: { wallTop: '#252e3a', wallBot: '#2f3947', floorA: '#3d2f21', floorB: '#2f241a', counterTop: '#7a5a38', counterFace: '#4a371f', wash: null },
+  dawn:  { wallTop: '#2d3138', wallBot: '#3d3a33', floorA: '#453527', floorB: '#362a1e', counterTop: '#87643c', counterFace: '#523d22', wash: 'rgba(235,170,80,0.10)' },
+  day:   { wallTop: '#3a4550', wallBot: '#49535d', floorA: '#4a3a2b', floorB: '#3b2f22', counterTop: '#94714a', counterFace: '#5a4428', wash: 'rgba(255,225,170,0.07)' },
+  dusk:  { wallTop: '#2c2f37', wallBot: '#3a332c', floorA: '#41301f', floorB: '#34281b', counterTop: '#7d5c38', counterFace: '#4d3820', wash: 'rgba(240,140,80,0.08)' },
 }
 
 function phaseText(phase: Phase): string {
   return phase === 'day' ? 'MARKET OPEN' : phase === 'dawn' ? 'DAWN RUN' : phase === 'dusk' ? 'AFTER CLOSE' : 'NIGHT WATCH'
 }
 
-// live glass — the painting's own four wall monitors, inner-screen fractions
-// measured against office.jpg's natural 1280x720 pixels — aspect-proof
-const WALL_PANELS: { x: number; y: number; w: number; h: number }[] = [
-  { x: 0.219, y: 0.028, w: 0.123, h: 0.128 },
-  { x: 0.369, y: 0.025, w: 0.131, h: 0.135 },
-  { x: 0.220, y: 0.192, w: 0.130, h: 0.128 },
-  { x: 0.377, y: 0.194, w: 0.130, h: 0.128 },
-]
-// the tilted corner monitor: the book screen (positions, or quiet when flat)
-const TILT = { cx: 0.112, cy: 0.180, w: 0.156, h: 0.252, rot: 0.12 }
-
 function coverRect(cw: number, ch: number, iw: number, ih: number) {
   const s = Math.max(cw / iw, ch / ih)
   const dw = iw * s
   const dh = ih * s
-  // vertical overflow crops mostly sky-side but keeps the desks: 72% off
-  // the top, 28% off the floor (papers), so the wall survives short frames
+  // vertical overflow crops mostly ceiling-side but keeps the desks
   return { dx: (cw - dw) / 2, dy: (ch - dh) * 0.72, dw, dh }
 }
 
@@ -213,7 +215,7 @@ function drawScreen(
     const max = Math.max(...series)
     const span = max - min || 1
     const chartY = y + h * 0.14
-    const chartH = h * 0.62
+    const chartH = h * 0.58
     ctx.beginPath()
     series.forEach((v, i) => {
       const px = x + pad + (i / Math.max(1, series.length - 1)) * (w - pad * 2)
@@ -237,46 +239,14 @@ function drawScreen(
       x + pad + 1, y + h - pad - 2,
     )
   }
-  // glass edge
   ctx.strokeStyle = 'rgba(160,255,200,0.10)'
   ctx.lineWidth = 1
   ctx.stroke()
   ctx.restore()
 }
 
-function drawOffScreen(
-  ctx: CanvasRenderingContext2D,
-  w: number, h: number,
-  now: number,
-) {
-  // called inside a translated+rotated frame centered at (0,0): a monitor
-  // that is simply off — dark glass, one standby ember
-  const x = -w / 2, y = -h / 2
-  ctx.beginPath()
-  ctx.roundRect(x, y, w, h, 5)
-  ctx.fillStyle = '#0a0f0d'
-  ctx.fill()
-  ctx.save()
-  ctx.clip()
-  ctx.fillStyle = 'rgba(200,240,220,0.035)'
-  ctx.beginPath()
-  ctx.moveTo(x + w * 0.15, y)
-  ctx.lineTo(x + w * 0.38, y)
-  ctx.lineTo(x + w * 0.12, y + h)
-  ctx.lineTo(x - w * 0.11, y + h)
-  ctx.closePath()
-  ctx.fill()
-  ctx.restore()
-  const on = Math.sin(now / 900) > -0.6
-  if (on) {
-    ctx.fillStyle = 'rgba(120,220,170,0.5)'
-    ctx.fillRect(x + w - 8, y + h - 7, 3, 3)
-  }
-}
-
 export default function RangeFloor() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const imgRef = useRef<HTMLImageElement | null>(null)
   const stillsRef = useRef<Record<string, HTMLImageElement>>({})
   const framesRef = useRef<Record<string, HTMLImageElement[]>>({ chair: [], walk: [], point: [] })
   const sparkRef = useRef<Record<string, number[]>>({})
@@ -288,7 +258,6 @@ export default function RangeFloor() {
 
   useEffect(() => {
     let cancelled = false
-    const office = loadImage('/office.jpg')
     const stills = Promise.all([
       loadImage('/bots/idle-chair.png').then(img => ['idle', img] as const),
       loadImage('/bots/work-chair.png').then(img => ['work', img] as const),
@@ -299,9 +268,8 @@ export default function RangeFloor() {
         Array.from({ length: FRAMES }, (_, i) => loadImage(`/bots/${kind}/${i}.png`)),
       ).then(imgs => [kind, imgs] as const),
     )
-    Promise.all([office, stills, Promise.all(packs)]).then(([img, stillPairs, packs]) => {
+    Promise.all([stills, Promise.all(packs)]).then(([stillPairs, packs]) => {
       if (cancelled) return
-      imgRef.current = img
       stillsRef.current = Object.fromEntries(stillPairs)
       const bag: Record<string, HTMLImageElement[]> = { chair: [], walk: [], point: [] }
       for (const [kind, imgs] of packs) bag[kind] = imgs
@@ -343,8 +311,7 @@ export default function RangeFloor() {
       ctx.fillStyle = '#0b1116'
       ctx.fillRect(0, 0, rect.width, rect.height)
 
-      const img = imgRef.current
-      if (!img) {
+      if (!stillsRef.current.idle) {
         // skeleton: the office warming up — shimmer band over dark glass
         const shim = ((now / 6) % (rect.width * 1.6)) - rect.width * 0.3
         const g = ctx.createLinearGradient(shim - 140, 0, shim + 140, 0)
@@ -361,34 +328,159 @@ export default function RangeFloor() {
         raf = requestAnimationFrame(draw)
         return
       }
-      const iw = img.width
-      const ih = img.height
-      const { dx, dy, dw, dh } = coverRect(rect.width, rect.height, iw, ih)
-      ctx.drawImage(img, dx, dy, dw, dh)
 
-      // time-of-day grade over the painting (sprites and live glass stay crisp)
+      const { dx, dy, dw, dh } = coverRect(rect.width, rect.height, 1280, 720)
+      const X = (fx: number) => dx + fx * dw
+      const Y = (fy: number) => dy + fy * dh
       const phase = getPhase(trading?.market)
-      const grade = GRADE[phase]
-      if (grade) {
-        ctx.save()
-        ctx.globalCompositeOperation = 'soft-light'
-        ctx.fillStyle = grade
-        ctx.fillRect(0, 0, rect.width, rect.height)
-        ctx.restore()
+      const room = ROOM[phase]
+
+      // ── the room ──
+      // wall
+      {
+        const g = ctx.createLinearGradient(0, Y(0), 0, Y(0.62))
+        g.addColorStop(0, room.wallTop)
+        g.addColorStop(1, room.wallBot)
+        ctx.fillStyle = g
+        ctx.fillRect(X(0), Y(0), dw, dh * 0.62)
+        if (room.wash) {
+          ctx.fillStyle = room.wash
+          ctx.fillRect(X(0), Y(0), dw, dh * 0.62)
+        }
+      }
+      // floor
+      {
+        const g = ctx.createLinearGradient(0, Y(0.62), 0, Y(1))
+        g.addColorStop(0, room.floorA)
+        g.addColorStop(1, room.floorB)
+        ctx.fillStyle = g
+        ctx.fillRect(X(0), Y(0.62), dw, dh * 0.38)
+        ctx.strokeStyle = 'rgba(0,0,0,0.16)'
+        ctx.lineWidth = 1
+        for (let i = 1; i < 8; i++) {
+          const fy = 0.62 + i * 0.048
+          ctx.beginPath()
+          ctx.moveTo(X(0), Y(fy))
+          ctx.lineTo(X(1), Y(fy))
+          ctx.stroke()
+        }
+        for (let i = 0; i < 9; i++) {
+          const fx = 0.06 + i * 0.115 + (i % 2) * 0.03
+          ctx.beginPath()
+          ctx.moveTo(X(fx), Y(0.62 + (i % 3) * 0.096))
+          ctx.lineTo(X(fx), Y(0.62 + (i % 3) * 0.096 + 0.048))
+          ctx.stroke()
+        }
+      }
+      // counter: top, face, shadow
+      ctx.fillStyle = room.counterTop
+      ctx.fillRect(X(0), Y(0.560), dw, dh * 0.030)
+      ctx.fillStyle = 'rgba(255,255,255,0.05)'
+      ctx.fillRect(X(0), Y(0.560), dw, dh * 0.006)
+      ctx.fillStyle = room.counterFace
+      ctx.fillRect(X(0), Y(0.590), dw, dh * 0.085)
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'
+      ctx.fillRect(X(0), Y(0.675), dw, dh * 0.012)
+      // drawer lines on the face
+      ctx.strokeStyle = 'rgba(0,0,0,0.20)'
+      for (const fx of [0.09, 0.34, 0.58, 0.82]) {
+        ctx.strokeRect(X(fx), Y(0.600), dw * 0.05, dh * 0.060)
       }
 
-      // live LED sign over the painted one
+      // the big board (houses the live tape)
+      ctx.fillStyle = '#10161d'
+      ctx.strokeStyle = '#0b0f14'
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.roundRect(X(BOARD.x), Y(BOARD.y), dw * BOARD.w, dh * BOARD.h, 8)
+      ctx.fill()
+      ctx.stroke()
+      ctx.fillStyle = 'rgba(255,255,255,0.045)'
+      ctx.fillRect(X(BOARD.x) + 3, Y(BOARD.y) + 2, dw * BOARD.w - 6, 2)
+      ctx.fillStyle = 'rgba(160,200,180,0.4)'
+      ctx.font = `${Math.max(6, dh * 0.014)}px ${MONO}`
+      ctx.fillText('THE TAPE — judged this session', X(BOARD.x + 0.008), Y(BOARD.y + BOARD.h) - dh * 0.012)
+
+      // LED sign housing
+      ctx.fillStyle = '#1a1113'
+      ctx.strokeStyle = '#33201d'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.roundRect(X(SIGN_HOUSE.x), Y(SIGN_HOUSE.y), dw * SIGN_HOUSE.w, dh * SIGN_HOUSE.h, 6)
+      ctx.fill()
+      ctx.stroke()
+
+      // wall clock — real ET
       {
-        const sx = dx + SIGN.x * dw, sy = dy + SIGN.y * dh
-        const sw = SIGN.w * dw, sh = SIGN.h * dh
+        const cx = X(CLOCK.x), cy = Y(CLOCK.y), r = dh * CLOCK.r
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2)
+        ctx.fillStyle = '#e6e2d4'; ctx.fill()
+        ctx.lineWidth = Math.max(2, r * 0.09); ctx.strokeStyle = '#2a2320'; ctx.stroke()
+        const et = trading?.market?.et?.match(/(\d{1,2}):(\d{2})/)
+        if (et) {
+          const hh = (parseInt(et[1], 10) % 12) + parseInt(et[2], 10) / 60
+          const mm = parseInt(et[2], 10)
+          const ha = (hh / 12) * Math.PI * 2 - Math.PI / 2
+          const ma = (mm / 60) * Math.PI * 2 - Math.PI / 2
+          ctx.strokeStyle = '#2a2320'
+          ctx.lineWidth = Math.max(1.5, r * 0.08)
+          ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(ha) * r * 0.5, cy + Math.sin(ha) * r * 0.5); ctx.stroke()
+          ctx.lineWidth = Math.max(1, r * 0.05)
+          ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(ma) * r * 0.78, cy + Math.sin(ma) * r * 0.78); ctx.stroke()
+          ctx.fillStyle = '#2a2320'
+          ctx.beginPath(); ctx.arc(cx, cy, r * 0.07, 0, Math.PI * 2); ctx.fill()
+        }
+        ctx.fillStyle = 'rgba(160,200,180,0.4)'
+        ctx.font = `${Math.max(6, dh * 0.013)}px ${MONO}`
+        ctx.textAlign = 'center'
+        ctx.fillText('ET', cx, cy + r + dh * 0.022)
+        ctx.textAlign = 'left'
+      }
+
+      // banker lamps + warm pools
+      for (const fx of [0.41, 0.635]) {
+        const lx = X(fx), ly = Y(0.560)
+        const glow = ctx.createRadialGradient(lx, ly - dh * 0.02, 2, lx, ly - dh * 0.02, dh * 0.12)
+        glow.addColorStop(0, 'rgba(200,240,150,0.16)')
+        glow.addColorStop(1, 'rgba(200,240,150,0)')
+        ctx.fillStyle = glow
+        ctx.fillRect(lx - dh * 0.12, ly - dh * 0.14, dh * 0.24, dh * 0.2)
+        ctx.strokeStyle = '#8a7a4a'
+        ctx.lineWidth = Math.max(1.5, dh * 0.005)
+        ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx, ly - dh * 0.045); ctx.stroke()
+        ctx.fillStyle = '#3f9a52'
+        ctx.beginPath()
+        ctx.ellipse(lx, ly - dh * 0.050, dh * 0.032, dh * 0.014, 0, Math.PI, 0)
+        ctx.fill()
+        ctx.fillStyle = 'rgba(230,255,190,0.7)'
+        ctx.fillRect(lx - dh * 0.024, ly - dh * 0.048, dh * 0.048, dh * 0.004)
+      }
+
+      // ── live tape on the board ──
+      const quotes = quotesFrom(board, trading)
+      if (now - lastPush > 400) {
+        lastPush = now
+        for (const q of quotes) {
+          const hist = sparkRef.current[q.symbol] ?? []
+          hist.push(q.last)
+          sparkRef.current[q.symbol] = hist.slice(-48)
+        }
+      }
+      for (const [i, scr] of WALL_PANELS.entries()) {
+        const q = quotes[i] ?? null
+        const hist = q ? (sparkRef.current[q.symbol] ?? []) : []
+        drawScreen(ctx, X(scr.x), Y(scr.y), dw * scr.w, dh * scr.h, q, hist, now)
+      }
+
+      // LED sign — the real session phase and clock
+      {
+        const sx = X(SIGN.x), sy = Y(SIGN.y)
+        const sw = dw * SIGN.w, sh = dh * SIGN.h
         ctx.save()
         ctx.beginPath()
         ctx.roundRect(sx, sy, sw, sh, 4)
-        ctx.fillStyle = '#140b0c'
+        ctx.fillStyle = '#120a0b'
         ctx.fill()
-        ctx.strokeStyle = 'rgba(120,60,50,0.8)'
-        ctx.lineWidth = 2
-        ctx.stroke()
         const open = trading?.market?.is_open
         const label = phaseText(phase)
         const et = trading?.market?.et?.match(/\d{1,2}:\d{2}/)?.[0] ?? ''
@@ -402,53 +494,52 @@ export default function RangeFloor() {
         ctx.restore()
       }
 
-      // the painting's four wall monitors carry the live tape
-      const quotes = quotesFrom(board, trading)
-      if (now - lastPush > 400) {
-        lastPush = now
-        for (const q of quotes) {
-          const hist = sparkRef.current[q.symbol] ?? []
-          hist.push(q.last)
-          sparkRef.current[q.symbol] = hist.slice(-48)
-        }
-      }
-      for (const [i, scr] of WALL_PANELS.entries()) {
-        const q = quotes[i] ?? null
-        const hist = q ? (sparkRef.current[q.symbol] ?? []) : []
-        drawScreen(ctx, dx + scr.x * dw, dy + scr.y * dh, scr.w * dw, scr.h * dh, q, hist, now)
-      }
-      // the tilted corner monitor is off — dark glass over the painted ticker
-      ctx.save()
-      ctx.translate(dx + TILT.cx * dw, dy + TILT.cy * dh)
-      ctx.rotate(TILT.rot)
-      drawOffScreen(ctx, TILT.w * dw, TILT.h * dh, now)
-      ctx.restore()
-
-      // vignette pulls the eye to the cast
-      {
-        const g = ctx.createRadialGradient(
-          rect.width / 2, rect.height * 0.58, rect.height * 0.35,
-          rect.width / 2, rect.height * 0.58, rect.width * 0.72,
-        )
-        g.addColorStop(0, 'rgba(0,0,0,0)')
-        g.addColorStop(1, 'rgba(4,6,8,0.34)')
-        ctx.fillStyle = g
-        ctx.fillRect(0, 0, rect.width, rect.height)
-      }
-
+      // ── the cast ──
       const stations = stationsFrom(seats, trading, fleet)
+
+      // desk monitors — each seat's screen glows with its robot's status
+      for (const key of DESK_SEATS) {
+        const st = stations.find(s => s.key === key)
+        const spot = SPOTS[key]
+        if (!st || !spot) continue
+        const mw = dw * 0.070, mh = dh * 0.082
+        const mx = X(spot.x) - mw / 2, my = Y(0.560) - mh - dh * 0.012
+        ctx.fillStyle = '#232a30'
+        ctx.beginPath(); ctx.roundRect(mx - 3, my - 3, mw + 6, mh + 6, 5); ctx.fill()
+        const on = st.present && !st.down
+        const glow = st.down ? 'rgba(240,113,106,0.5)' : st.pending ? 'rgba(224,179,77,0.28)' : 'rgba(125,232,168,0.35)'
+        ctx.fillStyle = on ? '#0b1a12' : '#10151a'
+        ctx.fillRect(mx, my, mw, mh)
+        ctx.fillStyle = glow
+        ctx.fillRect(mx, my, mw, mh * 0.16)
+        if (on) {
+          ctx.strokeStyle = 'rgba(125,232,168,0.6)'
+          ctx.lineWidth = 1
+          ctx.beginPath()
+          for (let i = 0; i <= 16; i++) {
+            const px = mx + (i / 16) * mw
+            const py = my + mh * 0.62 + Math.sin(now / 260 + i * 0.9 + spot.x * 20) * mh * 0.14
+            i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)
+          }
+          ctx.stroke()
+        }
+        // stand
+        ctx.fillStyle = '#1b2126'
+        ctx.fillRect(X(spot.x) - dw * 0.004, my + mh + 3, dw * 0.008, dh * 0.008)
+      }
+
       const frames = framesRef.current
       const stills = stillsRef.current
       const order = [...stations].sort((a, b) => a.y - b.y)
 
       for (const [i, s] of order.entries()) {
-        let x = dx + s.x * dw
-        let y = dy + s.y * dh
+        let x = X(s.x)
+        let y = Y(s.y)
         let flip = s.flip
         if (s.action === 'walk' && s.present) {
           const wpos = walkAt(now)
-          x = dx + wpos.x * dw
-          y = dy + wpos.y * dh
+          x = X(wpos.x)
+          y = Y(wpos.y)
           flip = wpos.flip
         }
         const working = s.present && !s.down
@@ -491,9 +582,9 @@ export default function RangeFloor() {
         const pick = withBubbles[Math.floor(now / 5000) % withBubbles.length]
         ctx.font = `11px ${MONO}`
         const w = Math.min(ctx.measureText(pick.bubble!).width + 14, 220)
-        const cxb = dx + pick.x * dw
+        const cxb = X(pick.x)
         const bx = Math.max(dx + 4, Math.min(dx + dw - w - 4, cxb - w / 2))
-        const by = Math.max(dy + 6, dy + (pick.y - SPRITE_FRAC[pick.action] - 0.05) * dh)
+        const by = Math.max(dy + 6, Y(pick.y - SPRITE_FRAC[pick.action] - 0.05))
         ctx.fillStyle = pick.down ? P.red : P.gold
         ctx.fillRect(bx, by, w, 18)
         ctx.fillStyle = P.bubble
@@ -502,6 +593,18 @@ export default function RangeFloor() {
         ctx.fillText(pick.bubble!.slice(0, 34), bx + 7, by + 13)
         ctx.fillStyle = pick.down ? P.red : P.gold
         ctx.fillRect(cxb - 3, by + 18, 6, 4)
+      }
+
+      // vignette pulls the eye to the cast
+      {
+        const g = ctx.createRadialGradient(
+          rect.width / 2, rect.height * 0.58, rect.height * 0.35,
+          rect.width / 2, rect.height * 0.58, rect.width * 0.72,
+        )
+        g.addColorStop(0, 'rgba(0,0,0,0)')
+        g.addColorStop(1, 'rgba(4,6,8,0.30)')
+        ctx.fillStyle = g
+        ctx.fillRect(0, 0, rect.width, rect.height)
       }
 
       raf = requestAnimationFrame(draw)
