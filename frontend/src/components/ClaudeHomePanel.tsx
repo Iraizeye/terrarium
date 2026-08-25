@@ -53,7 +53,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ height: '100%', overflowY: 'auto', display: 'grid', gap: 10, alignContent: 'start', padding: '4px 2px 8px' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-        <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: 3, color: UI.accentDim }}>
+        <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: 3, color: UI.brassDim }}>
           {'⌂'} CLAUDE HOME
         </span>
         <span style={{ fontSize: 10, color: UI.dim, letterSpacing: '0.08em' }}>

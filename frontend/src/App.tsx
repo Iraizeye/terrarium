@@ -160,7 +160,7 @@ function StatPill({ label, value, sub, warn }: { label: string; value: string; s
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
       padding: '5px 12px 6px',
-      border: `1px solid ${warn || (numericPct != null && numericPct > 85) ? 'rgba(224,179,77,0.5)' : numericPct != null && numericPct > 70 ? 'rgba(224,179,77,0.34)' : 'rgba(148,163,184,0.16)'}`,
+      border: `1px solid ${warn || (numericPct != null && numericPct > 85) ? 'rgba(224,179,77,0.5)' : numericPct != null && numericPct > 70 ? 'rgba(224,179,77,0.34)' : 'rgba(210,175,120,0.18)'}`,
       background: UI.surface,
       borderRadius: UI.radius,
       boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
@@ -229,7 +229,7 @@ export default function App() {
       <div className="shell">
         <div className="shell-header">
           <div>
-            <div style={{ fontSize: 11, color: UI.accent, letterSpacing: '0.18em', textTransform: 'uppercase' }}>Terrarium</div>
+            <div style={{ fontSize: 11, color: UI.brass, letterSpacing: '0.18em', textTransform: 'uppercase' }}>Terrarium</div>
             <div style={{ fontSize: 9, color: C.dim, letterSpacing: '0.14em', textTransform: 'uppercase', marginTop: 1 }}>a little world of working agents</div>
             <div className="hud-chip" style={{ marginTop: 4 }}>
               {phaseLabel(phase)} / {et} ET
@@ -241,7 +241,7 @@ export default function App() {
               onClick={() => setShowIntro(true)}
               style={{
                 fontFamily: MONO, fontSize: 10, color: C.dim, background: 'transparent',
-                border: '1px solid rgba(148,163,184,0.22)', borderRadius: 999, padding: '3px 9px', cursor: 'pointer',
+                border: '1px solid rgba(210,175,120,0.25)', borderRadius: 999, padding: '3px 9px', cursor: 'pointer',
               }}
               title="what am I looking at?"
             >?</button>
@@ -250,7 +250,7 @@ export default function App() {
               style={{
                 fontFamily: MONO, fontSize: 10, letterSpacing: 1.5,
                 color: view === 'home' ? UI.accent : UI.soft, background: 'transparent',
-                border: '1px solid rgba(148,163,184,0.22)', borderRadius: 999, padding: '3px 10px', cursor: 'pointer',
+                border: '1px solid rgba(210,175,120,0.25)', borderRadius: 999, padding: '3px 10px', cursor: 'pointer',
               }}
               title="the agent's own page"
             >{'\u2302'} home</button>

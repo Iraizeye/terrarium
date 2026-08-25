@@ -63,7 +63,7 @@ html, body, #root {
   height: 100%;
   overflow: hidden;
   position: relative;
-  background: #05070c;
+  background: #0a0806;
 }
 
 .shell {
@@ -164,9 +164,9 @@ html, body, #root {
   letter-spacing: 0.08em;
   padding: 5px 14px;
   border-radius: 999px;
-  background: rgba(20, 40, 32, 0.72);
-  border: 1px solid rgba(62, 207, 154, 0.35);
-  color: #d8efe4;
+  background: rgba(42, 33, 18, 0.72);
+  border: 1px solid rgba(217, 164, 65, 0.38);
+  color: #ecdfc2;
 }
 
 .hud-tools {
@@ -214,9 +214,9 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background:
-    radial-gradient(circle at top, rgba(60, 190, 140, 0.14), transparent 40%),
-    radial-gradient(circle at bottom, rgba(30, 110, 80, 0.13), transparent 34%),
-    linear-gradient(180deg, #06110c 0%, #030a07 100%);
+    radial-gradient(circle at top, rgba(150, 110, 50, 0.12), transparent 40%),
+    radial-gradient(circle at bottom, rgba(80, 55, 25, 0.12), transparent 34%),
+    linear-gradient(180deg, #0e0b07 0%, #070503 100%);
   color: var(--mc-text);
   letter-spacing: 0.02em;
 }
@@ -235,7 +235,7 @@ input {
 
 button:hover:not(:disabled),
 select:hover:not(:disabled) {
-  border-color: #3d5548 !important;
+  border-color: #55462f !important;
 }
 
 button:active:not(:disabled) {
@@ -247,7 +247,7 @@ textarea:focus-visible,
 select:focus-visible,
 input:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 1px rgba(62, 207, 154, 0.42);
+  box-shadow: 0 0 0 1px rgba(217, 164, 65, 0.42);
 }
 
 details > summary {
@@ -268,16 +268,16 @@ details[open] {
 }
 
 ::-webkit-scrollbar-track {
-  background: #0a120d;
+  background: #0f0c08;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2c4038;
+  background: #3e3426;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3d5548;
+  background: #55462f;
 }
 
 @keyframes bubble-in {
