@@ -59,7 +59,7 @@ const SPOTS: Record<string, { x: number; y: number; action: Action; flip?: boole
 const DESK_SEATS = ['projects', 'premarket', 'ops', 'content', 'paper'] as const
 const WALK = { x0: 0.315, x1: 0.600, y: F1.ground, period: 17000 }
 // bot height per pose, as a fraction of the scene scale S
-const POSE_H: Record<Action, number> = { sit: 0.235, work: 0.235, walk: 0.175, point: 0.26 }
+const POSE_H: Record<Action, number> = { sit: 0.195, work: 0.195, walk: 0.145, point: 0.26 }
 
 // the executive board, upper floor
 const BOARD = { x: 0.060, y: 0.055, w: 0.365, h: 0.235 }
@@ -172,7 +172,7 @@ const COPPERS = [
   { hi: '#f2c49a', mid: '#d89a64', dk: '#aa7440' },
 ]
 // the chief wears bright red with gold trim and a blue tie
-const CHIEF_NAVY = { hi: '#f0806c', mid: '#d4483a', dk: '#9c2f24' }
+const CHIEF_NAVY = { hi: '#e8544a', mid: '#b3232a', dk: '#7a1418' }
 const GOLD = '#d9a441'
 const LINE = 'rgba(52,30,14,0.55)'
 const CHAIR = { dark: '#2b3036', mid: '#3a4048', metal: '#8a939c' }
@@ -352,6 +352,35 @@ function drawStandingPoint(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], 
       ctx.fillStyle = GOLD
       ctx.beginPath(); ctx.arc(u * 0.065, ty + u * by2, u * 0.012, 0, Math.PI * 2); ctx.fill()
     }
+    // armor gloss: specular sweeps on torso and helmet
+    ctx.save()
+    ctx.beginPath()
+    ctx.roundRect(-u * 0.20, ty, u * 0.40, u * 0.30, u * 0.08)
+    ctx.clip()
+    ctx.fillStyle = 'rgba(255,255,255,0.16)'
+    ctx.beginPath()
+    ctx.moveTo(-u * 0.20, ty + u * 0.02)
+    ctx.lineTo(-u * 0.06, ty)
+    ctx.lineTo(-u * 0.16, ty + u * 0.30)
+    ctx.lineTo(-u * 0.20, ty + u * 0.30)
+    ctx.closePath()
+    ctx.fill()
+    ctx.restore()
+    const hh2 = u * 0.34, hw2 = u * 0.46
+    const hTop = -u * 0.67 + sway - hh2
+    ctx.save()
+    ctx.beginPath()
+    ctx.roundRect(-hw2 / 2, hTop, hw2, hh2, u * 0.09)
+    ctx.clip()
+    ctx.fillStyle = 'rgba(255,255,255,0.18)'
+    ctx.beginPath()
+    ctx.moveTo(-hw2 / 2, hTop + u * 0.015)
+    ctx.lineTo(-hw2 / 2 + u * 0.14, hTop)
+    ctx.lineTo(-hw2 / 2 + u * 0.05, hTop + hh2)
+    ctx.lineTo(-hw2 / 2, hTop + hh2)
+    ctx.closePath()
+    ctx.fill()
+    ctx.restore()
   }
   // left arm relaxed
   limb(ctx, c, [[-u * 0.20, -u * 0.60 + sway], [-u * 0.245, -u * 0.46], [-u * 0.19, -u * 0.38]], u * 0.052)
