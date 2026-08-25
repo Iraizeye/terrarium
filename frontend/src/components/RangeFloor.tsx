@@ -171,8 +171,8 @@ const COPPERS = [
   { hi: '#e6ab7a', mid: '#c48350', dk: '#946130' },
   { hi: '#f2c49a', mid: '#d89a64', dk: '#aa7440' },
 ]
-// the chief wears navy with gold trim
-const CHIEF_NAVY = { hi: '#7e8fb0', mid: '#4c5c7e', dk: '#303c58' }
+// the chief wears bright red with gold trim and a blue tie
+const CHIEF_NAVY = { hi: '#f0806c', mid: '#d4483a', dk: '#9c2f24' }
 const GOLD = '#d9a441'
 const LINE = 'rgba(52,30,14,0.55)'
 const CHAIR = { dark: '#2b3036', mid: '#3a4048', metal: '#8a939c' }
@@ -332,7 +332,7 @@ function drawStandingPoint(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], 
   // presidential kit: red tie, gold epaulets, gold buttons
   {
     const ty = -u * 0.66 + sway
-    ctx.fillStyle = '#8a2f28'
+    ctx.fillStyle = '#2f5aa8'
     ctx.beginPath()
     ctx.moveTo(-u * 0.030, ty + u * 0.015)
     ctx.lineTo(u * 0.030, ty + u * 0.015)
@@ -341,9 +341,9 @@ function drawStandingPoint(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], 
     ctx.lineTo(-u * 0.015, ty + u * 0.20)
     ctx.closePath()
     ctx.fill()
-    ctx.strokeStyle = 'rgba(40,10,8,0.5)'
+    ctx.strokeStyle = 'rgba(10,20,45,0.55)'
     ctx.stroke()
-    ctx.fillStyle = '#b03a30'
+    ctx.fillStyle = '#3a6cc4'
     ctx.fillRect(-u * 0.022, ty + u * 0.005, u * 0.044, u * 0.028)
     ctx.fillStyle = GOLD
     rr(ctx, -u * 0.215, ty - u * 0.005, u * 0.075, u * 0.026, u * 0.01, GOLD)
@@ -944,15 +944,15 @@ export default function RangeFloor() {
         const st = { working: s.present && !s.down, pending: s.pending, down: s.down }
         shadow(ctx, x, y, H * 0.55)
         drawBot(ctx, x, y, H, s.action, now, i, st, flip)
-        ctx.font = `8px ${MONO}`
+        ctx.font = `bold 11px ${MONO}`
         ctx.textAlign = 'center'
         ctx.save()
-        ctx.globalAlpha = 0.8
-        ctx.fillStyle = 'rgba(6,8,10,0.6)'
-        const lw2 = ctx.measureText(s.label).width + 8
-        ctx.fillRect(x - lw2 / 2, y + 6, lw2, 11)
+        ctx.globalAlpha = 0.9
+        ctx.fillStyle = 'rgba(6,8,10,0.65)'
+        const lw2 = ctx.measureText(s.label).width + 12
+        ctx.fillRect(x - lw2 / 2, y + 6, lw2, 16)
         ctx.fillStyle = s.down ? P.red : s.pending ? P.amber : P.text
-        ctx.fillText(s.label, x, y + 14)
+        ctx.fillText(s.label, x, y + 18)
         ctx.restore()
         ctx.textAlign = 'left'
       }
