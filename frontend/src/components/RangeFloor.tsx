@@ -332,7 +332,7 @@ function drawStandingPoint(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], 
   // presidential kit: red tie, gold epaulets, gold buttons
   {
     const ty = -u * 0.66 + sway
-    ctx.fillStyle = '#2f5aa8'
+    ctx.fillStyle = GOLD
     ctx.beginPath()
     ctx.moveTo(-u * 0.030, ty + u * 0.015)
     ctx.lineTo(u * 0.030, ty + u * 0.015)
@@ -341,9 +341,9 @@ function drawStandingPoint(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], 
     ctx.lineTo(-u * 0.015, ty + u * 0.20)
     ctx.closePath()
     ctx.fill()
-    ctx.strokeStyle = 'rgba(10,20,45,0.55)'
+    ctx.strokeStyle = 'rgba(90,60,10,0.55)'
     ctx.stroke()
-    ctx.fillStyle = '#3a6cc4'
+    ctx.fillStyle = '#eebc5e'
     ctx.fillRect(-u * 0.022, ty + u * 0.005, u * 0.044, u * 0.028)
     ctx.fillStyle = GOLD
     rr(ctx, -u * 0.215, ty - u * 0.005, u * 0.075, u * 0.026, u * 0.01, GOLD)
