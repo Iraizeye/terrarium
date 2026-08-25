@@ -1244,11 +1244,11 @@ export default function RangeFloor() {
         if (pick.key !== bubbleKey) { bubbleKey = pick.key; bubbleAt = now }
         const pop = Math.min(1, (now - bubbleAt) / 240)
         const ease = 1 - Math.pow(1 - pop, 3)
-        ctx.font = `10px ${MONO}`
+        ctx.font = `bold 13px ${MONO}`
         const text = pick.bubble!.slice(0, 40)
         const tw = ctx.measureText(text).width
-        const bw = Math.min(tw + 22, 250)
-        const bh = 24
+        const bw = Math.min(tw + 28, 330)
+        const bh = 30
         const tail = 8
         const cxb = X(pick.x)
         const bx = Math.max(dx + 6, Math.min(dx + dw - bw - 6, cxb - bw / 2))
@@ -1279,7 +1279,7 @@ export default function RangeFloor() {
         // text
         ctx.fillStyle = '#2b241a'
         ctx.textAlign = 'center'
-        ctx.fillText(text, bx + bw / 2, by + 16)
+        ctx.fillText(text, bx + bw / 2, by + 20)
         ctx.textAlign = 'left'
         ctx.restore()
       }
