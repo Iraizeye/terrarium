@@ -566,6 +566,27 @@ export default function RangeFloor() {
       ctx.fillRect(X(0), Y(0), dw * 0.015, dh)
       ctx.fillRect(X(0.985), Y(0), dw * 0.015, dh)
 
+      // roof furniture: mast with beacon, small dish
+      {
+        const rx = X(0.205), ry = Y(F3.top)
+        ctx.strokeStyle = '#3a3128'
+        ctx.lineWidth = Math.max(1.5, S * 0.006)
+        ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx, ry - S * 0.055); ctx.stroke()
+        ctx.beginPath(); ctx.moveTo(rx - S * 0.016, ry); ctx.lineTo(rx, ry - S * 0.030); ctx.stroke()
+        ctx.beginPath(); ctx.moveTo(rx + S * 0.016, ry); ctx.lineTo(rx, ry - S * 0.030); ctx.stroke()
+        const on = Math.floor(now / 1100) % 2 === 0
+        ctx.fillStyle = on ? '#f0716a' : '#4a3a38'
+        ctx.beginPath(); ctx.arc(rx, ry - S * 0.062, S * 0.009, 0, Math.PI * 2); ctx.fill()
+        const dxx = X(0.80), dyy = Y(F3.top)
+        ctx.fillStyle = '#3a3128'
+        ctx.fillRect(dxx - S * 0.005, dyy - S * 0.026, S * 0.010, S * 0.026)
+        ctx.fillStyle = '#8a939c'
+        ctx.beginPath()
+        ctx.ellipse(dxx - S * 0.012, dyy - S * 0.034, S * 0.020, S * 0.013, -0.6, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 1; ctx.stroke()
+      }
+
       // elevator shaft through all floors
       {
         ctx.fillStyle = '#1a2026'
@@ -618,6 +639,27 @@ export default function RangeFloor() {
       ctx.strokeStyle = 'rgba(200,160,100,0.25)'
       ctx.lineWidth = 1.5
       ctx.stroke()
+      // chief's ficus and coffee table
+      {
+        const fx2 = X(0.615), fy2 = Y(F3.ground - 0.006)
+        ctx.fillStyle = '#7a5230'
+        ctx.fillRect(fx2 - S * 0.020, fy2 - S * 0.040, S * 0.040, S * 0.040)
+        ctx.fillStyle = '#4f8f4a'
+        ctx.beginPath(); ctx.ellipse(fx2, fy2 - S * 0.075, S * 0.030, S * 0.038, 0, 0, Math.PI * 2); ctx.fill()
+        ctx.fillStyle = '#356534'
+        ctx.beginPath(); ctx.ellipse(fx2 - S * 0.016, fy2 - S * 0.058, S * 0.016, S * 0.020, 0, 0, Math.PI * 2); ctx.fill()
+        const tx2 = X(0.385), ty2 = Y(F3.ground - 0.006)
+        ctx.fillStyle = '#5a4428'
+        ctx.fillRect(tx2 - S * 0.030, ty2 - S * 0.036, S * 0.060, S * 0.008)
+        ctx.fillRect(tx2 - S * 0.024, ty2 - S * 0.028, S * 0.006, S * 0.028)
+        ctx.fillRect(tx2 + S * 0.018, ty2 - S * 0.028, S * 0.006, S * 0.028)
+        ctx.fillStyle = '#b45a4a'
+        ctx.fillRect(tx2 - S * 0.008, ty2 - S * 0.052, S * 0.016, S * 0.016)
+        ctx.fillStyle = '#8a4536'
+        ctx.fillRect(tx2 + S * 0.008, ty2 - S * 0.048, S * 0.006, S * 0.004)
+      }
+
+      const stations = stationsFrom(seats, trading, fleet)
 
       // ── offices: a room of one's own ──
       const cubTint = room.wash ? 'rgba(255,255,255,0.045)' : 'rgba(255,255,255,0.03)'
@@ -665,6 +707,77 @@ export default function RangeFloor() {
         }
       }
 
+      // office cosmetics — light strips, wall art, side desks
+      for (const bay of BAYS) {
+        const st = stations.find(s => s.key === bay.key)
+        const occupied = !!st && st.present && !st.down
+        // ceiling light strip + soft cone when someone's in
+        const lx = X(bay.x)
+        ctx.fillStyle = '#39424c'
+        ctx.fillRect(lx - S * 0.045, Y(bay.top + 0.012), S * 0.090, dh * 0.008)
+        ctx.fillStyle = occupied ? 'rgba(255,240,200,0.85)' : 'rgba(120,130,140,0.5)'
+        ctx.fillRect(lx - S * 0.040, Y(bay.top + 0.019), S * 0.080, dh * 0.004)
+        if (occupied) {
+          const cone = ctx.createLinearGradient(0, Y(bay.top + 0.02), 0, Y(bay.ground))
+          cone.addColorStop(0, 'rgba(255,240,200,0.10)')
+          cone.addColorStop(1, 'rgba(255,240,200,0)')
+          ctx.fillStyle = cone
+          ctx.beginPath()
+          ctx.moveTo(lx - S * 0.040, Y(bay.top + 0.022))
+          ctx.lineTo(lx + S * 0.040, Y(bay.top + 0.022))
+          ctx.lineTo(lx + S * 0.105, Y(bay.ground))
+          ctx.lineTo(lx - S * 0.105, Y(bay.ground))
+          ctx.closePath()
+          ctx.fill()
+        }
+        // framed wall art: tiny seeded chart doodle
+        {
+          const fx3 = X(bay.x + bay.half * 0.52), fy3 = Y(bay.top + 0.135)
+          const fw = S * 0.055, fh = S * 0.042
+          ctx.fillStyle = '#5a4428'
+          ctx.fillRect(fx3 - 2, fy3 - 2, fw + 4, fh + 4)
+          ctx.fillStyle = '#e8e2d0'
+          ctx.fillRect(fx3, fy3, fw, fh)
+          ctx.strokeStyle = '#8a7a5a'
+          ctx.lineWidth = 1
+          ctx.beginPath()
+          for (let i = 0; i <= 6; i++) {
+            const sx2 = fx3 + (i / 6) * fw
+            const sy2 = fy3 + fh * (0.75 - 0.5 * Math.abs(Math.sin(bay.x * 37 + i * 1.7)))
+            i === 0 ? ctx.moveTo(sx2, sy2) : ctx.lineTo(sx2, sy2)
+          }
+          ctx.stroke()
+        }
+        // side desk with lamp and mug (opposite the floor accessory)
+        {
+          const dxc = X(bay.x + bay.half * 0.58), dyg = Y(bay.ground - 0.012)
+          const dwj = S * 0.085, dhj = S * 0.062
+          ctx.fillStyle = '#5a4428'
+          ctx.fillRect(dxc - dwj / 2, dyg - dhj, dwj, S * 0.010)
+          ctx.fillRect(dxc - dwj / 2 + S * 0.006, dyg - dhj + S * 0.010, S * 0.008, dhj - S * 0.010)
+          ctx.fillRect(dxc + dwj / 2 - S * 0.014, dyg - dhj + S * 0.010, S * 0.008, dhj - S * 0.010)
+          // warm desk lamp, lit with the office
+          const lx2 = dxc + dwj * 0.28, ly2 = dyg - dhj
+          if (occupied) {
+            const glow = ctx.createRadialGradient(lx2, ly2 - S * 0.02, 1, lx2, ly2 - S * 0.02, S * 0.06)
+            glow.addColorStop(0, 'rgba(255,220,150,0.22)')
+            glow.addColorStop(1, 'rgba(255,220,150,0)')
+            ctx.fillStyle = glow
+            ctx.fillRect(lx2 - S * 0.06, ly2 - S * 0.08, S * 0.12, S * 0.10)
+          }
+          ctx.strokeStyle = '#8a7a4a'
+          ctx.lineWidth = Math.max(1, S * 0.005)
+          ctx.beginPath(); ctx.moveTo(lx2, ly2); ctx.lineTo(lx2, ly2 - S * 0.022); ctx.stroke()
+          ctx.fillStyle = '#3f9a52'
+          ctx.beginPath()
+          ctx.ellipse(lx2, ly2 - S * 0.025, S * 0.016, S * 0.008, 0, Math.PI, 0)
+          ctx.fill()
+          // mug
+          ctx.fillStyle = '#b45a4a'
+          ctx.fillRect(dxc - dwj * 0.28, ly2 - S * 0.014, S * 0.013, S * 0.014)
+        }
+      }
+
       // ── floor 1 lobby: wall clock, house letters, bench plants ──
       {
         const cx = X(CLOCK.x), cy = Y(CLOCK.y), r = S * CLOCK.r
@@ -690,6 +803,19 @@ export default function RangeFloor() {
         ctx.textAlign = 'center'
         ctx.fillText('T E R R A R I U M', cx, cy + r + S * 0.032)
         ctx.textAlign = 'left'
+      }
+      // lobby bench under the clock + elevator doormat
+      {
+        const bx2 = X(CLOCK.x), by2 = Y(F1.ground - 0.010)
+        ctx.fillStyle = '#5a4428'
+        ctx.fillRect(bx2 - S * 0.070, by2 - S * 0.030, S * 0.140, S * 0.012)
+        ctx.fillRect(bx2 - S * 0.058, by2 - S * 0.018, S * 0.008, S * 0.018)
+        ctx.fillRect(bx2 + S * 0.050, by2 - S * 0.018, S * 0.008, S * 0.018)
+        ctx.fillStyle = 'rgba(255,255,255,0.06)'
+        ctx.fillRect(bx2 - S * 0.070, by2 - S * 0.030, S * 0.140, S * 0.004)
+        const mx2 = X((SHAFT.x0 + SHAFT.x1) / 2)
+        ctx.fillStyle = 'rgba(120,90,50,0.45)'
+        ctx.fillRect(mx2 - S * 0.055, Y(F1.ground - 0.004), S * 0.110, dh * 0.012)
       }
       for (const fx of [0.305, 0.605]) {
         const px2 = X(fx), py2 = Y(F1.ground - 0.010)
@@ -740,7 +866,6 @@ export default function RangeFloor() {
       }
 
       // ── the cast ──
-      const stations = stationsFrom(seats, trading, fleet)
 
       // bay monitors — each office's screen glows with its robot's status
       for (const bay of BAYS) {
