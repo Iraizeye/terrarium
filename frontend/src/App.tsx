@@ -7,6 +7,7 @@ import BoardPanel from './components/BoardPanel'
 import ClaudeHomePanel from './components/ClaudeHomePanel'
 import DeskPanel from './components/DeskPanel'
 import FleetPanel from './components/FleetPanel'
+import { SearchInput, SearchResults, useSearch } from './components/SearchPanel'
 import TradingPanel from './components/TradingPanel'
 import { getPhase, type Phase } from './theme'
 import IntroOverlay, { introSeen, markIntroSeen } from './components/IntroOverlay'
@@ -213,6 +214,10 @@ export default function App() {
   // Deep-linkable: ?view=home opens the agent's home page directly.
   const [view, setView] = useState<'stage' | 'home'>(() =>
     new URLSearchParams(window.location.search).get('view') === 'home' ? 'home' : 'stage')
+  const [searchQ, setSearchQ] = useState(() =>
+    new URLSearchParams(window.location.search).get('q') ?? '')
+  const searching = searchQ.trim().length >= 2
+  const { hits: searchHits, loading: searchLoading } = useSearch(searchQ)
   const [showIntro, setShowIntro] = useState(() => !introSeen())
   const closeIntro = () => { markIntroSeen(); setShowIntro(false) }
   const system = useDashboardStore((s) => s.system)
@@ -261,15 +266,22 @@ export default function App() {
         </div>
 
         <div className="shell-log">
-          <div style={{ flexShrink: 0, maxHeight: '38%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            <FleetPanel />
-          </div>
-          <div style={{ flexShrink: 0 }}>
-            <DeskPanel />
-          </div>
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <OpsLog />
-          </div>
+          <SearchInput q={searchQ} setQ={setSearchQ} />
+          {searching ? (
+            <SearchResults q={searchQ} hits={searchHits} loading={searchLoading} />
+          ) : (
+            <>
+              <div style={{ flexShrink: 0, maxHeight: '38%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <FleetPanel />
+              </div>
+              <div style={{ flexShrink: 0 }}>
+                <DeskPanel />
+              </div>
+              <div style={{ flex: 1, minHeight: 0 }}>
+                <OpsLog />
+              </div>
+            </>
+          )}
         </div>
 
         <div className="shell-stage">

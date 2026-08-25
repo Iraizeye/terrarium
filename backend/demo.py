@@ -363,6 +363,29 @@ def demo_home() -> dict[str, Any]:
     }
 
 
+_SEARCH_CORPUS = [
+    ("sessions", 30, "[note] [demo] LIVE closed NOVA @ 43.80 — target, +3.1R", "session log"),
+    ("alerts", 95, "[demo] LIVE trailed NOVA to breakeven at +1.0R", "alerts.log"),
+    ("decisions", 140, "[demo] buy NOVA — fresh guidance raise, reclaimed VWAP on rvol 2.1, 3.1:1", "decisions.jsonl"),
+    ("memory", 60 * 26, "[demo] guidance-raise entries have held VWAP 3/3 times; keep the stop structural", "nova-follow-through"),
+    ("sessions", 200, "[note] [demo] preflight green: broker session, scanners, risk kernel", "session log"),
+    ("decisions", 220, "[demo] pass — RIDGE move is sector sympathy without its own news", "decisions.jsonl"),
+    ("memory", 60 * 49, "[demo] EOD flatten runs 15:50 — the close belongs to management, not new risk", "never-trade-the-last-half-hour"),
+]
+
+
+def demo_search(q: str) -> list[dict[str, Any]]:
+    """Scripted hits over the demo day — same shape as the real fan-out."""
+    ql = q.lower()
+    wall = datetime.now(timezone.utc)
+    return [
+        {"source": src, "at": (wall - timedelta(minutes=age)).isoformat(),
+         "text": text, "where": where}
+        for src, age, text, where in _SEARCH_CORPUS
+        if ql in text.lower()
+    ]
+
+
 def demo_desk(now: float | None = None) -> dict[str, Any]:
     """Scheduled seats for the synthetic day — labeled fiction, clock-driven."""
     from .routers.desk import SEATS

@@ -472,3 +472,73 @@ class TestBoardState:
         state = collectors.board_state()
         assert state["available"] is True
         assert state["arms"]["live"]["candidates"] == []
+
+
+# ---------------------------------------------------------------------------
+# Unified search — one question, receipts from every log
+# ---------------------------------------------------------------------------
+
+class TestUnifiedSearch:
+    def _seed_sessions(self, tmp_path):
+        import sqlite3
+        db = tmp_path / "sessions.db"
+        with sqlite3.connect(db) as conn:
+            conn.execute("CREATE TABLE session_log (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT, ts TEXT, role TEXT, content TEXT)")
+            conn.execute("INSERT INTO session_log (date, ts, role, content) VALUES ('2026-08-24','2026-08-24T14:00:00','note','trailing ratchet shipped to paper')")
+            conn.execute("INSERT INTO session_log (date, ts, role, content) VALUES ('2026-08-24','2026-08-24T15:00:00','note','nothing relevant here')")
+        return db
+
+    def test_each_source_is_searched_and_tagged(self, tmp_path):
+        from backend.routers.search import (search_alerts, search_decisions,
+                                            search_memory, search_sessions)
+
+        db = self._seed_sessions(tmp_path)
+        hits = search_sessions("trailing", db_path=db)
+        assert len(hits) == 1 and hits[0]["source"] == "sessions"
+        assert hits[0]["at"] == "2026-08-24T14:00:00"
+
+        state = tmp_path / "state"
+        state.mkdir()
+        (state / "alerts.log").write_text(
+            "2026-08-24T13:00:00+00:00 range-trader opened NG x10\n"
+            "  trailing context line without a date\n")
+        hits = search_alerts("trailing", state_dir=state)
+        # Undated context lines inherit the stamp of their entry.
+        assert len(hits) == 1 and hits[0]["at"] == "2026-08-24T13:00:00+00:00"
+
+        (state / "decisions.jsonl").write_text(
+            '{"at": "2026-08-24T12:00:00", "decision": {"action": "pass", "thesis": "trailing keeps 22% of peaks"}}\n')
+        hits = search_decisions("trailing", state_dir=state)
+        assert len(hits) == 1 and "trailing keeps" in hits[0]["text"]
+
+        mem = tmp_path / "memory"
+        mem.mkdir()
+        (mem / "some-memory.md").write_text(
+            "---\nname: some-memory\ndescription: about trailing\n---\n\nthe trailing ratchet idea\n")
+        hits = search_memory("trailing", memory_dir=mem)
+        # Frontmatter is skipped; the body line hits, one per file.
+        assert len(hits) == 1 and hits[0]["text"] == "the trailing ratchet idea"
+        assert hits[0]["where"] == "some-memory"
+
+    def test_missing_files_are_empty_results_never_errors(self, tmp_path):
+        from backend.routers.search import (search_alerts, search_argus,
+                                            search_decisions, search_memory,
+                                            search_sessions)
+        gone = tmp_path / "does-not-exist"
+        assert search_sessions("x", db_path=gone / "db.sqlite") == []
+        assert search_alerts("x", state_dir=gone) == []
+        assert search_decisions("x", state_dir=gone) == []
+        assert search_memory("x", memory_dir=gone) == []
+        assert search_argus("x", mailbox=gone / "mailbox.jsonl") == []
+
+    def test_short_query_is_safe_and_empty(self):
+        import asyncio
+        from backend.routers.search import api_search
+        assert asyncio.run(api_search("")) == {"q": "", "hits": []}
+        assert asyncio.run(api_search(" n "))["hits"] == []
+
+    def test_demo_search_is_scripted_and_labeled(self):
+        from backend.demo import demo_search
+        hits = demo_search("NOVA")
+        assert hits and all(h["text"].startswith("[demo]") or "[demo]" in h["text"] for h in hits)
+        assert {h["source"] for h in hits} <= {"sessions", "alerts", "decisions", "memory"}

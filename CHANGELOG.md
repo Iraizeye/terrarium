@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.11.0 - 2026-08-24 — receipts
+
+- Unified search: `GET /api/search?q=` fans out read-only across the
+  session log, trader alerts, decisions, the agent's memory shelf, and
+  the Argus mailbox — dated, source-tagged hits, newest first. The left
+  rail grows a search box; an active query swaps the rail to a receipts
+  panel. Deep-linkable via `?q=`. Idea borrowed from block/buzz's unified
+  event log, sized to one machine.
+- Demo mode ships a scripted search corpus — searching in demo never
+  reads the visitor's files.
+
 ## v0.10.1 - 2026-08-24 — the repo tells the truth
 
 - README rewritten around the product as it is: the three-story building,
