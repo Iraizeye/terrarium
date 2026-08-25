@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.10.0 - 2026-08-24 — the building
+
+- The office is now a three-storey cutaway, ant-farm style: the board
+  room up top (chief presenting on his rug), three private offices on
+  the middle floor, and a ground-floor lobby — house clock, TERRARIUM
+  letters, bench plants, and the LIVE bot on patrol — joined by an
+  elevator shaft with floor doors and an indicator light.
+- Bots scaled down again; every office keeps its own status monitor,
+  pinned notes, and a personal floor accessory.
+
 ## v0.9.2 - 2026-08-24 — the crew, drawn in code
 
 - Robot sprites retired; the copper crew is now drawn procedurally in the
