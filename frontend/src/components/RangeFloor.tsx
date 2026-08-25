@@ -58,6 +58,14 @@ const SPOTS: Record<string, { x: number; y: number; action: Action; flip?: boole
   live:      { x: 0.45, y: F1.ground, action: 'walk' },
 }
 const DESK_SEATS = ['projects', 'premarket', 'ops', 'content', 'paper'] as const
+// each office dressed for its job
+const JOB: Record<string, { notes: [string, string] }> = {
+  projects:  { notes: ['#e0b34d', '#d9a441'] },
+  premarket: { notes: ['#f0956a', '#e2b25a'] },
+  ops:       { notes: ['#8fd98f', '#7fb2d9'] },
+  content:   { notes: ['#d97fa0', '#c48ad9'] },
+  paper:     { notes: ['#7fb2d9', '#9fc4e8'] },
+}
 const WALK = { x0: 0.315, x1: 0.600, y: F1.ground, period: 17000 }
 // bot height per pose, as a fraction of the scene scale S
 const POSE_H: Record<Action, number> = { sit: 0.195, work: 0.195, walk: 0.145, point: 0.26 }
@@ -754,23 +762,65 @@ export default function RangeFloor() {
         ctx.fillStyle = noteC[(b0 + 1) % 4]
         ctx.fillRect(S * 0.010, S * 0.030, S * 0.024, S * 0.024)
         ctx.restore()
-        // personal touch on the office floor
-        const acc = b0 % 3
+        // the office's own gear on the floor
         const ax = X(bay.x - bay.half * 0.62), ay = Y(bay.ground - 0.014)
-        if (acc === 0) {
-          ctx.fillStyle = '#7a5230'
-          ctx.fillRect(ax - S * 0.013, ay - S * 0.026, S * 0.026, S * 0.026)
-          ctx.fillStyle = '#4f8f4a'
-          ctx.beginPath(); ctx.ellipse(ax, ay - S * 0.040, S * 0.020, S * 0.017, 0, 0, Math.PI * 2); ctx.fill()
-        } else if (acc === 1) {
-          ctx.fillStyle = '#d9d4c4'
-          ctx.fillRect(ax - S * 0.017, ay - S * 0.012, S * 0.034, S * 0.012)
-          ctx.fillRect(ax - S * 0.014, ay - S * 0.022, S * 0.028, S * 0.010)
+        if (bay.key === 'projects') {
+          // red toolbox
+          ctx.fillStyle = '#b03a30'
+          ctx.fillRect(ax - S * 0.020, ay - S * 0.024, S * 0.040, S * 0.024)
+          ctx.fillStyle = '#8a2a22'
+          ctx.fillRect(ax - S * 0.020, ay - S * 0.030, S * 0.040, S * 0.007)
+          ctx.strokeStyle = '#3a1a16'
+          ctx.lineWidth = Math.max(1, S * 0.004)
+          ctx.beginPath()
+          ctx.arc(ax, ay - S * 0.030, S * 0.010, Math.PI, 0)
+          ctx.stroke()
+        } else if (bay.key === 'premarket') {
+          // coffee station: machine + warm pot
+          ctx.fillStyle = '#2e343c'
+          ctx.fillRect(ax - S * 0.018, ay - S * 0.040, S * 0.036, S * 0.040)
+          ctx.fillStyle = '#c9a06a'
+          ctx.fillRect(ax - S * 0.010, ay - S * 0.020, S * 0.020, S * 0.014)
+          ctx.fillStyle = 'rgba(255,200,120,0.8)'
+          ctx.fillRect(ax - S * 0.012, ay - S * 0.036, S * 0.024, S * 0.004)
+        } else if (bay.key === 'ops') {
+          // mini server rack, LEDs alive
+          ctx.fillStyle = '#232a30'
+          ctx.fillRect(ax - S * 0.016, ay - S * 0.048, S * 0.032, S * 0.048)
+          for (let r = 0; r < 3; r++) {
+            const on = Math.floor(now / 700 + r + bay.x * 10) % 3 !== 0
+            ctx.fillStyle = on ? '#8df0c0' : '#3a4a40'
+            ctx.beginPath(); ctx.arc(ax + S * 0.008, ay - S * 0.040 + r * S * 0.014, S * 0.0035, 0, Math.PI * 2); ctx.fill()
+            ctx.fillStyle = '#39424c'
+            ctx.fillRect(ax - S * 0.012, ay - S * 0.042 + r * S * 0.014, S * 0.014, S * 0.004)
+          }
+        } else if (bay.key === 'content') {
+          // clapperboard on a little easel
+          ctx.strokeStyle = '#5a4428'
+          ctx.lineWidth = Math.max(1, S * 0.005)
+          ctx.beginPath()
+          ctx.moveTo(ax - S * 0.014, ay); ctx.lineTo(ax, ay - S * 0.034)
+          ctx.moveTo(ax + S * 0.014, ay); ctx.lineTo(ax, ay - S * 0.034)
+          ctx.stroke()
+          ctx.fillStyle = '#1c2126'
+          ctx.fillRect(ax - S * 0.016, ay - S * 0.040, S * 0.032, S * 0.020)
+          ctx.save()
+          ctx.translate(ax - S * 0.016, ay - S * 0.040)
+          ctx.rotate(-0.18)
+          ctx.fillStyle = '#e8e2d0'
+          ctx.fillRect(0, -S * 0.008, S * 0.034, S * 0.008)
+          ctx.fillStyle = '#1c2126'
+          for (let i = 0; i < 3; i++) ctx.fillRect(S * 0.004 + i * S * 0.011, -S * 0.008, S * 0.005, S * 0.008)
+          ctx.restore()
         } else {
-          ctx.fillStyle = '#b45a4a'
-          ctx.fillRect(ax - S * 0.011, ay - S * 0.022, S * 0.022, S * 0.022)
-          ctx.fillStyle = '#8a4536'
-          ctx.fillRect(ax + S * 0.009, ay - S * 0.017, S * 0.007, S * 0.004)
+          // filing cabinet
+          ctx.fillStyle = '#39424c'
+          ctx.fillRect(ax - S * 0.015, ay - S * 0.052, S * 0.030, S * 0.052)
+          ctx.fillStyle = '#8a939c'
+          ctx.fillRect(ax - S * 0.008, ay - S * 0.042, S * 0.016, S * 0.004)
+          ctx.fillRect(ax - S * 0.008, ay - S * 0.020, S * 0.016, S * 0.004)
+          ctx.fillStyle = '#d9d4c4'
+          ctx.fillRect(ax + S * 0.016, ay - S * 0.010, S * 0.024, S * 0.010)
         }
         // divider walls
         for (const side of [-1, 1]) {
@@ -786,24 +836,37 @@ export default function RangeFloor() {
       for (const bay of BAYS) {
         const st = stations.find(s => s.key === bay.key)
         const occupied = !!st && st.active && !st.down
-        // ceiling light strip + soft cone when someone's in
+        // ceiling light strip + a light that clearly reads ON
         const lx = X(bay.x)
         ctx.fillStyle = '#39424c'
         ctx.fillRect(lx - S * 0.045, Y(bay.top + 0.012), S * 0.090, dh * 0.008)
-        ctx.fillStyle = occupied ? 'rgba(255,240,200,0.85)' : 'rgba(120,130,140,0.5)'
-        ctx.fillRect(lx - S * 0.040, Y(bay.top + 0.019), S * 0.080, dh * 0.004)
         if (occupied) {
+          // hot tube + halo
+          ctx.fillStyle = '#fff3cf'
+          ctx.fillRect(lx - S * 0.042, Y(bay.top + 0.019), S * 0.084, dh * 0.006)
+          const halo = ctx.createRadialGradient(lx, Y(bay.top + 0.022), 1, lx, Y(bay.top + 0.022), S * 0.09)
+          halo.addColorStop(0, 'rgba(255,240,190,0.35)')
+          halo.addColorStop(1, 'rgba(255,240,190,0)')
+          ctx.fillStyle = halo
+          ctx.fillRect(lx - S * 0.09, Y(bay.top), S * 0.18, dh * 0.05)
+          // strong cone
           const cone = ctx.createLinearGradient(0, Y(bay.top + 0.02), 0, Y(bay.ground))
-          cone.addColorStop(0, 'rgba(255,240,200,0.10)')
-          cone.addColorStop(1, 'rgba(255,240,200,0)')
+          cone.addColorStop(0, 'rgba(255,240,195,0.26)')
+          cone.addColorStop(1, 'rgba(255,240,195,0.02)')
           ctx.fillStyle = cone
           ctx.beginPath()
-          ctx.moveTo(lx - S * 0.040, Y(bay.top + 0.022))
-          ctx.lineTo(lx + S * 0.040, Y(bay.top + 0.022))
-          ctx.lineTo(lx + S * 0.105, Y(bay.ground))
-          ctx.lineTo(lx - S * 0.105, Y(bay.ground))
+          ctx.moveTo(lx - S * 0.042, Y(bay.top + 0.022))
+          ctx.lineTo(lx + S * 0.042, Y(bay.top + 0.022))
+          ctx.lineTo(lx + S * 0.115, Y(bay.ground))
+          ctx.lineTo(lx - S * 0.115, Y(bay.ground))
           ctx.closePath()
           ctx.fill()
+          // the whole room warms up
+          ctx.fillStyle = 'rgba(255,236,190,0.085)'
+          ctx.fillRect(X(bay.x - bay.half) + S * 0.006, Y(bay.top + 0.008), dw * bay.half * 2 - S * 0.012, dh * (bay.ground - bay.top - 0.016))
+        } else {
+          ctx.fillStyle = 'rgba(120,130,140,0.45)'
+          ctx.fillRect(lx - S * 0.040, Y(bay.top + 0.019), S * 0.080, dh * 0.004)
         }
         // framed wall art: tiny seeded chart doodle
         {
@@ -813,15 +876,60 @@ export default function RangeFloor() {
           ctx.fillRect(fx3 - 2, fy3 - 2, fw + 4, fh + 4)
           ctx.fillStyle = '#e8e2d0'
           ctx.fillRect(fx3, fy3, fw, fh)
-          ctx.strokeStyle = '#8a7a5a'
-          ctx.lineWidth = 1
-          ctx.beginPath()
-          for (let i = 0; i <= 6; i++) {
-            const sx2 = fx3 + (i / 6) * fw
-            const sy2 = fy3 + fh * (0.75 - 0.5 * Math.abs(Math.sin(bay.x * 37 + i * 1.7)))
-            i === 0 ? ctx.moveTo(sx2, sy2) : ctx.lineTo(sx2, sy2)
+          const key2 = bay.key
+          if (key2 === 'projects') {
+            for (let col = 0; col < 3; col++) {
+              ctx.fillStyle = '#c9c2ae'
+              ctx.fillRect(fx3 + 2 + col * (fw / 3), fy3 + 2, fw / 3 - 3, fh - 4)
+              ctx.fillStyle = ['#e0b34d', '#7fb2d9', '#8fd98f'][col]
+              for (let card = 0; card < 2 - (col % 2); card++) {
+                ctx.fillRect(fx3 + 3 + col * (fw / 3), fy3 + 4 + card * 7, fw / 3 - 5, 5)
+              }
+            }
+          } else if (key2 === 'premarket') {
+            ctx.fillStyle = '#f0b45a'
+            ctx.beginPath()
+            ctx.arc(fx3 + fw / 2, fy3 + fh * 0.72, fw * 0.22, Math.PI, 0)
+            ctx.fill()
+            ctx.strokeStyle = '#c98a3a'
+            ctx.lineWidth = 1
+            ctx.beginPath(); ctx.moveTo(fx3 + 2, fy3 + fh * 0.72); ctx.lineTo(fx3 + fw - 2, fy3 + fh * 0.72); ctx.stroke()
+            for (const a of [-0.9, -0.45, 0, 0.45, 0.9]) {
+              ctx.beginPath()
+              ctx.moveTo(fx3 + fw / 2 + Math.sin(a) * fw * 0.28, fy3 + fh * 0.72 - Math.cos(a) * fh * 0.42)
+              ctx.lineTo(fx3 + fw / 2 + Math.sin(a) * fw * 0.36, fy3 + fh * 0.72 - Math.cos(a) * fh * 0.58)
+              ctx.stroke()
+            }
+          } else if (key2 === 'ops') {
+            ctx.fillStyle = '#8fd98f'
+            for (let b2 = 0; b2 < 4; b2++) {
+              const bh2 = fh * (0.25 + 0.16 * ((b2 * 2) % 3))
+              ctx.fillRect(fx3 + 3 + b2 * (fw / 4), fy3 + fh - 2 - bh2, fw / 4 - 4, bh2)
+            }
+          } else if (key2 === 'content') {
+            ctx.fillStyle = '#d97fa0'
+            ctx.beginPath()
+            ctx.arc(fx3 + fw / 2, fy3 + fh / 2, Math.min(fw, fh) * 0.34, 0, Math.PI * 2)
+            ctx.fill()
+            ctx.fillStyle = '#e8e2d0'
+            ctx.beginPath()
+            ctx.moveTo(fx3 + fw / 2 - 2, fy3 + fh / 2 - 4)
+            ctx.lineTo(fx3 + fw / 2 + 4, fy3 + fh / 2)
+            ctx.lineTo(fx3 + fw / 2 - 2, fy3 + fh / 2 + 4)
+            ctx.closePath()
+            ctx.fill()
+          } else {
+            ctx.strokeStyle = '#8a7a5a'
+            ctx.lineWidth = 1
+            for (let l2 = 0; l2 < 4; l2++) {
+              ctx.beginPath()
+              ctx.moveTo(fx3 + 3, fy3 + 4 + l2 * (fh / 4.5))
+              ctx.lineTo(fx3 + fw - 3, fy3 + 4 + l2 * (fh / 4.5))
+              ctx.stroke()
+            }
+            ctx.fillStyle = '#7fb2d9'
+            ctx.fillRect(fx3 + fw - 10, fy3 + 3, 7, 5)
           }
-          ctx.stroke()
         }
         // side desk with lamp and mug (opposite the floor accessory)
         {
@@ -834,11 +942,11 @@ export default function RangeFloor() {
           // warm desk lamp, lit with the office
           const lx2 = dxc + dwj * 0.28, ly2 = dyg - dhj
           if (occupied) {
-            const glow = ctx.createRadialGradient(lx2, ly2 - S * 0.02, 1, lx2, ly2 - S * 0.02, S * 0.06)
-            glow.addColorStop(0, 'rgba(255,220,150,0.22)')
+            const glow = ctx.createRadialGradient(lx2, ly2 - S * 0.02, 1, lx2, ly2 - S * 0.02, S * 0.095)
+            glow.addColorStop(0, 'rgba(255,220,150,0.40)')
             glow.addColorStop(1, 'rgba(255,220,150,0)')
             ctx.fillStyle = glow
-            ctx.fillRect(lx2 - S * 0.06, ly2 - S * 0.08, S * 0.12, S * 0.10)
+            ctx.fillRect(lx2 - S * 0.095, ly2 - S * 0.11, S * 0.19, S * 0.15)
           }
           ctx.strokeStyle = '#8a7a4a'
           ctx.lineWidth = Math.max(1, S * 0.005)
