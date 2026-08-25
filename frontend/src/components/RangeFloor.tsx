@@ -32,20 +32,21 @@ interface Station {
   bubble: string | null
 }
 
-const GROUND = 0.88
+const GROUND = 0.90
 const SPOTS: Record<string, { x: number; y: number; action: Action; flip?: boolean }> = {
-  projects:  { x: 0.155, y: GROUND, action: 'sit' },
-  premarket: { x: 0.275, y: GROUND, action: 'sit' },
-  ops:       { x: 0.505, y: GROUND, action: 'sit' },
-  content:   { x: 0.745, y: GROUND, action: 'work' },
-  paper:     { x: 0.885, y: GROUND, action: 'sit' },
-  chief:     { x: 0.400, y: 0.875, action: 'point' },
-  live:      { x: 0.62, y: 0.91, action: 'walk' },
+  projects:  { x: 0.085, y: GROUND, action: 'sit' },
+  premarket: { x: 0.225, y: GROUND, action: 'sit' },
+  ops:       { x: 0.365, y: GROUND, action: 'sit' },
+  content:   { x: 0.775, y: GROUND, action: 'work' },
+  paper:     { x: 0.915, y: GROUND, action: 'sit' },
+  chief:     { x: 0.520, y: 0.895, action: 'point' },
+  live:      { x: 0.56, y: 0.935, action: 'walk' },
 }
 const DESK_SEATS = ['projects', 'premarket', 'ops', 'content', 'paper'] as const
-const WALK = { x0: 0.56, x1: 0.68, y: 0.91, period: 14000 }
+const BAY_HALF = 0.068
+const WALK = { x0: 0.445, x1: 0.675, y: 0.935, period: 16000 }
 // bot height per pose, as a fraction of the scene scale S
-const POSE_H: Record<Action, number> = { sit: 0.44, work: 0.44, walk: 0.30, point: 0.50 }
+const POSE_H: Record<Action, number> = { sit: 0.34, work: 0.34, walk: 0.26, point: 0.42 }
 
 // the big board on the wall houses the live tape
 const BOARD = { x: 0.180, y: 0.014, w: 0.348, h: 0.336 }
@@ -516,53 +517,35 @@ export default function RangeFloor() {
       // ── the room ──
       // wall
       {
-        const g = ctx.createLinearGradient(0, Y(0), 0, Y(0.62))
+        const g = ctx.createLinearGradient(0, Y(0), 0, Y(0.47))
         g.addColorStop(0, room.wallTop)
         g.addColorStop(1, room.wallBot)
         ctx.fillStyle = g
-        ctx.fillRect(X(0), Y(0), dw, dh * 0.62)
+        ctx.fillRect(X(0), Y(0), dw, dh * 0.47)
         if (room.wash) {
           ctx.fillStyle = room.wash
-          ctx.fillRect(X(0), Y(0), dw, dh * 0.62)
+          ctx.fillRect(X(0), Y(0), dw, dh * 0.47)
         }
       }
       // floor
       {
-        const g = ctx.createLinearGradient(0, Y(0.62), 0, Y(1))
+        const g = ctx.createLinearGradient(0, Y(0.47), 0, Y(1))
         g.addColorStop(0, room.floorA)
         g.addColorStop(1, room.floorB)
         ctx.fillStyle = g
-        ctx.fillRect(X(0), Y(0.62), dw, dh * 0.38)
+        ctx.fillRect(X(0), Y(0.47), dw, dh * 0.53)
         ctx.strokeStyle = 'rgba(0,0,0,0.16)'
         ctx.lineWidth = 1
-        for (let i = 1; i < 8; i++) {
-          const fy = 0.62 + i * 0.048
+        for (let i = 1; i < 9; i++) {
+          const fy = 0.47 + i * 0.062
           ctx.beginPath()
           ctx.moveTo(X(0), Y(fy))
           ctx.lineTo(X(1), Y(fy))
           ctx.stroke()
         }
-        for (let i = 0; i < 9; i++) {
-          const fx = 0.06 + i * 0.115 + (i % 2) * 0.03
-          ctx.beginPath()
-          ctx.moveTo(X(fx), Y(0.62 + (i % 3) * 0.096))
-          ctx.lineTo(X(fx), Y(0.62 + (i % 3) * 0.096 + 0.048))
-          ctx.stroke()
-        }
-      }
-      // counter: top, face, shadow
-      ctx.fillStyle = room.counterTop
-      ctx.fillRect(X(0), Y(0.560), dw, dh * 0.030)
-      ctx.fillStyle = 'rgba(255,255,255,0.05)'
-      ctx.fillRect(X(0), Y(0.560), dw, dh * 0.006)
-      ctx.fillStyle = room.counterFace
-      ctx.fillRect(X(0), Y(0.590), dw, dh * 0.085)
-      ctx.fillStyle = 'rgba(0,0,0,0.25)'
-      ctx.fillRect(X(0), Y(0.675), dw, dh * 0.012)
-      // drawer lines on the face
-      ctx.strokeStyle = 'rgba(0,0,0,0.20)'
-      for (const fx of [0.09, 0.34, 0.58, 0.82]) {
-        ctx.strokeRect(X(fx), Y(0.600), dw * 0.05, dh * 0.060)
+        // wall/floor seam
+        ctx.fillStyle = 'rgba(0,0,0,0.22)'
+        ctx.fillRect(X(0), Y(0.47), dw, dh * 0.008)
       }
 
       // the big board (houses the live tape)
@@ -634,24 +617,83 @@ export default function RangeFloor() {
         ctx.fillRect(lx - dh * 0.024, ly - dh * 0.048, dh * 0.048, dh * 0.004)
       }
 
-      // counter dressing: paper tray left, potted plant right
+      // ── cubicles: an office of one's own for every seated bot ──
+      const cubTint = room.wash ? 'rgba(255,255,255,0.045)' : 'rgba(255,255,255,0.03)'
+      for (const key of DESK_SEATS) {
+        const bx = SPOTS[key].x
+        const left = X(bx - BAY_HALF), right = X(bx + BAY_HALF)
+        // back panel
+        ctx.fillStyle = room.wallBot
+        ctx.fillRect(left, Y(0.505), right - left, dh * 0.425)
+        ctx.fillStyle = cubTint
+        ctx.fillRect(left, Y(0.505), right - left, dh * 0.425)
+        // baseboard inside the bay
+        ctx.fillStyle = 'rgba(0,0,0,0.18)'
+        ctx.fillRect(left, Y(0.905), right - left, dh * 0.02)
+        // pinboard notes (two per bay, colors vary by bay)
+        const noteC = ['#d9b24a', '#7fb2d9', '#d97fa0', '#8fd98f']
+        const b0 = Math.floor(bx * 23)
+        ctx.save()
+        ctx.translate(X(bx + BAY_HALF * 0.52), Y(0.545))
+        ctx.rotate(-0.04)
+        ctx.fillStyle = noteC[b0 % 4]
+        ctx.fillRect(0, 0, S * 0.028, S * 0.028)
+        ctx.rotate(0.09)
+        ctx.fillStyle = noteC[(b0 + 1) % 4]
+        ctx.fillRect(S * 0.012, S * 0.036, S * 0.028, S * 0.028)
+        ctx.restore()
+        // personal touch on the floor corner
+        const acc = b0 % 3
+        const ax = X(bx - BAY_HALF * 0.62), ay = Y(0.905)
+        if (acc === 0) {
+          ctx.fillStyle = '#7a5230'
+          ctx.fillRect(ax - S * 0.016, ay - S * 0.030, S * 0.032, S * 0.030)
+          ctx.fillStyle = '#4f8f4a'
+          ctx.beginPath(); ctx.ellipse(ax, ay - S * 0.046, S * 0.024, S * 0.020, 0, 0, Math.PI * 2); ctx.fill()
+        } else if (acc === 1) {
+          ctx.fillStyle = '#d9d4c4'
+          ctx.fillRect(ax - S * 0.020, ay - S * 0.014, S * 0.040, S * 0.014)
+          ctx.fillRect(ax - S * 0.017, ay - S * 0.026, S * 0.034, S * 0.012)
+        } else {
+          ctx.fillStyle = '#b45a4a'
+          ctx.fillRect(ax - S * 0.013, ay - S * 0.026, S * 0.026, S * 0.026)
+          ctx.fillStyle = '#8a4536'
+          ctx.fillRect(ax + S * 0.011, ay - S * 0.020, S * 0.008, S * 0.004)
+        }
+      }
+      // divider walls (drawn after panels so edges are crisp)
+      for (const key of DESK_SEATS) {
+        const bx = SPOTS[key].x
+        for (const side of [-1, 1]) {
+          const wx = X(bx + side * BAY_HALF)
+          ctx.fillStyle = '#39424c'
+          ctx.fillRect(wx - S * 0.007, Y(0.495), S * 0.014, dh * 0.44)
+          ctx.fillStyle = 'rgba(255,255,255,0.10)'
+          ctx.fillRect(wx - S * 0.007, Y(0.495), S * 0.014, dh * 0.012)
+        }
+      }
+      // the chief's open floor: a rug in front of the board
       {
-        const ty = Y(0.560)
-        ctx.fillStyle = '#d9d4c4'
-        ctx.fillRect(X(0.030), ty - dh * 0.016, S * 0.075, dh * 0.006)
-        ctx.fillRect(X(0.033), ty - dh * 0.026, S * 0.068, dh * 0.006)
-        ctx.fillStyle = '#3b3f45'
-        ctx.fillRect(X(0.028), ty - dh * 0.010, S * 0.082, dh * 0.010)
-        const px2 = X(0.958)
+        ctx.fillStyle = 'rgba(120,90,50,0.35)'
+        ctx.beginPath()
+        ctx.ellipse(X(0.52), Y(0.925), S * 0.30, dh * 0.035, 0, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.strokeStyle = 'rgba(200,160,100,0.25)'
+        ctx.lineWidth = 1.5
+        ctx.stroke()
+      }
+      // corner plants
+      for (const fx of [0.022, 0.978]) {
+        const px2 = X(fx), py2 = Y(0.955)
         ctx.fillStyle = '#7a5230'
-        ctx.fillRect(px2 - S * 0.020, ty - dh * 0.030, S * 0.040, dh * 0.030)
+        ctx.fillRect(px2 - S * 0.026, py2 - S * 0.045, S * 0.052, S * 0.045)
         ctx.fillStyle = '#4f8f4a'
-        ctx.beginPath(); ctx.ellipse(px2, ty - dh * 0.048, S * 0.030, dh * 0.024, 0, 0, Math.PI * 2); ctx.fill()
+        ctx.beginPath(); ctx.ellipse(px2, py2 - S * 0.070, S * 0.040, S * 0.034, 0, 0, Math.PI * 2); ctx.fill()
         ctx.fillStyle = '#356534'
-        ctx.beginPath(); ctx.ellipse(px2 - S * 0.018, ty - dh * 0.040, S * 0.016, dh * 0.014, 0, 0, Math.PI * 2); ctx.fill()
+        ctx.beginPath(); ctx.ellipse(px2 - S * 0.024, py2 - S * 0.058, S * 0.020, S * 0.018, 0, 0, Math.PI * 2); ctx.fill()
       }
 
-      // ── live tape on the board ──
+      // ── live tape on the board ──      // ── live tape on the board ──
       const quotes = quotesFrom(board, trading)
       if (now - lastPush > 400) {
         lastPush = now
@@ -692,13 +734,13 @@ export default function RangeFloor() {
       // ── the cast ──
       const stations = stationsFrom(seats, trading, fleet)
 
-      // desk monitors — each seat's screen glows with its robot's status
+      // bay monitors — each office's screen glows with its robot's status
       for (const key of DESK_SEATS) {
         const st = stations.find(s => s.key === key)
         const spot = SPOTS[key]
         if (!st || !spot) continue
-        const mw = S * 0.125, mh = S * 0.100
-        const mx = X(spot.x) - mw / 2, my = Y(0.560) - mh - dh * 0.012
+        const mw = S * 0.105, mh = S * 0.085
+        const mx = X(spot.x) - BAY_HALF * dw * 0.45 - mw / 2, my = Y(0.535)
         ctx.fillStyle = '#232a30'
         ctx.beginPath(); ctx.roundRect(mx - 3, my - 3, mw + 6, mh + 6, 5); ctx.fill()
         const on = st.present && !st.down
@@ -711,16 +753,13 @@ export default function RangeFloor() {
           ctx.strokeStyle = 'rgba(125,232,168,0.6)'
           ctx.lineWidth = 1
           ctx.beginPath()
-          for (let i = 0; i <= 16; i++) {
-            const px = mx + (i / 16) * mw
+          for (let i = 0; i <= 14; i++) {
+            const px = mx + (i / 14) * mw
             const py = my + mh * 0.62 + Math.sin(now / 260 + i * 0.9 + spot.x * 20) * mh * 0.14
             i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)
           }
           ctx.stroke()
         }
-        // stand
-        ctx.fillStyle = '#1b2126'
-        ctx.fillRect(X(spot.x) - dw * 0.004, my + mh + 3, dw * 0.008, dh * 0.008)
       }
 
       const order = [...stations].sort((a, b) => a.y - b.y)
