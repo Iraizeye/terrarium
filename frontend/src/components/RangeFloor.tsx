@@ -171,6 +171,9 @@ const COPPERS = [
   { hi: '#e6ab7a', mid: '#c48350', dk: '#946130' },
   { hi: '#f2c49a', mid: '#d89a64', dk: '#aa7440' },
 ]
+// the chief wears navy with gold trim
+const CHIEF_NAVY = { hi: '#7e8fb0', mid: '#4c5c7e', dk: '#303c58' }
+const GOLD = '#d9a441'
 const LINE = 'rgba(52,30,14,0.55)'
 const CHAIR = { dark: '#2b3036', mid: '#3a4048', metal: '#8a939c' }
 
@@ -326,6 +329,30 @@ function drawStandingPoint(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], 
   rr(ctx, u * 0.035, -u * 0.06, u * 0.13, u * 0.05, u * 0.025, c.dk)
   rr(ctx, -u * 0.14, -u * 0.375, u * 0.28, u * 0.06, u * 0.03, c.dk)
   drawTorso(ctx, c, u, -u * 0.66 + sway, u * 0.30, t, seed, st)
+  // presidential kit: red tie, gold epaulets, gold buttons
+  {
+    const ty = -u * 0.66 + sway
+    ctx.fillStyle = '#8a2f28'
+    ctx.beginPath()
+    ctx.moveTo(-u * 0.030, ty + u * 0.015)
+    ctx.lineTo(u * 0.030, ty + u * 0.015)
+    ctx.lineTo(u * 0.015, ty + u * 0.20)
+    ctx.lineTo(0, ty + u * 0.235)
+    ctx.lineTo(-u * 0.015, ty + u * 0.20)
+    ctx.closePath()
+    ctx.fill()
+    ctx.strokeStyle = 'rgba(40,10,8,0.5)'
+    ctx.stroke()
+    ctx.fillStyle = '#b03a30'
+    ctx.fillRect(-u * 0.022, ty + u * 0.005, u * 0.044, u * 0.028)
+    ctx.fillStyle = GOLD
+    rr(ctx, -u * 0.215, ty - u * 0.005, u * 0.075, u * 0.026, u * 0.01, GOLD)
+    rr(ctx, u * 0.14, ty - u * 0.005, u * 0.075, u * 0.026, u * 0.01, GOLD)
+    for (const by2 of [0.09, 0.15]) {
+      ctx.fillStyle = GOLD
+      ctx.beginPath(); ctx.arc(u * 0.065, ty + u * by2, u * 0.012, 0, Math.PI * 2); ctx.fill()
+    }
+  }
   // left arm relaxed
   limb(ctx, c, [[-u * 0.20, -u * 0.60 + sway], [-u * 0.245, -u * 0.46], [-u * 0.19, -u * 0.38]], u * 0.052)
   hand(ctx, c, -u * 0.185, -u * 0.37, u * 0.034)
@@ -342,6 +369,13 @@ function drawStandingPoint(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], 
   ctx.stroke()
   ctx.lineCap = 'butt'
   drawHead(ctx, c, u, -u * 0.67 + sway, t, seed, st)
+  // gold band across the brow
+  {
+    const hh = u * 0.34, hw = u * 0.46
+    const topY = -u * 0.67 + sway - hh
+    ctx.fillStyle = GOLD
+    ctx.fillRect(-hw / 2 + u * 0.02, topY + hh * 0.10, hw - u * 0.04, u * 0.018)
+  }
 }
 
 function drawWalker(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], u: number, t: number, seed: number, st: BotState) {
@@ -374,7 +408,7 @@ function drawBot(
   pose: Action, t: number, seed: number,
   st: BotState, flip: boolean,
 ) {
-  const c = COPPERS[seed % COPPERS.length]
+  const c = pose === 'point' ? CHIEF_NAVY : COPPERS[seed % COPPERS.length]
   ctx.save()
   ctx.translate(x, groundY)
   if (flip) ctx.scale(-1, 1)
