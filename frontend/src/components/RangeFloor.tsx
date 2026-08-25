@@ -670,6 +670,19 @@ export default function RangeFloor() {
         ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 1; ctx.stroke()
       }
 
+      // floor 3 wainscot — dark wood paneling with a gold trim line
+      {
+        const wy = Y(0.243), wh2 = dh * (F3.ground - 0.243 - 0.016)
+        ctx.fillStyle = '#4a3220'
+        ctx.fillRect(X(0.015), wy, dw * 0.97, wh2)
+        ctx.fillStyle = 'rgba(0,0,0,0.22)'
+        for (let i = 1; i < 13; i++) ctx.fillRect(X(0.015 + i * 0.075), wy + 3, 2, wh2 - 6)
+        ctx.fillStyle = GOLD
+        ctx.globalAlpha = 0.55
+        ctx.fillRect(X(0.015), wy, dw * 0.97, 2)
+        ctx.globalAlpha = 1
+      }
+
       // elevator shaft through all floors
       {
         ctx.fillStyle = '#1a2026'
@@ -714,14 +727,68 @@ export default function RangeFloor() {
       ctx.fill()
       ctx.stroke()
 
-      // chief's rug on the top floor
-      ctx.fillStyle = 'rgba(120,90,50,0.35)'
+      // presidential red carpet with gold border
+      ctx.fillStyle = 'rgba(138,36,48,0.75)'
       ctx.beginPath()
-      ctx.ellipse(X(0.50), Y(F3.ground - 0.006), S * 0.26, dh * 0.022, 0, 0, Math.PI * 2)
+      ctx.ellipse(X(0.50), Y(F3.ground - 0.006), S * 0.27, dh * 0.024, 0, 0, Math.PI * 2)
       ctx.fill()
-      ctx.strokeStyle = 'rgba(200,160,100,0.25)'
-      ctx.lineWidth = 1.5
+      ctx.strokeStyle = 'rgba(217,164,65,0.65)'
+      ctx.lineWidth = 2
       ctx.stroke()
+      ctx.strokeStyle = 'rgba(217,164,65,0.35)'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.ellipse(X(0.50), Y(F3.ground - 0.006), S * 0.22, dh * 0.018, 0, 0, Math.PI * 2)
+      ctx.stroke()
+
+      // standing flags flanking the chief, gold finials
+      for (const fx4 of [0.428, 0.607]) {
+        const px3 = X(fx4), base = Y(F3.ground - 0.004)
+        const topy = base - dh * 0.155
+        ctx.fillStyle = '#3a2a18'
+        ctx.beginPath(); ctx.ellipse(px3, base, S * 0.020, S * 0.007, 0, 0, Math.PI * 2); ctx.fill()
+        ctx.strokeStyle = '#8a7a4a'
+        ctx.lineWidth = Math.max(1.5, S * 0.006)
+        ctx.beginPath(); ctx.moveTo(px3, base); ctx.lineTo(px3, topy); ctx.stroke()
+        ctx.fillStyle = GOLD
+        ctx.beginPath(); ctx.arc(px3, topy - S * 0.008, S * 0.008, 0, Math.PI * 2); ctx.fill()
+        // draped cloth: deep green with gold fringe
+        const sway2 = Math.sin(now / 1600 + fx4 * 40) * S * 0.004
+        ctx.fillStyle = '#1e4d38'
+        ctx.beginPath()
+        ctx.moveTo(px3, topy + S * 0.004)
+        ctx.quadraticCurveTo(px3 + S * 0.030 + sway2, topy + S * 0.030, px3 + S * 0.020 + sway2, topy + S * 0.075)
+        ctx.lineTo(px3, topy + S * 0.062)
+        ctx.closePath()
+        ctx.fill()
+        ctx.strokeStyle = 'rgba(217,164,65,0.7)'
+        ctx.lineWidth = 1.2
+        ctx.beginPath()
+        ctx.moveTo(px3 + S * 0.020 + sway2, topy + S * 0.075)
+        ctx.lineTo(px3, topy + S * 0.062)
+        ctx.stroke()
+      }
+
+      // gold seal on the wall
+      {
+        const sx2 = X(0.632), sy2 = Y(0.105), r2 = S * 0.026
+        ctx.strokeStyle = GOLD
+        ctx.lineWidth = Math.max(1.5, S * 0.005)
+        ctx.beginPath(); ctx.arc(sx2, sy2, r2, 0, Math.PI * 2); ctx.stroke()
+        ctx.lineWidth = 1
+        ctx.beginPath(); ctx.arc(sx2, sy2, r2 * 0.72, 0, Math.PI * 2); ctx.stroke()
+        ctx.fillStyle = GOLD
+        ctx.font = `bold ${Math.max(8, r2 * 1.1)}px ${MONO}`
+        ctx.textAlign = 'center'
+        ctx.fillText('T', sx2, sy2 + r2 * 0.38)
+        ctx.textAlign = 'left'
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2
+          ctx.beginPath()
+          ctx.arc(sx2 + Math.cos(a) * r2 * 0.86, sy2 + Math.sin(a) * r2 * 0.86, r2 * 0.05, 0, Math.PI * 2)
+          ctx.fill()
+        }
+      }
       // chief's ficus and coffee table
       {
         const fx2 = X(0.615), fy2 = Y(F3.ground - 0.006)
