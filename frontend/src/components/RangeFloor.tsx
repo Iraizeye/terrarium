@@ -569,6 +569,8 @@ export default function RangeFloor() {
     if (!ctx) return
     let raf = 0
     let lastPush = 0
+    let bubbleKey = ''
+    let bubbleAt = 0
 
     const draw = (now: number) => {
       const { seats, trading, fleet, board } = dataRef.current
@@ -989,19 +991,47 @@ export default function RangeFloor() {
       const withBubbles = stations.filter(s => s.bubble)
       if (withBubbles.length) {
         const pick = withBubbles[Math.floor(now / 5000) % withBubbles.length]
-        ctx.font = `11px ${MONO}`
-        const w = Math.min(ctx.measureText(pick.bubble!).width + 14, 220)
+        if (pick.key !== bubbleKey) { bubbleKey = pick.key; bubbleAt = now }
+        const pop = Math.min(1, (now - bubbleAt) / 240)
+        const ease = 1 - Math.pow(1 - pop, 3)
+        ctx.font = `10px ${MONO}`
+        const text = pick.bubble!.slice(0, 40)
+        const tw = ctx.measureText(text).width
+        const bw = Math.min(tw + 22, 250)
+        const bh = 24
+        const tail = 8
         const cxb = X(pick.x)
-        const bx = Math.max(dx + 4, Math.min(dx + dw - w - 4, cxb - w / 2))
-        const by = Math.max(dy + 6, Y(pick.y) - S * POSE_H[pick.action] * 1.14 - dh * 0.05)
-        ctx.fillStyle = pick.down ? P.red : P.gold
-        ctx.fillRect(bx, by, w, 18)
-        ctx.fillStyle = P.bubble
-        ctx.fillRect(bx + 1, by + 1, w - 2, 16)
-        ctx.fillStyle = P.ink
-        ctx.fillText(pick.bubble!.slice(0, 34), bx + 7, by + 13)
-        ctx.fillStyle = pick.down ? P.red : P.gold
-        ctx.fillRect(cxb - 3, by + 18, 6, 4)
+        const bx = Math.max(dx + 6, Math.min(dx + dw - bw - 6, cxb - bw / 2))
+        const by = Math.max(dy + 6, Y(pick.y) - S * POSE_H[pick.action] * 1.14 - dh * 0.045 - bh)
+        const tipX = Math.max(bx + 14, Math.min(bx + bw - 14, cxb))
+        const accent = pick.down ? 'rgba(240,113,106,0.85)' : 'rgba(217,164,65,0.85)'
+        ctx.save()
+        ctx.globalAlpha = ease
+        ctx.translate(tipX, by + bh + tail)
+        ctx.scale(0.86 + 0.14 * ease, 0.86 + 0.14 * ease)
+        ctx.translate(-tipX, -(by + bh + tail))
+        // body + tail as one shape, soft tinted shadow
+        ctx.shadowColor = 'rgba(8,6,3,0.35)'
+        ctx.shadowBlur = 10
+        ctx.shadowOffsetY = 3
+        ctx.beginPath()
+        ctx.roundRect(bx, by, bw, bh, 9)
+        ctx.moveTo(tipX - 7, by + bh)
+        ctx.lineTo(tipX, by + bh + tail)
+        ctx.lineTo(tipX + 7, by + bh)
+        ctx.closePath()
+        ctx.fillStyle = '#f6f2e4'
+        ctx.fill()
+        ctx.shadowColor = 'transparent'
+        ctx.strokeStyle = accent
+        ctx.lineWidth = 1.4
+        ctx.stroke()
+        // text
+        ctx.fillStyle = '#2b241a'
+        ctx.textAlign = 'center'
+        ctx.fillText(text, bx + bw / 2, by + 16)
+        ctx.textAlign = 'left'
+        ctx.restore()
       }
 
       // vignette pulls the eye to the cast
