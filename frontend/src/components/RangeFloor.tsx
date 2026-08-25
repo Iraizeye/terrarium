@@ -59,12 +59,12 @@ const SPOTS: Record<string, { x: number; y: number; action: Action; flip?: boole
 }
 const DESK_SEATS = ['projects', 'premarket', 'ops', 'content', 'paper'] as const
 // each office dressed for its job
-const JOB: Record<string, { notes: [string, string] }> = {
-  projects:  { notes: ['#e0b34d', '#d9a441'] },
-  premarket: { notes: ['#f0956a', '#e2b25a'] },
-  ops:       { notes: ['#8fd98f', '#7fb2d9'] },
-  content:   { notes: ['#d97fa0', '#c48ad9'] },
-  paper:     { notes: ['#7fb2d9', '#9fc4e8'] },
+const JOB: Record<string, { notes: [string, string]; accent: string }> = {
+  projects:  { notes: ['#e0b34d', '#d9a441'], accent: '#d9a441' },
+  premarket: { notes: ['#f0956a', '#e2b25a'], accent: '#e88a52' },
+  ops:       { notes: ['#8fd98f', '#7fb2d9'], accent: '#5abf7a' },
+  content:   { notes: ['#d97fa0', '#c48ad9'], accent: '#d97fa0' },
+  paper:     { notes: ['#7fb2d9', '#9fc4e8'], accent: '#6fa6d9' },
 }
 const WALK = { x0: 0.315, x1: 0.600, y: F1.ground, period: 17000 }
 // bot height per pose, as a fraction of the scene scale S
@@ -751,6 +751,17 @@ export default function RangeFloor() {
         const left = X(bay.x - bay.half), right = X(bay.x + bay.half)
         ctx.fillStyle = cubTint
         ctx.fillRect(left, Y(bay.top + 0.012), right - left, dh * (bay.ground - bay.top - 0.028))
+        // department color: header beam + floor mat
+        const accent = JOB[bay.key]?.accent ?? '#d9a441'
+        ctx.fillStyle = accent
+        ctx.globalAlpha = 0.75
+        ctx.fillRect(left + S * 0.004, Y(bay.top + 0.008), right - left - S * 0.008, dh * 0.010)
+        ctx.globalAlpha = 0.16
+        ctx.fillStyle = accent
+        ctx.beginPath()
+        ctx.ellipse(X(bay.x), Y(bay.ground - 0.006), (right - left) * 0.34, dh * 0.020, 0, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.globalAlpha = 1
         // pinboard notes
         const b0 = Math.floor(bay.x * 23 + bay.top * 31)
         ctx.save()
@@ -775,25 +786,59 @@ export default function RangeFloor() {
           ctx.beginPath()
           ctx.arc(ax, ay - S * 0.030, S * 0.010, Math.PI, 0)
           ctx.stroke()
+          // rolled blueprints leaning on the wall
+          for (const [ox, rot] of [[0.036, 0.12], [0.046, 0.05]] as const) {
+            ctx.save()
+            ctx.translate(ax + S * ox, ay)
+            ctx.rotate(rot)
+            ctx.fillStyle = '#7fb2d9'
+            ctx.fillRect(-S * 0.004, -S * 0.052, S * 0.008, S * 0.052)
+            ctx.fillStyle = '#e8e2d0'
+            ctx.fillRect(-S * 0.004, -S * 0.052, S * 0.008, S * 0.006)
+            ctx.restore()
+          }
         } else if (bay.key === 'premarket') {
-          // coffee station: machine + warm pot
+          // coffee station: machine + warm pot + rising steam
           ctx.fillStyle = '#2e343c'
           ctx.fillRect(ax - S * 0.018, ay - S * 0.040, S * 0.036, S * 0.040)
           ctx.fillStyle = '#c9a06a'
           ctx.fillRect(ax - S * 0.010, ay - S * 0.020, S * 0.020, S * 0.014)
           ctx.fillStyle = 'rgba(255,200,120,0.8)'
           ctx.fillRect(ax - S * 0.012, ay - S * 0.036, S * 0.024, S * 0.004)
+          ctx.strokeStyle = 'rgba(230,230,230,0.35)'
+          ctx.lineWidth = Math.max(1, S * 0.004)
+          for (const sxo of [-0.006, 0.006]) {
+            ctx.beginPath()
+            for (let i = 0; i <= 6; i++) {
+              const yy = ay - S * 0.044 - i * S * 0.006
+              const xx = ax + sxo * S * 1 + Math.sin(now / 300 + i + sxo * 400) * S * 0.004
+              i === 0 ? ctx.moveTo(xx, yy) : ctx.lineTo(xx, yy)
+            }
+            ctx.stroke()
+          }
         } else if (bay.key === 'ops') {
-          // mini server rack, LEDs alive
+          // full server rack, LEDs alive, traffic cone on standby
           ctx.fillStyle = '#232a30'
-          ctx.fillRect(ax - S * 0.016, ay - S * 0.048, S * 0.032, S * 0.048)
-          for (let r = 0; r < 3; r++) {
+          ctx.fillRect(ax - S * 0.018, ay - S * 0.068, S * 0.036, S * 0.068)
+          ctx.fillStyle = '#151a1f'
+          ctx.fillRect(ax - S * 0.018, ay - S * 0.068, S * 0.036, S * 0.005)
+          for (let r = 0; r < 4; r++) {
             const on = Math.floor(now / 700 + r + bay.x * 10) % 3 !== 0
             ctx.fillStyle = on ? '#8df0c0' : '#3a4a40'
-            ctx.beginPath(); ctx.arc(ax + S * 0.008, ay - S * 0.040 + r * S * 0.014, S * 0.0035, 0, Math.PI * 2); ctx.fill()
+            ctx.beginPath(); ctx.arc(ax + S * 0.010, ay - S * 0.058 + r * S * 0.015, S * 0.0038, 0, Math.PI * 2); ctx.fill()
             ctx.fillStyle = '#39424c'
-            ctx.fillRect(ax - S * 0.012, ay - S * 0.042 + r * S * 0.014, S * 0.014, S * 0.004)
+            ctx.fillRect(ax - S * 0.014, ay - S * 0.060 + r * S * 0.015, S * 0.016, S * 0.005)
           }
+          const cx3 = ax + S * 0.042
+          ctx.fillStyle = '#e07a3a'
+          ctx.beginPath()
+          ctx.moveTo(cx3, ay - S * 0.030)
+          ctx.lineTo(cx3 - S * 0.011, ay)
+          ctx.lineTo(cx3 + S * 0.011, ay)
+          ctx.closePath()
+          ctx.fill()
+          ctx.fillStyle = '#f2ede0'
+          ctx.fillRect(cx3 - S * 0.006, ay - S * 0.016, S * 0.012, S * 0.004)
         } else if (bay.key === 'content') {
           // clapperboard on a little easel
           ctx.strokeStyle = '#5a4428'
@@ -812,15 +857,35 @@ export default function RangeFloor() {
           ctx.fillStyle = '#1c2126'
           for (let i = 0; i < 3; i++) ctx.fillRect(S * 0.004 + i * S * 0.011, -S * 0.008, S * 0.005, S * 0.008)
           ctx.restore()
+          // camera on tripod
+          const tx3 = ax + S * 0.052
+          ctx.strokeStyle = '#39424c'
+          ctx.lineWidth = Math.max(1, S * 0.005)
+          ctx.beginPath()
+          ctx.moveTo(tx3 - S * 0.012, ay); ctx.lineTo(tx3, ay - S * 0.036)
+          ctx.moveTo(tx3 + S * 0.012, ay); ctx.lineTo(tx3, ay - S * 0.036)
+          ctx.moveTo(tx3, ay - S * 0.010); ctx.lineTo(tx3, ay - S * 0.036)
+          ctx.stroke()
+          ctx.fillStyle = '#2b3036'
+          ctx.fillRect(tx3 - S * 0.012, ay - S * 0.052, S * 0.024, S * 0.016)
+          ctx.fillStyle = '#d97fa0'
+          ctx.beginPath(); ctx.arc(tx3 + S * 0.008, ay - S * 0.044, S * 0.005, 0, Math.PI * 2); ctx.fill()
+          const rec = Math.floor(now / 800) % 2 === 0
+          ctx.fillStyle = rec ? '#f0716a' : '#5a3a38'
+          ctx.beginPath(); ctx.arc(tx3 - S * 0.008, ay - S * 0.048, S * 0.003, 0, Math.PI * 2); ctx.fill()
         } else {
-          // filing cabinet
+          // tall filing cabinet + paper stacks
           ctx.fillStyle = '#39424c'
-          ctx.fillRect(ax - S * 0.015, ay - S * 0.052, S * 0.030, S * 0.052)
+          ctx.fillRect(ax - S * 0.016, ay - S * 0.068, S * 0.032, S * 0.068)
           ctx.fillStyle = '#8a939c'
-          ctx.fillRect(ax - S * 0.008, ay - S * 0.042, S * 0.016, S * 0.004)
-          ctx.fillRect(ax - S * 0.008, ay - S * 0.020, S * 0.016, S * 0.004)
+          for (const hy of [0.056, 0.036, 0.016]) {
+            ctx.fillRect(ax - S * 0.009, ay - S * hy, S * 0.018, S * 0.004)
+          }
           ctx.fillStyle = '#d9d4c4'
-          ctx.fillRect(ax + S * 0.016, ay - S * 0.010, S * 0.024, S * 0.010)
+          ctx.fillRect(ax + S * 0.020, ay - S * 0.012, S * 0.030, S * 0.012)
+          ctx.fillRect(ax + S * 0.024, ay - S * 0.020, S * 0.024, S * 0.008)
+          ctx.fillStyle = '#c9c4b4'
+          ctx.fillRect(ax + S * 0.022, ay - S * 0.026, S * 0.020, S * 0.006)
         }
         // divider walls
         for (const side of [-1, 1]) {
@@ -870,8 +935,8 @@ export default function RangeFloor() {
         }
         // framed wall art: tiny seeded chart doodle
         {
-          const fx3 = X(bay.x + bay.half * 0.52), fy3 = Y(bay.top + 0.135)
-          const fw = S * 0.055, fh = S * 0.042
+          const fx3 = X(bay.x + bay.half * 0.46), fy3 = Y(bay.top + 0.125)
+          const fw = S * 0.078, fh = S * 0.058
           ctx.fillStyle = '#5a4428'
           ctx.fillRect(fx3 - 2, fy3 - 2, fw + 4, fh + 4)
           ctx.fillStyle = '#e8e2d0'
