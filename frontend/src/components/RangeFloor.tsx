@@ -17,7 +17,7 @@ const P = {
 }
 
 type SeatStatus = 'ok' | 'failed' | 'pending'
-interface DeskSeat { name: string; status: SeatStatus; brief?: string | null }
+interface DeskSeat { name: string; status: SeatStatus; brief?: string | null; ran_at?: string | null }
 type Action = 'sit' | 'work' | 'walk' | 'point'
 interface Station {
   key: string
@@ -27,6 +27,7 @@ interface Station {
   action: Action
   flip: boolean
   present: boolean
+  active: boolean       // doing something RIGHT NOW — drives lights + motion
   down: boolean
   pending: boolean
   bubble: string | null
@@ -99,16 +100,21 @@ function stationsFrom(
 ): Station[] {
   const liveHb = trading?.modes?.live?.status === 'alive'
   const busy = fleetBusy(fleet) || liveHb
+  const ACTIVE_WINDOW = 20 * 60_000
+  const ranRecently = (seat?: DeskSeat) =>
+    !!seat?.ran_at && Date.now() - new Date(seat.ran_at).getTime() < ACTIVE_WINDOW
   const names = ['projects', 'premarket', 'ops', 'content'] as const
   const out: Station[] = names.map((name) => {
     const seat = seats.find(s => s.name === name)
     const st: SeatStatus = seat?.status ?? 'pending'
     const p = SPOTS[name]
-    const present = st === 'ok' || (busy && st !== 'failed')
+    const present = st === 'ok'
     return {
       key: name, label: name.toUpperCase(), x: p.x, y: p.y,
       action: p.action, flip: !!p.flip,
-      present, down: st === 'failed', pending: !present && st !== 'failed',
+      present,
+      active: present && ranRecently(seat),
+      down: st === 'failed', pending: !present && st !== 'failed',
       bubble: st === 'failed' ? 'SEAT DOWN' : null,
     }
   })
@@ -118,7 +124,8 @@ function stationsFrom(
   out.push({
     key: 'paper', label: 'PAPER', x: pp.x, y: pp.y,
     action: 'sit', flip: true,
-    present: paperOn, down: paper?.status === 'stale',
+    present: paperOn, active: paperOn,
+    down: paper?.status === 'stale',
     pending: !paperOn && paper?.status !== 'stale',
     bubble: null,
   })
@@ -128,18 +135,21 @@ function stationsFrom(
   out.push({
     key: 'chief', label: 'CHIEF', x: cp.x, y: cp.y,
     action: 'point', flip: false,
-    present: chiefOk || busy, down: chiefSeat?.status === 'failed',
+    present: chiefOk || busy,
+    active: (chiefOk && ranRecently(chiefSeat)) || busy,
+    down: chiefSeat?.status === 'failed',
     pending: !(chiefOk || busy) && chiefSeat?.status !== 'failed',
     bubble: chiefOk ? 'brief sent — runs the floor' : null,
   })
   const live = trading?.modes?.live
   const last = trading?.last_decision
   const p = SPOTS.live
-  const liveWalk = live?.status === 'alive' || busy
+  const liveWalk = live?.status === 'alive'
   out.push({
     key: 'live', label: 'LIVE', x: p.x, y: p.y,
     action: 'walk', flip: false,
-    present: liveWalk, down: live?.status === 'stale',
+    present: liveWalk, active: liveWalk,
+    down: live?.status === 'stale',
     pending: !liveWalk && live?.status !== 'stale',
     bubble: last?.action
       ? `${last.action.toUpperCase()}${last.symbol ? ' ' + last.symbol : ''}` : null,
@@ -775,7 +785,7 @@ export default function RangeFloor() {
       // office cosmetics — light strips, wall art, side desks
       for (const bay of BAYS) {
         const st = stations.find(s => s.key === bay.key)
-        const occupied = !!st && st.present && !st.down
+        const occupied = !!st && st.active && !st.down
         // ceiling light strip + soft cone when someone's in
         const lx = X(bay.x)
         ctx.fillStyle = '#39424c'
@@ -940,8 +950,8 @@ export default function RangeFloor() {
         const mx = X(bay.x) - bay.half * dw * 0.45 - mw / 2, my = Y(bay.top + 0.040)
         ctx.fillStyle = '#232a30'
         ctx.beginPath(); ctx.roundRect(mx - 3, my - 3, mw + 6, mh + 6, 5); ctx.fill()
-        const on = st.present && !st.down
-        const glow = st.down ? 'rgba(240,113,106,0.5)' : st.pending ? 'rgba(224,179,77,0.28)' : 'rgba(125,232,168,0.35)'
+        const on = st.active && !st.down
+        const glow = st.down ? 'rgba(240,113,106,0.5)' : on ? 'rgba(125,232,168,0.35)' : 'rgba(120,130,140,0.20)'
         ctx.fillStyle = on ? '#0b1a12' : '#10151a'
         ctx.fillRect(mx, my, mw, mh)
         ctx.fillStyle = glow
@@ -972,7 +982,7 @@ export default function RangeFloor() {
           flip = wpos.flip
         }
         const H = S * POSE_H[s.action]
-        const st = { working: s.present && !s.down, pending: s.pending, down: s.down }
+        const st = { working: s.active && !s.down, pending: s.pending, down: s.down }
         shadow(ctx, x, y, H * 0.55)
         drawBot(ctx, x, y, H, s.action, now, i, st, flip)
         ctx.font = `bold 11px ${MONO}`
