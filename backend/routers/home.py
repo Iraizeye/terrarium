@@ -163,6 +163,10 @@ def read_toolbox(home: Path = CLAUDE_HOME_DIR,
 
 @router.get("/api/home")
 async def api_home():
+    from ..config import DEMO
+    if DEMO:
+        from ..demo import demo_home
+        return demo_home()
     return {
         "memory": read_memory_shelf(),
         "doctor": read_doctor_line(),

@@ -6,7 +6,11 @@ import { UI, MONO } from '../ui'
 const SEEN_KEY = 'terrarium.intro-seen'
 
 export function introSeen(): boolean {
-  try { return localStorage.getItem(SEEN_KEY) === '1' } catch { return true }
+  // ?intro=0 skips the overlay (kiosk displays, screenshots).
+  try {
+    if (new URLSearchParams(window.location.search).get('intro') === '0') return true
+    return localStorage.getItem(SEEN_KEY) === '1'
+  } catch { return true }
 }
 
 export function markIntroSeen(): void {
@@ -14,10 +18,10 @@ export function markIntroSeen(): void {
 }
 
 const ZONES: { name: string; desc: string }[] = [
-  { name: 'The floor', desc: 'center — the office. Every robot is a real seat or book: typing on shift, dim while waiting, red when down. The big board charts what the engine judged, the LED sign and wall clock are the real session time, and each desk monitor glows with its robot\u2019s true status.' },
+  { name: 'The building', desc: 'center — a three-story office. The chief holds the executive floor; each agent below has an office themed to its job. A lit office means that seat worked in the last 20 minutes — dark means off shift. Typing, patrol walks, and speech bubbles are all driven by real state.' },
   { name: 'Fleet', desc: 'left rail — sessions, scheduled seats, and the ops log. Always on. Tool names only, never content.' },
   { name: 'Books', desc: 'right rail — live and paper books, positions, stops, and the last decision verbatim. Always on.' },
-  { name: 'The tape', desc: 'under the office — what the engine saw last cycle. PASS means it judged a candidate and declined.' },
+  { name: 'The tape', desc: 'under the building — what the engine saw last cycle. PASS means it judged a candidate and declined.' },
 ]
 
 export default function IntroOverlay({ onClose }: { onClose: () => void }) {
@@ -34,20 +38,20 @@ export default function IntroOverlay({ onClose }: { onClose: () => void }) {
         onClick={(e) => e.stopPropagation()}
         style={{
           width: 'min(560px, 92vw)', padding: '28px 30px 24px',
-          background: 'rgba(17,19,24,0.97)', border: UI.border, borderRadius: 14,
-          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05), 0 24px 64px rgba(3,12,8,0.55)',
+          background: 'rgba(26,22,16,0.97)', border: UI.border, borderRadius: 14,
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05), 0 24px 64px rgba(12,7,2,0.55)',
         }}
       >
         <div style={{ fontSize: 10, letterSpacing: '0.24em', color: UI.dim, textTransform: 'uppercase' }}>
           welcome to
         </div>
-        <div style={{ fontSize: 26, color: UI.accent, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '2px 0 4px' }}>
+        <div style={{ fontSize: 26, color: UI.brass, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '2px 0 4px' }}>
           Terrarium
         </div>
         <div style={{ fontSize: 12.5, color: UI.soft, lineHeight: 1.5, marginBottom: 18 }}>
-          A little world of working agents. The office is hand-drawn; every number,
-          chart, sign, and robot in it is live telemetry from this machine —
-          nothing rendered is simulated except demo mode, which says so.
+          A little world of working agents. The building is drawn entirely in code;
+          every light, chart, sign, and robot in it is live telemetry from this
+          machine — nothing rendered is simulated except demo mode, which says so.
         </div>
         <div style={{ display: 'grid', gap: 12, marginBottom: 20 }}>
           {ZONES.map((z) => (

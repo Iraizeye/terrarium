@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.10.1 - 2026-08-24 — the repo tells the truth
+
+- README rewritten around the product as it is: the three-story building,
+  the activity lights, a "how to read the building" legend, and fresh
+  screenshots — the real night watch plus two demo-mode captures.
+- Demo mode now covers `/api/home` with a fully scripted home page; before
+  this, demo read the visitor's real `~/.claude` memory shelf, breaking
+  the "nothing on your machine is read" promise.
+- Demo desk seats stamp wall-relative `ran_at` so the 20-minute activity
+  lights actually perform in demo: most offices lit, premarket off shift.
+- Deep links: `?view=home` opens the agent's home page, `?intro=0` skips
+  the intro overlay (kiosk displays, screenshots).
+- Intro overlay copy and colors caught up with the building and the warm
+  brass chrome.
+
 ## v0.10.0 - 2026-08-24 — the building
 
 - The office is now a three-storey cutaway, ant-farm style: the board

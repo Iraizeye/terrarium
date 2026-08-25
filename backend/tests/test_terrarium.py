@@ -256,6 +256,21 @@ class TestDemoMode:
         for line in demo_trading_status()["alerts"]:
             assert line.startswith("[demo]")
 
+    def test_demo_home_matches_shape_and_reads_nothing(self):
+        from backend.demo import demo_home
+
+        home = demo_home()
+        # Same top-level shape as /api/home so the frontend can't tell.
+        assert set(home) == {"memory", "doctor", "watch", "experiments", "toolbox"}
+        assert set(home["watch"]) == {"token_expires_at", "positions", "kill",
+                                      "last_broker_contact"}
+        # Every scripted line self-identifies as fiction.
+        for m in home["memory"]:
+            assert m["title"].startswith("[demo]")
+        for e in home["experiments"]:
+            assert e["title"].startswith("[demo]")
+        assert home["doctor"]["line"].startswith("[demo]")
+
     def test_demo_desk_is_clock_driven_and_labeled(self):
         from backend.demo import demo_desk
 
@@ -271,8 +286,15 @@ class TestDemoMode:
             assert seat["status"] == "ok"
             assert seat["brief"].startswith("[demo]")
             assert seat["ran_at"].endswith("+00:00") or seat["ran_at"].endswith("Z")
-        dawn2 = demo_desk(now=0.0)
-        assert dawn["seats"][0]["ran_at"] == dawn2["seats"][0]["ran_at"]
+        # ran_at is wall-relative so the floor's 20-minute activity lights
+        # actually light in demo: most seats recent, premarket off shift.
+        from datetime import datetime, timezone
+        ages = {
+            s["name"]: (datetime.now(timezone.utc) - datetime.fromisoformat(s["ran_at"])).total_seconds() / 60
+            for s in day["seats"]
+        }
+        assert ages["premarket"] > 20
+        assert all(ages[n] < 20 for n in ("ops", "content", "projects", "chief"))
 
 
 # ---------------------------------------------------------------------------

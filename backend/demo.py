@@ -18,7 +18,7 @@ import asyncio
 import os
 import sqlite3
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 DEMO_DAY_S = int(os.getenv("TERRARIUM_DEMO_DAY_S") or os.getenv("RANGEWATCH_DEMO_DAY_S", "300"))
@@ -305,13 +305,62 @@ _DESK_RUNS = {
 }
 
 
-def _demo_ran_at(run_min: int) -> str:
-    """Stable UTC timestamp for a synthetic ET minute on today's calendar."""
-    from zoneinfo import ZoneInfo
-    et = ZoneInfo("America/New_York")
-    day = datetime.now(tz=et).date()
-    hour, minute = divmod(int(run_min) % (24 * 60), 60)
-    return datetime(day.year, day.month, day.day, hour, minute, tzinfo=et).astimezone(timezone.utc).isoformat()
+# Minutes-ago offsets for finished demo seats. The floor lights an office when
+# its seat ran inside the last 20 real minutes, so the spread is chosen to show
+# the feature: most offices lit, premarket already off shift (it ran at dawn).
+_DESK_RECENCY_MIN = {
+    "premarket": 26,
+    "ops": 6,
+    "content": 12,
+    "projects": 17,
+    "chief": 3,
+}
+
+
+def demo_home() -> dict[str, Any]:
+    """A fictional agent's home page — memories, watch, experiments.
+
+    Demo mode must never read the visitor's real ~/.claude; this payload is
+    the same shape as /api/home with every line scripted and labeled.
+    """
+    wall = datetime.now(timezone.utc)
+    mem = [
+        ("[demo] The morning routine", "premarket brief before the open; doctor line is the day's first truth", 2),
+        ("[demo] NOVA follow-through", "guidance-raise entries have held VWAP 3/3 times; keep the stop structural", 26),
+        ("[demo] Never trade the last half hour", "EOD flatten runs 15:50 — the close belongs to management, not new risk", 49),
+        ("[demo] RIDGE post-mortem", "sector sympathy without own news = no trade; waited for confirmation, still stopped", 72),
+        ("[demo] Watchdog cadence", "heartbeats every 60s, watchdog restarts a silent daemon after 5 misses", 95),
+    ]
+    return {
+        "memory": [
+            {"title": t, "hook": h,
+             "updated": (wall - timedelta(hours=age)).isoformat()}
+            for t, h, age in mem
+        ],
+        "doctor": {
+            "line": "[demo] DOCTOR: all green — broker session fresh, ledgers reconciled, disk 12%, flat into the open",
+            "at": wall.isoformat(),
+            "green": True,
+        },
+        "watch": {
+            "token_expires_at": wall.timestamp() + 6.5 * 86400,
+            "positions": [
+                {"mode": "live", "symbol": "CINDER", "quantity": 3.0,
+                 "stop": 27.80, "horizon": "day"},
+            ],
+            "kill": False,
+            "last_broker_contact": wall.isoformat(),
+        },
+        "experiments": [
+            {"title": "[demo] Breakeven trail at +1.0R", "sample": "live entries",
+             "pass_bar": "expectancy >= +0.25R/trade over the untrailed baseline", "n": 14},
+            {"title": "[demo] Afternoon range breaks", "sample": "paper arm",
+             "pass_bar": "hit rate >= 40% AND avg winner >= 2R", "n": None},
+            {"title": "[demo] Sympathy-move veto", "sample": "shadow tickets",
+             "pass_bar": "vetoed names underperform entries by >= 0.5R median", "n": 22},
+        ],
+        "toolbox": {"skills": 12, "agents": 5, "commands": 9, "memories": len(mem)},
+    }
 
 
 def demo_desk(now: float | None = None) -> dict[str, Any]:
@@ -319,14 +368,16 @@ def demo_desk(now: float | None = None) -> dict[str, Any]:
     from .routers.desk import SEATS
 
     minute = _demo_minute(now)
+    wall = datetime.now(timezone.utc)
     seats = []
     for seat in SEATS:
         run_min, brief = _DESK_RUNS[seat["name"]]
         done = minute >= run_min
+        ran_at = (wall - timedelta(minutes=_DESK_RECENCY_MIN[seat["name"]])).isoformat()
         seats.append({
             **seat,
             "status": "ok" if done else "pending",
-            "ran_at": _demo_ran_at(run_min) if done else None,
+            "ran_at": ran_at if done else None,
             "brief": brief if done else None,
         })
     return {"date": datetime.now().strftime("%Y-%m-%d"), "seats": seats}

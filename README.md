@@ -2,19 +2,23 @@
 
 **A little world of working agents.**
 
-![Terrarium at dawn — live telemetry, real agents](docs/media/terrarium-hero.jpg)
+![Terrarium on night watch — live telemetry, real agents](docs/media/terrarium-hero.jpg)
 
-*Market open: the full crew at their desks — chief of staff running the
-floor, the LIVE bot walking the aisle, real tickers on every lit screen,
-the LED sign reading the actual session clock.*
+*Night watch, for real: the building sleeps because the agents do. One office
+is still lit — that seat worked in the last twenty minutes. The chief holds
+the executive floor, the LED sign reads the actual session clock, and the
+big board charts the names the trading engine really judged today.*
 
 ## What am I looking at?
 
 Terrarium is a local-first mission control for the AI agents running on one
-machine. Every agent session is a figure on the floor; the sky lives the
-real market day; the rails carry live telemetry — sessions, scheduled
-seats, both trading books, an ops log, machine vitals. Everything on screen
-is real (except demo mode, which says so on every line).
+machine, drawn as a three-story office building — entirely in code, no image
+assets. Every robot is a real scheduled seat or trading book. Every light,
+chart, sign, and speech bubble is live telemetry: an office lights up when
+its agent worked in the last twenty minutes and goes dark when it's off
+shift. The rails around the building carry the raw feeds — sessions, seats,
+both trading books, an ops log, machine vitals. Everything on screen is real
+(except demo mode, which says so on every line).
 
 ## Try it in 60 seconds — no accounts, no config
 
@@ -23,19 +27,43 @@ git clone https://github.com/Iraizeye/terrarium && cd terrarium
 make demo        # -> http://127.0.0.1:3000
 ```
 
+![Demo mode at market open — every line scripted and labeled](docs/media/terrarium-demo-day.jpg)
+
+*Demo mode at its market open: offices lit because their seats "just ran",
+premarket already off shift, a scripted book working a position.*
+
 Demo mode (`TERRARIUM_DEMO=1`) runs every panel on a **scripted synthetic
 day** — a fictional trader working NOVA, RIDGE and CINDER through entries,
 breakeven trails, a stop-out and a target, while scripted agent sessions
-stream the ops log. A compressed 24h session loops every 5 minutes so you
-see the glasshouse at dawn, through the open, past the close and into the
-firefly night without waiting for New York. Every line is fiction and
-labeled `[demo]`; nothing on your machine is read.
+fill the fleet and the desk. A compressed 24h session loops every 5 minutes,
+so you see the building wake up, trade the open, and go dark for the night
+without waiting for New York. Every line is fiction and labeled `[demo]`;
+nothing on your machine is read.
 
-First visit, an intro overlay walks you through the four zones; reopen it
-any time with the `?` button in the header. Preview any hour of the sky
-with `?phase=night|dawn|day|dusk`.
+First visit, an intro overlay explains the four zones; reopen it any time
+with the `?` button in the header. Useful URL params: `?phase=night|dawn|day|dusk`
+previews the room lighting, `?view=home` deep-links the agent's home page,
+`?intro=0` skips the overlay (kiosk displays).
 
-A local-first dashboard that watches the three things that matter on the box:
+## How to read the building
+
+- **Executive floor** — the chief of staff. Its speech bubble is the last
+  line of the real morning brief; the pointing pose means the brief is in.
+- **Offices** — one per scheduled agent seat (pre-market, ops, content,
+  projects) plus the paper book, each themed to its job. **Lit office =
+  that seat ran in the last 20 minutes.** Dark = off shift. Red monitor =
+  seat is down.
+- **The lobby** — the live trading book. When the live daemon's heartbeat
+  is fresh, its robot patrols the lobby; the wall clock reads actual ET.
+- **The big board** — charts the symbols the trading engine judged this
+  session, drawn from its real decision log.
+- **The LED sign** — the real market session clock (pre-market, open,
+  after hours, night watch).
+- **The tape** — under the building: what the engine saw last cycle.
+  `PASS` means it judged a candidate and declined, with the thesis verbatim
+  in the right rail.
+
+## What it watches
 
 - **The agents** — live activity via Claude Code hooks: every session, tool
   call, and finished turn lands on the stage in ~2s, plus a token/usage strip
@@ -51,22 +79,21 @@ Health checks run over the *real* stack — daemons, watchdogs, heartbeats,
 kill switch, disk — and feed the header status bar. Red means something is
 actually wrong; a healthy machine reads **ALL STATIONS GO**.
 
-The stage is a room drawn in code, staffed by a code-drawn copper crew, and
-every element of it is live: the big board charts the names the engine
-actually judged this session, the LED sign is the real session clock, the
-wall clock reads ET, each desk monitor glows with its seat's true status,
-and the room re-lights itself with the market phase — dawn amber, open
-daylight, dusk ember, night. Every robot is a real seat or book: typing
-when its session is working, walking the aisle when the live book is up,
-pointing at the board when the chief's brief is in, dim while waiting,
-red when down. Fleet, seats, ops log, both books, the board, the tape,
-and vitals stay on screen — nothing is behind a pill.
+## The agent's home page
+
+The `⌂ home` button (or `?view=home`) flips the stage to the agent's own
+page: the morning doctor line, standing watch items (auth runway, kill
+switch, open positions), the pre-registered experiment board with its pass
+bars, and the agent's persistent memory shelf — titles and hooks read
+straight from its own files, so the page can never drift from the truth.
+
+![The agent's home page in demo mode](docs/media/terrarium-home.jpg)
 
 ## Architecture
 
 ```
-backend/   FastAPI :8000 — 5 modules, read-only collectors, WebSocket push
-frontend/  React + Vite :3000 — canvas stage, trading desk, ops log
+backend/   FastAPI :8000 — read-only collectors, WebSocket push
+frontend/  React + Vite :3000 — canvas building, trading desk, ops log
 ```
 
 Two API contracts are **frozen** (external hooks depend on them):

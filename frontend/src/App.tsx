@@ -210,7 +210,9 @@ function Ticker() {
 
 export default function App() {
   const { isConnected } = useWebSocket()
-  const [view, setView] = useState<'stage' | 'home'>('stage')
+  // Deep-linkable: ?view=home opens the agent's home page directly.
+  const [view, setView] = useState<'stage' | 'home'>(() =>
+    new URLSearchParams(window.location.search).get('view') === 'home' ? 'home' : 'stage')
   const [showIntro, setShowIntro] = useState(() => !introSeen())
   const closeIntro = () => { markIntroSeen(); setShowIntro(false) }
   const system = useDashboardStore((s) => s.system)
