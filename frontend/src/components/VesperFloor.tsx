@@ -161,6 +161,7 @@ const BANNER = { x: 128, y: 42, w: 1648, h: 98 }
 const BUBBLE_STRAT = { cx: 605, top: 270 } // where "Quiet shift tonight" lived
 const BUBBLE_MEET = { cx: 1415, top: 272 } // where "RFC looks steady." lived
 const CHIEF_BUBBLE = { cx: 1440, top: 640 }
+const NIGHTBELL = { x: 1632, y: 766 } // the painted bell on the chief's table
 const LEDS = {
   strategy: { x: 540, y: 585, label: 'STRATEGY' },
   build: { x: 618, y: 905, label: 'BUILD' },
@@ -457,6 +458,25 @@ export default function VesperFloor() {
             9 * s,
             (i + 1) * bh * 0.13,
           )
+        }
+
+        // ── the Nightbell on the chief's table glows while doctor is unhappy ──
+        // same conditions as a warn banner; a green doctor leaves it a bell
+        if (warn) {
+          const ring = 0.34 + 0.22 * Math.sin(now / 800)
+          const gx = X(NIGHTBELL.x)
+          const gy = Y(NIGHTBELL.y)
+          ctx.save()
+          ctx.globalCompositeOperation = 'lighter'
+          const g = ctx.createRadialGradient(gx, gy, 1, gx, gy, 34 * s)
+          g.addColorStop(0, `rgba(255,120,60,${ring})`)
+          g.addColorStop(0.55, `rgba(255,140,70,${ring * 0.45})`)
+          g.addColorStop(1, 'rgba(255,120,60,0)')
+          ctx.fillStyle = g
+          ctx.beginPath()
+          ctx.arc(gx, gy, 34 * s, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.restore()
         }
       }
 
