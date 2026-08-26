@@ -311,8 +311,8 @@ export default function VesperFloor() {
       ) => {
         const ex = X(cx)
         const ey = Y(groundY - h + (46 / 132) * h)
-        const r = h * s * 0.055
-        const gap = h * s * 0.1
+        const r = h * s * 0.072
+        const gap = h * s * 0.115
         if (state.sleep) {
           ctx.strokeStyle = 'rgba(245,184,74,0.5)'
           ctx.lineWidth = Math.max(1.2, h * s * 0.016)
@@ -431,30 +431,30 @@ export default function VesperFloor() {
         ctx.fillStyle = 'rgba(111,148,96,0.85)'
         ctx.fillRect(X(317), Y(G2 - 53.5), 32 * s, 21 * s)
       }
-      shadow(930, G2, 78)
-      place(chiefUrl, 886, G2 - 124, 90, 124)
+      shadow(930, G2, 86)
+      place(chiefUrl, 880, G2 - 138, 100, 138)
       if (chiefDown) {
         ctx.fillStyle = 'rgba(240,113,106,0.55)'
-        ctx.fillRect(X(910), Y(G2 - 84), 42 * s, 5 * s)
+        ctx.fillRect(X(908), Y(G2 - 92), 46 * s, 5 * s)
       } else if (night && !chiefRan) {
         ctx.strokeStyle = 'rgba(122,200,190,0.25)'
         ctx.lineWidth = Math.max(1, 2 * s)
         ctx.beginPath()
-        ctx.moveTo(X(912), Y(G2 - 80))
-        ctx.lineTo(X(950), Y(G2 - 80))
+        ctx.moveTo(X(910), Y(G2 - 88))
+        ctx.lineTo(X(952), Y(G2 - 88))
         ctx.stroke()
       }
-      place(nightbellUrl, 1040, G2 - 96, 26, 30)
+      place(nightbellUrl, 996, G2 - 82, 32, 36)
       {
         const tail3 = (trading?.alerts ?? []).slice(-3).join(' ')
         const ringing = /NOT READY|KILL|stranded|SEAT DOWN|stale/i.test(tail3)
         if (ringing) {
-          const g = ctx.createRadialGradient(X(1053), Y(G2 - 84), 1, X(1053), Y(G2 - 84), 34 * s)
+          const g = ctx.createRadialGradient(X(1012), Y(G2 - 66), 1, X(1012), Y(G2 - 66), 34 * s)
           g.addColorStop(0, 'rgba(240,113,106,0.4)')
           g.addColorStop(1, 'rgba(240,113,106,0)')
           ctx.fillStyle = g
           ctx.beginPath()
-          ctx.arc(X(1053), Y(G2 - 84), 34 * s, 0, Math.PI * 2)
+          ctx.arc(X(1012), Y(G2 - 66), 34 * s, 0, Math.PI * 2)
           ctx.fill()
         }
       }
@@ -537,25 +537,27 @@ export default function VesperFloor() {
           }
         }
         eyes(cx, G1, 90, p.st)
+        // tags label STATIONS, not walkers — pinned so they never collide
+        const tagX = p.cx
         ctx.font = `bold ${Math.max(8, 15 * s)}px ${MONO}`
         const tw = ctx.measureText(p.tag).width + 18 * s
-        const tx = X(cx) - tw / 2
+        const tx = X(tagX) - tw / 2
         const ty = Y(G1 - 90) - 30 * s
         ctx.save()
         ctx.shadowColor = 'rgba(18,10,6,0.4)'
         ctx.shadowBlur = 6
         ctx.beginPath()
         ctx.roundRect(tx, ty, tw, 22 * s, 8 * s)
-        ctx.moveTo(X(cx) - 5 * s, ty + 22 * s)
-        ctx.lineTo(X(cx), ty + 29 * s)
-        ctx.lineTo(X(cx) + 5 * s, ty + 22 * s)
+        ctx.moveTo(X(tagX) - 5 * s, ty + 22 * s)
+        ctx.lineTo(X(tagX), ty + 29 * s)
+        ctx.lineTo(X(tagX) + 5 * s, ty + 22 * s)
         ctx.closePath()
         ctx.fillStyle = CREAM
         ctx.fill()
         ctx.shadowColor = 'transparent'
         ctx.fillStyle = '#3b2a1a'
         ctx.textAlign = 'center'
-        ctx.fillText(p.tag, X(cx), ty + 15.5 * s)
+        ctx.fillText(p.tag, X(tagX), ty + 15.5 * s)
         ctx.textAlign = 'left'
         ctx.restore()
         if (p.tag === 'KERNEL') flame(cx + 22, G1 - 62, 0.7)

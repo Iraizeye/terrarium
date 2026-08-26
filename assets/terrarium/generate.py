@@ -82,16 +82,16 @@ def robot(name, red=False, pose="idle"):
     )
     body = (
         legs
-        + f'<rect x="25" y="{torso_y}" width="50" height="42" rx="10" fill="url(#body)"/>'
+        + f'<rect x="21" y="{torso_y}" width="58" height="42" rx="9" fill="url(#body)"/>'+ f'<rect x="21" y="{torso_y}" width="58" height="12" rx="9" fill="{hi}" opacity="0.5"/>'
         + crest
         + arms
         + shoulders
         # dome head with soft chin
-        + f'<path d="M17 66 L17 40 A33 33 0 0 1 83 40 L83 66 Q83 72 72 72 L28 72 Q17 72 17 66 Z" fill="url(#body)"/>'
-        + '<ellipse cx="38" cy="22" rx="11" ry="5.5" fill="#fff8e6" opacity="0.28" transform="rotate(-28 38 22)"/>'
-        + f'<rect x="24" y="34" width="52" height="24" rx="12" fill="url(#vis)" stroke="#000" stroke-opacity="0.45"/>'
+        + f'<path d="M12 64 L12 34 Q12 8 50 8 Q88 8 88 34 L88 64 Q88 72 78 72 L22 72 Q12 72 12 64 Z" fill="url(#body)"/>'
+        + '<ellipse cx="36" cy="20" rx="13" ry="6" fill="#fff8e6" opacity="0.3" transform="rotate(-24 36 20)"/>'
+        + f'<rect x="19" y="32" width="62" height="28" rx="14" fill="url(#vis)" stroke="#000" stroke-opacity="0.5" stroke-width="1.5"/>'
         + (
-            '<rect x="30" y="40" width="40" height="12" rx="6" fill="#7ac8be" opacity="0.08"/>'
+            '<rect x="25" y="38" width="50" height="15" rx="7" fill="#7ac8be" opacity="0.09"/>'
             if red
             else ""
         )
