@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.16.1 - 2026-08-26 — the painted pass
+
+Hard art-lock enforcement: same composition, real paint. Robots gained
+faces — inset panels, big amber eyes with glow cores and speculars,
+sleeping lid-arcs; bodies are shaded volumes with feet, not silhouettes.
+The elevator became solid paneled bronze doors with gold plates. Interior
+partition walls and ceiling shadows carve actual rooms; ambient-occlusion
+shadows ground every object; candles pool light on the floor. Zero
+geometry-grid look remains. Goldens regenerated.
+
 ## v0.16.0 - 2026-08-26 — WARM EMBER TERRARIUM A
 
 - The stage reborn to the marked-favorite reference: rounded mahogany
