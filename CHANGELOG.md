@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.15.1 - 2026-08-26 — the chrome catches up to the bell
+
+First pass by the new UI/UX seat, scoped to three fixes:
+- The status strip now follows the full state matrix: GO only when the
+  doctor agrees; DEGRADED/NOT READY carry their cause; KILL and missing
+  telemetry are named; a quiet night reads "NIGHT WATCH · all quiet"
+  instead of implying it.
+- The tape stops at night: "TAPE CLOSED · reopens 09:30 ET" — no more
+  scrolling yesterday's prices at 5am.
+- The left rail scrolls inside its row instead of bleeding into the
+  vitals at small heights (the 1280x760 night-laptop overlap).
+
 ## v0.15.0 - 2026-08-26 — art direction A, company behavior
 
 - Same robots, same rooms, deeper truth: departments SLEEP at night

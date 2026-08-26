@@ -97,87 +97,176 @@ function ClockDot({ isConnected }: { isConnected: boolean }) {
   )
 }
 
-// ── Alert bar — red only when something REAL is wrong ────────────────────────
+// ── Status strip — the 30-second answer, per the state matrix ──────────────
+// GO only when the doctor agrees; quiet is named, never implied; missing
+// telemetry is a fact, not a verdict.
+
+function doctorCause(line: string | null | undefined): string {
+  if (!line) return ''
+  const afterDash = line.split(/problem\(s\) — /)[1] ?? line
+  return afterDash
+    .split(/ — |\(/)[0]
+    .trim()
+    .slice(0, 60)
+}
 
 function AlertBar() {
   const store = useDashboardStore()
   const trading = store.trading
+  const [doctor, setDoctor] = useState<{ line: string | null; green: boolean | null } | null>(null)
+  useEffect(() => {
+    let alive = true
+    const load = () =>
+      fetch('/api/home')
+        .then((r) => r.json())
+        .then((d) => {
+          if (alive) setDoctor(d.doctor ?? null)
+        })
+        .catch(() => {})
+    load()
+    const id = setInterval(load, 120_000)
+    return () => {
+      alive = false
+      clearInterval(id)
+    }
+  }, [])
 
-  const alerts: { text: string; tone: string }[] = []
+  const Strip = ({
+    dot,
+    text,
+    tone,
+    strong,
+  }: {
+    dot: string
+    text: string
+    tone: string
+    strong?: boolean
+  }) => (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '5px 12px',
+        borderRadius: 999,
+        border: strong ? `1px solid ${dot}55` : undefined,
+        background: strong ? UI.surfaceSoft : undefined,
+        maxWidth: 680,
+      }}
+    >
+      <span style={{ width: 4, height: 4, borderRadius: '50%', background: dot, flexShrink: 0 }} />
+      <span
+        style={{
+          fontSize: strong ? 11 : 10,
+          color: tone,
+          letterSpacing: '0.14em',
+          textTransform: 'uppercase',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}
+      >
+        {text}
+      </span>
+    </div>
+  )
+
+  // 1. no telemetry: never render a verdict on missing data
+  if (!trading)
+    return <Strip dot={C.amber} text="TELEMETRY DOWN — not a verdict" tone={C.amber} strong />
+  // 2. kill switch beats everything
+  if (trading.kill_switch)
+    return <Strip dot={C.red} text="KILL ACTIVE — buys halted" tone={C.red} strong />
+  // 3. doctor NOT READY
+  const notReady = /NOT READY/i.test(doctor?.line ?? '')
+  if (notReady)
+    return (
+      <Strip
+        dot={C.red}
+        text={`NOT READY — ${doctorCause(doctor?.line)} · next open 09:30 ET`}
+        tone={C.red}
+        strong
+      />
+    )
+  // 4. board cell alerts (red/amber), same as before
   const cells = buildBoardCells(useDashboardStore.getState())
+  const alerts: { text: string; tone: string }[] = []
   for (const cell of cells) {
     if (cell.state === 'nogo')
       alerts.push({ text: `${cell.callsign}: ${cell.detail}`, tone: C.red })
     if (cell.state === 'hold')
       alerts.push({ text: `${cell.callsign}: ${cell.detail}`, tone: C.amber })
   }
-  // A stale trading heartbeat during market hours is the one that matters most
-  const marketOpen = trading?.market?.is_open
-  const anyStale =
-    marketOpen && (['paper', 'live'] as const).some((m) => trading?.modes?.[m]?.status === 'stale')
-
-  if (alerts.length === 0) {
+  if (doctor && doctor.green === false)
+    alerts.unshift({ text: `DEGRADED — ${doctorCause(doctor.line)}`, tone: C.amber })
+  if (alerts.length > 0) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px' }}>
-        <span style={{ width: 4, height: 4, borderRadius: '50%', background: C.green }} />
-        <span
-          style={{ fontSize: 10, color: C.dim, letterSpacing: '0.2em', textTransform: 'uppercase' }}
-        >
-          All stations GO
-        </span>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 6,
+          padding: '5px 12px',
+          borderRadius: 999,
+          border: `1px solid ${alerts.some((a) => a.tone === C.red) ? 'rgba(240,113,106,0.32)' : 'rgba(224,179,77,0.30)'}`,
+          background: UI.surfaceSoft,
+          maxWidth: 680,
+        }}
+      >
+        {alerts.slice(0, 3).map((alert, i) => (
+          <span
+            key={i}
+            title={alert.text}
+            style={{ display: 'flex', alignItems: 'center', gap: 5 }}
+          >
+            <span
+              style={{
+                width: 4,
+                height: 4,
+                borderRadius: '50%',
+                background: alert.tone,
+                flexShrink: 0,
+              }}
+            />
+            <span
+              style={{
+                fontSize: 11,
+                color: alert.tone,
+                letterSpacing: '0.06em',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: 260,
+              }}
+            >
+              {alert.text}
+            </span>
+          </span>
+        ))}
+        {alerts.length > 3 && (
+          <span
+            style={{
+              fontSize: 9,
+              color: C.dim,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+            }}
+          >
+            +{alerts.length - 3}
+          </span>
+        )}
       </div>
     )
   }
-
-  return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: 6,
-        padding: '5px 12px',
-        borderRadius: 999,
-        border: `1px solid ${anyStale || alerts.some((a) => a.tone === C.red) ? 'rgba(240,113,106,0.32)' : 'rgba(224,179,77,0.30)'}`,
-        background: UI.surfaceSoft,
-        maxWidth: 680,
-      }}
-    >
-      {alerts.slice(0, 3).map((alert, i) => (
-        <span key={i} title={alert.text} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span
-            style={{
-              width: 4,
-              height: 4,
-              borderRadius: '50%',
-              background: alert.tone,
-              flexShrink: 0,
-            }}
-          />
-          <span
-            style={{
-              fontSize: 11,
-              color: alert.tone,
-              letterSpacing: '0.06em',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              maxWidth: 260,
-            }}
-          >
-            {alert.text}
-          </span>
-        </span>
-      ))}
-      {alerts.length > 3 && (
-        <span
-          style={{ fontSize: 9, color: C.dim, letterSpacing: '0.14em', textTransform: 'uppercase' }}
-        >
-          +{alerts.length - 3}
-        </span>
-      )}
-    </div>
-  )
+  // 5. quiet-GO: night, closed, flat — quiet is a state, not an absence
+  const flat =
+    (trading.modes?.live?.open_positions?.length ?? 0) === 0 &&
+    (trading.modes?.paper?.open_positions?.length ?? 0) === 0
+  if (getPhase(trading.market) === 'night' && !trading.market?.is_open && flat)
+    return <Strip dot={C.dim} text="NIGHT WATCH · all quiet" tone={C.dim} />
+  // 6. GO — and now it means it
+  return <Strip dot={C.green} text="All stations GO" tone={C.dim} />
 }
 
 // ── Bottom stat pills ────────────────────────────────────────────────────────
@@ -291,8 +380,15 @@ function Ticker() {
       c: up ? UI.green : UI.red,
     })
   }
-  if (!cells.length)
-    cells.push({ txt: trading?.market?.is_open ? 'quiet tape' : 'night crew on', c: UI.dim })
+  if (!trading?.market?.is_open) {
+    // closed market: a scrolling tape is fake busy — say the truth, still
+    return (
+      <div className="ticker" aria-hidden style={{ justifyContent: 'center', display: 'flex' }}>
+        <span style={{ animation: 'none', color: UI.dim }}>TAPE CLOSED · reopens 09:30 ET</span>
+      </div>
+    )
+  }
+  if (!cells.length) cells.push({ txt: 'quiet tape', c: UI.dim })
   const line = cells.map((c) => c.txt).join('   ·   ')
   return (
     <div className="ticker" aria-hidden>

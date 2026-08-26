@@ -126,6 +126,9 @@ body,
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* a rail taller than its row scrolls inside it — never bleeds into the
+     footer (the 1280x760 night-laptop overlap) */
+  overflow-y: auto;
 }
 .shell-desk {
   grid-area: desk;
