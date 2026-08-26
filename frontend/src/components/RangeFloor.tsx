@@ -590,6 +590,37 @@ export default function RangeFloor() {
     let bubbleKey = ''
     let bubbleAt = 0
 
+    // ── office mail: an envelope per REAL message, never fiction ──
+    // A seat finishing a run sends its output to the chief's desk (the chief
+    // seat genuinely digests every seat's output); the chief finishing sends
+    // the brief out of the building (Telegram); a fresh trader alert sends a
+    // note from the lobby toward the trading-desk rail.
+    interface Memo { pts: [number, number][]; t0: number; dur: number; tint: string }
+    const memos: Memo[] = []
+    let seenRuns: Record<string, string | null> | null = null
+    let seenAlert: string | null = null
+    let alertPrimed = false
+    const mailPreview = new URLSearchParams(window.location.search).get('mail') === 'test'
+    let lastPreview = 0
+    const spawnMemo = (pts: [number, number][], tint: string, now: number, dur = 3000) => {
+      if (memos.length > 12) memos.shift()
+      memos.push({ pts, t0: now, dur, tint })
+    }
+    const shaftMid = (SHAFT.x0 + SHAFT.x1) / 2
+    const chiefDesk: [number, number] = [0.545, F3.ground - 0.12]
+    const seatMemo = (name: string, now: number) => {
+      const p = SPOTS[name]
+      if (!p) return
+      spawnMemo(
+        [[p.x, p.y - 0.10], [shaftMid, p.y - 0.10], [shaftMid, F3.ground - 0.10], chiefDesk],
+        JOB[name]?.accent ?? '#d9a441', now,
+      )
+    }
+    const chiefMemo = (now: number) =>
+      spawnMemo([chiefDesk, [0.66, 0.16], [0.86, 0.09], [1.03, 0.06]], '#d9a441', now, 2400)
+    const alertMemo = (now: number) =>
+      spawnMemo([[SPOTS.live.x, F1.ground - 0.10], [0.90, F1.ground - 0.16], [1.03, F1.ground - 0.20]], '#5abf7a', now, 2200)
+
     const draw = (now: number) => {
       const { seats, trading, fleet, board } = dataRef.current
       const dpr = Math.min(window.devicePixelRatio || 1, 2)
@@ -609,6 +640,31 @@ export default function RangeFloor() {
       const S = Math.min(dh, dw * 0.60)
       const phase = getPhase(trading?.market)
       const room = ROOM[phase]
+
+      // office-mail transitions: diff real state, spawn envelopes on change
+      {
+        const runs: Record<string, string | null> = {}
+        for (const s of seats) runs[s.name] = s.ran_at ?? null
+        if (seenRuns) {
+          for (const name of Object.keys(runs)) {
+            if (runs[name] && runs[name] !== seenRuns[name]) {
+              if (name === 'chief') chiefMemo(now)
+              else seatMemo(name, now)
+            }
+          }
+        }
+        seenRuns = runs
+        const alerts = trading?.alerts
+        const tail = alerts?.length ? alerts[alerts.length - 1] : null
+        if (!alertPrimed) { alertPrimed = trading != null; seenAlert = tail }
+        else if (tail && tail !== seenAlert) { alertMemo(now); seenAlert = tail }
+        if (mailPreview && now - lastPreview > 4200) {
+          lastPreview = now
+          const cycle = ['projects', 'ops', 'premarket', 'content', 'paper', 'chief', 'alert']
+          const pick = cycle[Math.floor(now / 4200) % cycle.length]
+          pick === 'chief' ? chiefMemo(now) : pick === 'alert' ? alertMemo(now) : seatMemo(pick, now)
+        }
+      }
 
       // ── the building, cut open ──
       // backdrop behind the structure
@@ -1281,6 +1337,61 @@ export default function RangeFloor() {
         ctx.textAlign = 'center'
         ctx.fillText(text, bx + bw / 2, by + 20)
         ctx.textAlign = 'left'
+        ctx.restore()
+      }
+
+      // office mail in flight — above the rooms, under the vignette
+      for (let i = memos.length - 1; i >= 0; i--) {
+        const m = memos[i]
+        const t = (now - m.t0) / m.dur
+        if (t > 1.15) { memos.splice(i, 1); continue }
+        const tt = Math.min(1, t)
+        const pts = m.pts.map(([fx, fy]) => [X(fx), Y(fy)] as [number, number])
+        const segs: number[] = []
+        let total = 0
+        for (let k = 0; k < pts.length - 1; k++) {
+          const L = Math.hypot(pts[k + 1][0] - pts[k][0], pts[k + 1][1] - pts[k][1])
+          segs.push(L); total += L
+        }
+        const e = tt < 0.5 ? 2 * tt * tt : 1 - Math.pow(-2 * tt + 2, 2) / 2
+        let dist = e * total
+        let px = pts[pts.length - 1][0], py = pts[pts.length - 1][1]
+        for (let k = 0; k < segs.length; k++) {
+          if (dist <= segs[k]) {
+            const f = segs[k] ? dist / segs[k] : 1
+            px = pts[k][0] + (pts[k + 1][0] - pts[k][0]) * f
+            py = pts[k][1] + (pts[k + 1][1] - pts[k][1]) * f
+            break
+          }
+          dist -= segs[k]
+        }
+        ctx.save()
+        if (t <= 1) {
+          py += Math.sin(now / 90 + i * 2) * 1.5
+          const w = S * 0.030, h = w * 0.68
+          ctx.shadowColor = 'rgba(8,6,3,0.35)'
+          ctx.shadowBlur = 6
+          ctx.shadowOffsetY = 2
+          ctx.fillStyle = '#f6f2e4'
+          ctx.fillRect(px - w / 2, py - h / 2, w, h)
+          ctx.shadowColor = 'transparent'
+          ctx.strokeStyle = m.tint
+          ctx.lineWidth = 1.2
+          ctx.strokeRect(px - w / 2, py - h / 2, w, h)
+          ctx.beginPath()
+          ctx.moveTo(px - w / 2, py - h / 2)
+          ctx.lineTo(px, py + h * 0.12)
+          ctx.lineTo(px + w / 2, py - h / 2)
+          ctx.stroke()
+        } else {
+          // delivered — a soft flash where it landed
+          const f = (t - 1) / 0.15
+          const g = ctx.createRadialGradient(px, py, 0, px, py, S * 0.05)
+          g.addColorStop(0, `rgba(246,242,228,${0.5 * (1 - f)})`)
+          g.addColorStop(1, 'rgba(246,242,228,0)')
+          ctx.fillStyle = g
+          ctx.fillRect(px - S * 0.05, py - S * 0.05, S * 0.10, S * 0.10)
+        }
         ctx.restore()
       }
 

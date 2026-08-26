@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.11.1 - 2026-08-26 — the office mail is real
+
+- Inter-agent traffic is now drawn, never invented: when a seat finishes a
+  real run, an envelope rides the elevator to the chief's desk (the chief
+  seat genuinely digests every output); when the chief's brief goes out,
+  the envelope leaves the building (Telegram); a fresh trader alert sends
+  a note from the lobby toward the desk rail. Born from LinkedIn feedback
+  asking for "agents that talk" — this is the version that keeps the
+  telemetry law.
+- `?mail=test` previews the animation (same class of dev knob as `?phase=`).
+
 ## v0.11.0 - 2026-08-24 — receipts
 
 - Unified search: `GET /api/search?q=` fans out read-only across the
