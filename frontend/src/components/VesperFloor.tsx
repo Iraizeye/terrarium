@@ -875,7 +875,7 @@ function drawScreen(
   ctx.restore()
 }
 
-export default function RangeFloor() {
+export default function VesperFloor() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sparkRef = useRef<Record<string, number[]>>({})
   const [seats, setSeats] = useState<DeskSeat[]>([])

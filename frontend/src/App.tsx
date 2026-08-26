@@ -5,9 +5,9 @@ import { buildBoardCells, OpsLog } from './components/CrewTelemetry'
 import DeskPanel from './components/DeskPanel'
 import FleetPanel from './components/FleetPanel'
 import IntroOverlay, { introSeen, markIntroSeen } from './components/IntroOverlay'
-import RangeFloor from './components/RangeFloor'
 import { SearchInput, SearchResults, useSearch } from './components/SearchPanel'
 import TradingPanel from './components/TradingPanel'
+import VesperFloor from './components/VesperFloor'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useDashboardStore } from './store/dashboardStore'
 import { getPhase, type Phase } from './theme'
@@ -431,7 +431,7 @@ export default function App() {
         </div>
 
         <div className="shell-stage">
-          {view === 'stage' ? <RangeFloor /> : <ClaudeHomePanel />}
+          {view === 'stage' ? <VesperFloor /> : <ClaudeHomePanel />}
           <Ticker />
         </div>
 

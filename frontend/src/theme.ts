@@ -1,5 +1,5 @@
 // The market phase — the one piece of "theme" that survived the redesigns.
-// The building (RangeFloor) owns its own per-phase palettes; the rails are
+// The building (VesperFloor) owns its own per-phase palettes; the rails are
 // styled by ui.tsx. This module only answers: what part of the trading day
 // is it?
 //
