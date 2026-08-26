@@ -45,16 +45,21 @@ with the `?` button in the header. Useful URL params: `?phase=night|dawn|day|dus
 previews the room lighting, `?view=home` deep-links the agent's home page,
 `?intro=0` skips the overlay (kiosk displays).
 
-## How to read the building
+## How to read the building (the company chart, drawn)
 
-- **Executive floor** — the chief of staff. Its speech bubble is the last
-  line of the real morning brief; the pointing pose means the brief is in.
-- **Offices** — one per scheduled agent seat (pre-market, ops, content,
-  projects) plus the paper book, each themed to its job. **Lit office =
-  that seat ran in the last 20 minutes.** Dark = off shift. Red monitor =
-  seat is down.
-- **The lobby** — the live trading book. When the live daemon's heartbeat
-  is fresh, its robot patrols the lobby; the wall clock reads actual ET.
+- **3F — Chief / Vesper HQ** — the chief of staff. Bubble = the morning
+  brief when it's in, else the latest Strategy verdict. Lights only when
+  the chief itself ran — never because someone downstairs was busy.
+- **2F — Strategy & Build** — the on-call departments, with the desk
+  annexes (ops, projects) across the shaft. **Lamps are artifact-driven:**
+  Strategy lights when an RFC file changed in the last 20 minutes; Build
+  lights when a commit landed in a hub repo. Talk lights nothing.
+- **1F — the TRADING PIT** — the ground-floor plant: live + paper
+  terminals side by side, the premarket briefing desk, and the INTERLOCK
+  breaker (green = armed & watched, red = KILL) drawn from real
+  kill-switch + watchdog telemetry. Display only — this dashboard has no
+  trading controls. The live robot patrols the lobby on a fresh
+  heartbeat; the content annex keeps its studio; the wall clock reads ET.
 - **The big board** — charts the symbols the trading engine judged this
   session, drawn from its real decision log.
 - **The LED sign** — the real market session clock (pre-market, open,

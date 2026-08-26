@@ -398,6 +398,29 @@ def demo_search(q: str) -> list[dict[str, Any]]:
     ]
 
 
+def demo_company(now: float | None = None) -> dict[str, Any]:
+    """The upstairs beat: Strategy verdict lands mid-morning, Build lamp
+    blinks after, Chief already spoke at dawn. All fiction, all labeled."""
+    minute = _demo_minute(now)
+    wall = _demo_wall()
+    verdict_in = minute >= 10 * 60 + 40      # 10:40 ET: RFC lands
+    build_in = minute >= 11 * 60             # 11:00 ET: the fix ships
+    rfcs = []
+    if verdict_in:
+        rfcs.append({"name": "[demo] 0007-brighter-premarket-lamp",
+                     "verdict": "add",
+                     "at": (wall - timedelta(minutes=3)).isoformat()})
+    rfcs.append({"name": "[demo] 0006-second-espresso-machine",
+                 "verdict": "later",
+                 "at": (wall - timedelta(hours=22)).isoformat()})
+    return {
+        "strategy_at": rfcs[0]["at"] if verdict_in else None,
+        "strategy_verdict": "[demo] brighter premarket lamp: add" if verdict_in else None,
+        "build_at": (wall - timedelta(minutes=2)).isoformat() if build_in else None,
+        "rfcs": rfcs,
+    }
+
+
 def demo_desk(now: float | None = None) -> dict[str, Any]:
     """Scheduled seats for the synthetic day — labeled fiction, clock-driven."""
     from .routers.desk import SEATS

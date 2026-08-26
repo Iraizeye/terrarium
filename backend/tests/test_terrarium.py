@@ -552,3 +552,31 @@ class TestUnifiedSearch:
         hits = demo_search("NOVA")
         assert hits and all(h["text"].startswith("[demo]") or "[demo]" in h["text"] for h in hits)
         assert {h["source"] for h in hits} <= {"sessions", "alerts", "decisions", "memory"}
+
+
+# ---------------------------------------------------------------------------
+# Company — department lamps driven by artifacts, never guesses
+# ---------------------------------------------------------------------------
+
+class TestCompany:
+    def test_rfc_shelf_parses_verdicts_and_skips_template(self, tmp_path):
+        from backend.routers.company import rfc_shelf
+        (tmp_path / "0000-template.md").write_text("- **Verdict:** add | later | no")
+        (tmp_path / "0001-lamp.md").write_text("# RFC\n- **Verdict:** add\n")
+        (tmp_path / "0002-maybe.md").write_text("Verdict: later\n")
+        shelf = rfc_shelf(tmp_path)
+        assert [r["name"] for r in shelf] == ["0002-maybe", "0001-lamp"]
+        assert shelf[1]["verdict"] == "add" and shelf[0]["verdict"] == "later"
+
+    def test_missing_rfc_dir_is_empty_not_error(self, tmp_path):
+        from backend.routers.company import last_build_at, rfc_shelf
+        assert rfc_shelf(tmp_path / "nope") == []
+        assert last_build_at([tmp_path / "not-a-repo"]) is None
+
+    def test_demo_company_is_labeled_and_clock_driven(self):
+        from backend.demo import DEMO_DAY_S, demo_company
+        early = demo_company(now=0.0)                 # dawn: no verdict yet
+        assert early["strategy_at"] is None and early["build_at"] is None
+        mid = demo_company(now=DEMO_DAY_S * 0.45)     # mid-day: beat landed
+        assert mid["strategy_verdict"] and "[demo]" in mid["strategy_verdict"]
+        assert all("[demo]" in r["name"] for r in mid["rfcs"])

@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.14.0 - 2026-08-26 — the company floors
+
+- The building now draws Vesper as a company, same art language: 2F is
+  STRATEGY + BUILD (on-call primaries) with ops/projects annexes; the
+  paper book moved down to a two-terminal TRADING PIT beside the premarket
+  briefing desk; an INTERLOCK breaker renders real kill-switch + watchdog
+  state (display only). The trader stays the ground-floor plant.
+- Light law: department lamps are artifact-driven — Strategy = fresh RFC
+  in ~/Projects/vesper/rfcs, Build = fresh commit in a hub repo, Chief =
+  its own run only (a busy session no longer lights the chief).
+- New IDEAS · RFC rail reads the RFC shelf; `GET /api/company`.
+- Demo gains the upstairs beat: a [demo] Strategy verdict lands mid-
+  morning, Build blinks, the pit trades on.
+- Fixed: watchdog "not installed" false alarm after the vesper label
+  rename; annex wall art clamped inside narrow rooms.
+
 ## v0.13.0 - 2026-08-26 — the quality floor
 
 - The look is now a tested contract: Playwright renders the building and

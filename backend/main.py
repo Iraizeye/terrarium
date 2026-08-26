@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import state as _st
 from .config import DEMO, MAX_WS_CONNECTIONS, POLL_INTERVAL, SESSIONS_DB
-from .routers import crew, desk, home, search, sessions
+from .routers import company, crew, desk, home, search, sessions
 from .state import _now_iso, _state, broadcast_status, status_payload
 
 if DEMO:
@@ -120,7 +120,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for router_module in (crew, desk, home, search, sessions):
+for router_module in (company, crew, desk, home, search, sessions):
     app.include_router(router_module.router)
 
 

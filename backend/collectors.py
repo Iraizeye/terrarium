@@ -225,8 +225,10 @@ def _alerts_tail() -> list[str]:
 def _watchdog_armed(mode: str) -> bool:
     """A watchdog counts as armed when its launchd plist is installed."""
     names = (
+        f"com.vesper.watchdog{'' if mode == 'paper' else '-live'}.plist",
+        f"com.vesper.watchdog-{mode}.plist",
+        # pre-rename fallbacks — harmless to keep, cheap to check
         f"com.range-trader.watchdog{'' if mode == 'paper' else '-live'}.plist",
-        f"com.range-trader.watchdog-{mode}.plist",
     )
     return any((LAUNCH_AGENTS_DIR / n).exists() for n in names)
 

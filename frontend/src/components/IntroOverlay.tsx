@@ -27,7 +27,7 @@ export function markIntroSeen(): void {
 const ZONES: { name: string; desc: string }[] = [
   {
     name: 'The building',
-    desc: 'center — a three-story office. The chief holds the executive floor; each agent below has an office themed to its job. A lit office means that seat worked in the last 20 minutes — dark means off shift. Typing, patrol walks, and speech bubbles are all driven by real state.',
+    desc: 'center — the company, drawn: Chief up top, Strategy and Build on-call on 2F with the desk annexes, and the ground-floor TRADING PIT with its interlock breaker. Lamps are artifact-driven — an RFC lights Strategy, a commit lights Build, a fresh heartbeat walks the pit robot. Talk lights nothing.',
   },
   {
     name: 'Fleet',

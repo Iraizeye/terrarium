@@ -5,6 +5,7 @@ import { buildBoardCells, OpsLog } from './components/CrewTelemetry'
 import DeskPanel from './components/DeskPanel'
 import FleetPanel from './components/FleetPanel'
 import IntroOverlay, { introSeen, markIntroSeen } from './components/IntroOverlay'
+import RfcRail from './components/RfcRail'
 import { SearchInput, SearchResults, useSearch } from './components/SearchPanel'
 import TradingPanel from './components/TradingPanel'
 import VesperFloor from './components/VesperFloor'
@@ -423,6 +424,7 @@ export default function App() {
               <div style={{ flexShrink: 0 }}>
                 <DeskPanel />
               </div>
+              <RfcRail />
               <div style={{ flex: 1, minHeight: 0 }}>
                 <OpsLog />
               </div>

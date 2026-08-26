@@ -59,31 +59,52 @@ interface Bay {
   top: number
   ground: number
   half: number
+  label?: string
 }
+
+// Department lamps are ARTIFACT-driven (the company's light law): Strategy
+// lit iff an RFC changed recently, Build lit iff a commit landed recently.
+// Talk lights nothing; only work does.
+export interface CompanyStatus {
+  strategy_at: string | null
+  strategy_verdict: string | null
+  build_at: string | null
+  rfcs: { name: string; verdict: string | null; at: string }[]
+}
+// The company floors: 2F = Strategy + Build (primary) with the desk
+// annexes right of the shaft; 1F = content annex, the lobby, and the
+// TRADING PIT — live + paper terminals side by side with the premarket
+// briefing desk. Trading is the ground-floor plant, never a peer office.
 const BAYS: Bay[] = [
-  { key: 'projects', x: 0.16, top: F2.top, ground: F2.ground, half: 0.115 },
-  { key: 'ops', x: 0.45, top: F2.top, ground: F2.ground, half: 0.115 },
-  { key: 'premarket', x: 0.85, top: F2.top, ground: F2.ground, half: 0.115 },
+  { key: 'strategy', x: 0.17, top: F2.top, ground: F2.ground, half: 0.135, label: 'STRATEGY' },
+  { key: 'build', x: 0.48, top: F2.top, ground: F2.ground, half: 0.135, label: 'BUILD' },
+  { key: 'ops', x: 0.795, top: F2.top, ground: F2.ground, half: 0.062 },
+  { key: 'projects', x: 0.928, top: F2.top, ground: F2.ground, half: 0.055 },
   { key: 'content', x: 0.16, top: F1.top, ground: F1.ground, half: 0.115 },
-  { key: 'paper', x: 0.85, top: F1.top, ground: F1.ground, half: 0.115 },
+  { key: 'pit', x: 0.845, top: F1.top, ground: F1.ground, half: 0.128, label: 'TRADING PIT' },
 ]
 const SPOTS: Record<string, { x: number; y: number; action: Action; flip?: boolean }> = {
-  projects: { x: 0.16, y: F2.ground, action: 'sit' },
-  ops: { x: 0.45, y: F2.ground, action: 'sit' },
-  premarket: { x: 0.85, y: F2.ground, action: 'sit' },
+  strategy: { x: 0.17, y: F2.ground, action: 'work' },
+  build: { x: 0.48, y: F2.ground, action: 'sit' },
+  ops: { x: 0.795, y: F2.ground, action: 'sit' },
+  projects: { x: 0.928, y: F2.ground, action: 'sit' },
   content: { x: 0.16, y: F1.ground, action: 'work' },
-  paper: { x: 0.85, y: F1.ground, action: 'sit' },
+  premarket: { x: 0.765, y: F1.ground, action: 'sit' },
+  paper: { x: 0.915, y: F1.ground, action: 'sit' },
   chief: { x: 0.5, y: F3.ground, action: 'point' },
   live: { x: 0.45, y: F1.ground, action: 'walk' },
 }
 const _DESK_SEATS = ['projects', 'premarket', 'ops', 'content', 'paper'] as const
 // each office dressed for its job
 const JOB: Record<string, { notes: [string, string]; accent: string }> = {
-  projects: { notes: ['#e0b34d', '#d9a441'], accent: '#d9a441' },
+  strategy: { notes: ['#7fb2d9', '#9fc4e8'], accent: '#7fb2d9' },
+  build: { notes: ['#e0b34d', '#d9a441'], accent: '#d9a441' },
+  projects: { notes: ['#e0b34d', '#d9a441'], accent: '#b8933f' },
   premarket: { notes: ['#f0956a', '#e2b25a'], accent: '#e88a52' },
   ops: { notes: ['#8fd98f', '#7fb2d9'], accent: '#5abf7a' },
   content: { notes: ['#d97fa0', '#c48ad9'], accent: '#d97fa0' },
   paper: { notes: ['#7fb2d9', '#9fc4e8'], accent: '#6fa6d9' },
+  pit: { notes: ['#8fd98f', '#7fb2d9'], accent: '#5abf7a' },
 }
 const WALK = { x0: 0.315, x1: 0.6, y: F1.ground, period: 17000 }
 // bot height per pose, as a fraction of the scene scale S
@@ -162,27 +183,53 @@ function phaseText(phase: Phase): string {
         : 'NIGHT WATCH'
 }
 
-function fleetBusy(fleet: AgentFleet | null): boolean {
-  return !!fleet?.agents?.some((a) => a.state === 'live')
-}
-
 function stationsFrom(
   seats: DeskSeat[],
   trading: TradingStatus | null,
-  fleet: AgentFleet | null,
+  _fleet: AgentFleet | null,
+  company: CompanyStatus | null,
 ): Station[] {
-  const liveHb = trading?.modes?.live?.status === 'alive'
-  const busy = fleetBusy(fleet) || liveHb
   const ACTIVE_WINDOW = 20 * 60_000
-  const ranRecently = (seat?: DeskSeat) =>
-    !!seat?.ran_at && Date.now() - new Date(seat.ran_at).getTime() < ACTIVE_WINDOW
+  const fresh = (iso?: string | null) =>
+    !!iso && Date.now() - new Date(iso).getTime() < ACTIVE_WINDOW
+  const ranRecently = (seat?: DeskSeat) => fresh(seat?.ran_at)
+  const out: Station[] = []
+  // 2F primaries — on-call departments, lamps lit by their artifacts only
+  const stratOn = fresh(company?.strategy_at)
+  out.push({
+    key: 'strategy',
+    label: 'STRATEGY',
+    x: SPOTS.strategy.x,
+    y: SPOTS.strategy.y,
+    action: 'work',
+    flip: false,
+    present: true,
+    active: stratOn,
+    down: false,
+    pending: !stratOn,
+    bubble: stratOn && company?.strategy_verdict ? company.strategy_verdict.slice(0, 40) : null,
+  })
+  const buildOn = fresh(company?.build_at)
+  out.push({
+    key: 'build',
+    label: 'BUILD',
+    x: SPOTS.build.x,
+    y: SPOTS.build.y,
+    action: 'sit',
+    flip: false,
+    present: true,
+    active: buildOn,
+    down: false,
+    pending: !buildOn,
+    bubble: null,
+  })
   const names = ['projects', 'premarket', 'ops', 'content'] as const
-  const out: Station[] = names.map((name) => {
+  names.forEach((name) => {
     const seat = seats.find((s) => s.name === name)
     const st: SeatStatus = seat?.status ?? 'pending'
     const p = SPOTS[name]
     const present = st === 'ok'
-    return {
+    out.push({
       key: name,
       label: name.toUpperCase(),
       x: p.x,
@@ -194,7 +241,7 @@ function stationsFrom(
       down: st === 'failed',
       pending: !present && st !== 'failed',
       bubble: st === 'failed' ? 'SEAT DOWN' : null,
-    }
+    })
   })
   const paper = trading?.modes?.paper
   const pp = SPOTS.paper
@@ -215,6 +262,8 @@ function stationsFrom(
   const chiefSeat = seats.find((s) => s.name === 'chief')
   const cp = SPOTS.chief
   const chiefOk = chiefSeat?.status === 'ok'
+  // light law: the chief lights only when the CHIEF ran — never because
+  // Build shipped or a session is merely busy
   out.push({
     key: 'chief',
     label: 'CHIEF',
@@ -222,11 +271,15 @@ function stationsFrom(
     y: cp.y,
     action: 'point',
     flip: false,
-    present: chiefOk || busy,
-    active: (chiefOk && ranRecently(chiefSeat)) || busy,
+    present: chiefOk,
+    active: chiefOk && ranRecently(chiefSeat),
     down: chiefSeat?.status === 'failed',
-    pending: !(chiefOk || busy) && chiefSeat?.status !== 'failed',
-    bubble: chiefOk ? 'brief sent — runs the floor' : null,
+    pending: !chiefOk && chiefSeat?.status !== 'failed',
+    bubble: chiefOk
+      ? 'brief sent — runs the floor'
+      : company?.strategy_verdict
+        ? `strategy: ${company.strategy_verdict.slice(0, 32)}`
+        : null,
   })
   const live = trading?.modes?.live
   const last = trading?.last_decision
@@ -883,6 +936,24 @@ export default function VesperFloor() {
   const fleet = useDashboardStore((s) => s.fleet)
   const board = useDashboardStore((s) => s.board)
 
+  const [company, setCompany] = useState<CompanyStatus | null>(null)
+  useEffect(() => {
+    let alive = true
+    const load = () =>
+      fetch('/api/company')
+        .then((r) => r.json())
+        .then((d) => {
+          if (alive) setCompany(d)
+        })
+        .catch(() => {})
+    load()
+    const id = setInterval(load, 60_000)
+    return () => {
+      alive = false
+      clearInterval(id)
+    }
+  }, [])
+
   useEffect(() => {
     let alive = true
     const load = () =>
@@ -900,8 +971,8 @@ export default function VesperFloor() {
     }
   }, [])
 
-  const dataRef = useRef({ seats, trading, fleet, board })
-  dataRef.current = { seats, trading, fleet, board }
+  const dataRef = useRef({ seats, trading, fleet, board, company })
+  dataRef.current = { seats, trading, fleet, board, company }
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -964,7 +1035,7 @@ export default function VesperFloor() {
 
     const draw = (rafNow: number) => {
       const now = frozenMs ?? rafNow
-      const { seats, trading, fleet, board } = dataRef.current
+      const { seats, trading, fleet, board, company } = dataRef.current
       const dpr = Math.min(window.devicePixelRatio || 1, 2)
       const rect = canvas.getBoundingClientRect()
       canvas.width = rect.width * dpr
@@ -1276,7 +1347,7 @@ export default function VesperFloor() {
         ctx.fillRect(tx2 + S * 0.008, ty2 - S * 0.048, S * 0.006, S * 0.004)
       }
 
-      const stations = stationsFrom(seats, trading, fleet)
+      const stations = stationsFrom(seats, trading, fleet, company)
 
       // ── offices: a room of one's own ──
       const cubTint = room.wash ? 'rgba(255,255,255,0.045)' : 'rgba(255,255,255,0.03)'
@@ -1464,7 +1535,12 @@ export default function VesperFloor() {
       // office cosmetics — light strips, wall art, side desks
       for (const bay of BAYS) {
         const st = stations.find((s) => s.key === bay.key)
-        const occupied = !!st && st.active && !st.down
+        let occupied = !!st && st.active && !st.down
+        // the pit is the plant: lit when either trading daemon is alive
+        if (bay.key === 'pit') {
+          occupied =
+            trading?.modes?.live?.status === 'alive' || trading?.modes?.paper?.status === 'alive'
+        }
         // ceiling light strip + a light that clearly reads ON
         const lx = X(bay.x)
         ctx.fillStyle = '#39424c'
@@ -1509,12 +1585,54 @@ export default function VesperFloor() {
           ctx.fillStyle = 'rgba(120,130,140,0.45)'
           ctx.fillRect(lx - S * 0.04, Y(bay.top + 0.019), S * 0.08, dh * 0.004)
         }
+        // room placard (the pit announces itself; primaries speak via bots)
+        if (bay.label && bay.key === 'pit') {
+          ctx.font = `bold ${Math.max(8, S * 0.017)}px ${MONO}`
+          ctx.textAlign = 'center'
+          ctx.fillStyle = 'rgba(6,8,10,0.6)'
+          const pw = ctx.measureText(bay.label).width + 10
+          ctx.fillRect(X(bay.x) - pw / 2, Y(bay.top + 0.028), pw, S * 0.026)
+          ctx.fillStyle = '#d9a441'
+          ctx.fillText(bay.label, X(bay.x), Y(bay.top + 0.028) + S * 0.019)
+          ctx.textAlign = 'left'
+        }
+        // the INTERLOCK: kill-switch + watchdog telemetry as a breaker box,
+        // same blocky geometry as everything else. Green up = armed and
+        // watched; red down = KILL (buys halted). Display only — no controls.
+        if (bay.key === 'pit') {
+          const kill = !!trading?.kill_switch
+          const wd =
+            !!trading?.modes?.live?.watchdog_armed || !!trading?.modes?.paper?.watchdog_armed
+          const bx2 = X(bay.x - bay.half) + S * 0.018
+          const by2 = Y(bay.top + 0.1)
+          const bw2 = S * 0.034
+          const bh2 = S * 0.062
+          ctx.fillStyle = '#39424c'
+          ctx.fillRect(bx2 - 2, by2 - 2, bw2 + 4, bh2 + 4)
+          ctx.fillStyle = '#2a323b'
+          ctx.fillRect(bx2, by2, bw2, bh2)
+          // lever
+          const leverUp = !kill
+          ctx.fillStyle = leverUp ? '#5abf7a' : '#f0716a'
+          const ly2 = leverUp ? by2 + bh2 * 0.16 : by2 + bh2 * 0.52
+          ctx.fillRect(bx2 + bw2 * 0.32, ly2, bw2 * 0.36, bh2 * 0.34)
+          // status LED: green armed+watched, amber unwatched, red KILL
+          ctx.fillStyle = kill ? '#f0716a' : wd ? '#5abf7a' : '#e0b34d'
+          ctx.beginPath()
+          ctx.arc(bx2 + bw2 / 2, by2 + bh2 + S * 0.012, S * 0.006, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.font = `${Math.max(6, S * 0.011)}px ${MONO}`
+          ctx.fillStyle = 'rgba(220,215,200,0.55)'
+          ctx.textAlign = 'center'
+          ctx.fillText(kill ? 'KILL' : 'ARMED', bx2 + bw2 / 2, by2 + bh2 + S * 0.032)
+          ctx.textAlign = 'left'
+        }
         // framed wall art: tiny seeded chart doodle
         {
-          const fx3 = X(bay.x + bay.half * 0.46),
+          const fw = Math.min(S * 0.078, dw * bay.half * 0.82),
+            fh = Math.min(S * 0.058, dw * bay.half * 0.6)
+          const fx3 = Math.min(X(bay.x + bay.half * 0.46), X(bay.x + bay.half) - fw - S * 0.008),
             fy3 = Y(bay.top + 0.125)
-          const fw = S * 0.078,
-            fh = S * 0.058
           ctx.fillStyle = '#5a4428'
           ctx.fillRect(fx3 - 2, fy3 - 2, fw + 4, fh + 4)
           ctx.fillStyle = '#e8e2d0'
