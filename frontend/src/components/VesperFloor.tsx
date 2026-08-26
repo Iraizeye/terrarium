@@ -173,6 +173,18 @@ const LEDS = {
 const PATROL = { x0: 430, x1: 1180, y: 1300, period: 19000 }
 const AMBER = '#f5b84a'
 const CREAM = '#efe3c8'
+// the painting's own flames + lamp bulbs (CROP space) — the flicker layer
+// breathes light onto them; it never adds fire the painting doesn't have
+const FLAMES: { x: number; y: number; r: number; seed: number; lamp?: boolean; follow?: string }[] =
+  [
+    { x: 380, y: 280, r: 62, seed: 1, lamp: true }, // 3F left cone lamp
+    { x: 1595, y: 295, r: 62, seed: 2, lamp: true }, // 3F right cone lamp
+    { x: 385, y: 635, r: 48, seed: 3, lamp: true }, // 1F sconce
+    { x: 1565, y: 400, r: 26, seed: 4 }, // 3F candle by the hall
+    { x: 1592, y: 755, r: 26, seed: 5 }, // chief's candle
+    { x: 1745, y: 1110, r: 30, seed: 6 }, // pit-right candle
+    { x: 562, y: 1105, r: 22, seed: 7, follow: 'kernel' }, // kernel's hand candle
+  ]
 
 // each bot opens the panel that already tells its story — no new pages
 const BOT_PANEL: Record<keyof typeof SPRITES, string> = {
@@ -375,12 +387,11 @@ export default function VesperFloor() {
         }
       }
 
-      // ── the robots: traced sprites with a pose layer, idle by default ──
-      // each painted robot already IS its job pose (laptop, tablet, talk);
-      // pose = how the sprite is presented: idle static, active bobs and
-      // breathes glow onto the painted eyes, talk leans in. Motion only on
-      // real state — no constant walking, no fake busy. Sub-3px offsets sit
-      // on the inpainted patches; feathered edges hide them.
+      // ── the robots: living traced sprites (animated-film idle layer) ──
+      // Everyone breathes, blinks, and sways on their own clock — that is
+      // being ALIVE, not being busy. WORK (typing rhythm, brighter eyes),
+      // TALK (step + nod) and pit excursions still fire only on real
+      // telemetry, and Reduce Motion stills the whole floor.
       const talking = now < meetTalkUntil
       type Pose = 'idle' | 'active' | 'talk' | 'sleep'
       const bob = (period: number, amp: number, on: boolean, phase = 0) =>
@@ -388,17 +399,55 @@ export default function VesperFloor() {
       const sprite = (
         sp: { url: string; x: number; y: number; w: number; h: number; eyes: number[][] },
         pose: Pose,
+        seed: number,
         dx = 0,
         dy = 0,
+        tiltExtra = 0,
       ) => {
         const im = image(sp.url)
         if (!(im.complete && im.naturalWidth)) return
+        // breathing: bottom-anchored squash & stretch, volume-preserving
+        let squash = 0
+        let tilt = tiltExtra
+        if (!reduceMotion) {
+          if (pose === 'active') {
+            squash = 0.011 * Math.sin(now / 430 + seed * 2.1) + 0.005 * Math.sin(now / 1600 + seed)
+            tilt += 0.006 * Math.sin(now / 1900 + seed * 1.7)
+          } else if (pose === 'talk') {
+            squash = 0.01 * Math.sin(now / 520 + seed * 3.1)
+            tilt += 0.012 * Math.sin(now / 900 + seed * 2.3)
+          } else if (pose === 'sleep') {
+            squash = 0.005 * Math.sin(now / 2600 + seed)
+          } else {
+            squash = 0.008 * Math.sin(now / 1500 + seed * 1.9)
+            tilt += 0.008 * Math.sin(now / 2800 + seed * 1.3)
+          }
+        }
+        const cxp = X(sp.x + dx) + (sp.w * s) / 2
+        const byp = Y(sp.y + dy) + sp.h * s
+        ctx.save()
+        ctx.translate(cxp, byp)
+        ctx.rotate(tilt)
+        ctx.scale(1 - squash * 0.6, 1 + squash)
         if (pose === 'sleep') ctx.filter = 'brightness(0.55) saturate(0.85)'
-        ctx.drawImage(im, X(sp.x + dx), Y(sp.y + dy), sp.w * s, sp.h * s)
+        ctx.drawImage(im, -(sp.w * s) / 2, -sp.h * s, sp.w * s, sp.h * s)
         ctx.filter = 'none'
-        if (pose === 'active' || pose === 'talk') {
+        // blink: quick eyelid pass on each bot's own clock
+        const cycle = 3400 + ((seed * 811) % 2100)
+        const bt = (now + seed * 1327) % cycle
+        const blinking = !reduceMotion && pose !== 'sleep' && bt < 130
+        if (blinking) {
+          ctx.fillStyle = 'rgba(38,28,20,0.95)'
+          for (const [ex, ey] of sp.eyes) {
+            ctx.beginPath()
+            ctx.ellipse(X(ex + dx) - cxp, Y(ey + dy) - byp, 13 * s, 10 * s, 0, 0, Math.PI * 2)
+            ctx.fill()
+          }
+        }
+        ctx.restore()
+        if ((pose === 'active' || pose === 'talk') && !blinking) {
           // breathe extra glow onto the painted amber eyes
-          const pulse = reduceMotion ? 0.3 : 0.28 + 0.1 * Math.sin(now / 640)
+          const pulse = reduceMotion ? 0.3 : 0.3 + 0.14 * Math.sin(now / 640 + seed)
           ctx.save()
           ctx.globalCompositeOperation = 'lighter'
           for (const [ex, ey] of sp.eyes) {
@@ -421,29 +470,24 @@ export default function VesperFloor() {
         const c = Math.max(0, Math.min(1, u))
         return c < 0.5 ? 2 * c * c : 1 - (-2 * c + 2) ** 2 / 2
       }
-      // strategy at the laptop — active while the RFC artifact is fresh
-      sprite(SPRITES.strategy, pose(stratOn, true), 0, bob(3200, 1.5, stratOn))
+      // strategy at the laptop — typing rhythm while the RFC artifact is fresh
+      sprite(SPRITES.strategy, pose(stratOn, true), 0)
       // hall pair — on a real handoff they STEP together (500ms ease in),
-      // talk for ~8s with a nod, then ease back to their marks (600ms)
+      // talk ~8s leaning into each other, then ease back to their marks
       const step =
         meetTalkUntil > 0 && !reduceMotion
           ? ease01((now - (meetTalkUntil - 8000)) / 500) * (1 - ease01((now - meetTalkUntil) / 600))
           : 0
       const meetPose: Pose = talking ? 'talk' : night ? 'sleep' : 'idle'
-      sprite(SPRITES.meetA, meetPose, 14 * step, bob(1800, 1, talking))
-      sprite(SPRITES.meetB, meetPose, -14 * step, bob(1800, 1, talking, Math.PI))
-      // build at the tablet — active while the last commit is fresh
-      sprite(SPRITES.build, pose(buildOn, true), 0, bob(2800, 1.5, buildOn))
-      // chief: smoked visor, no eye glow — idle, gentle bob after a real run
-      sprite(
-        SPRITES.chief,
-        night && !chiefRan && !chiefDown ? 'sleep' : 'idle',
-        0,
-        bob(3600, 1, chiefRan),
-      )
+      sprite(SPRITES.meetA, meetPose, 1, 14 * step, bob(1800, 1, talking), 0.02 * step)
+      sprite(SPRITES.meetB, meetPose, 2, -14 * step, bob(1800, 1, talking, Math.PI), -0.02 * step)
+      // build at the tablet — typing rhythm while the last commit is fresh
+      sprite(SPRITES.build, pose(buildOn, true), 3)
+      // chief: smoked visor — the elder statesman sways slowest of all
+      sprite(SPRITES.chief, night && !chiefRan && !chiefDown ? 'sleep' : 'idle', 4)
       // the pit never dims — SYSTEMS NEVER SLEEP. A fresh heartbeat sends
-      // each bot easing toward its prop (locker / charts / stack) and back;
-      // between heartbeats they stand on their marks. Never constant walking.
+      // each bot stepping toward its prop (locker / charts / stack) with a
+      // little two-hop gait, then back to its mark.
       const exc = (t0: number) => {
         const t = now - t0
         if (reduceMotion || t < 0 || t > 1800) return 0
@@ -451,19 +495,65 @@ export default function VesperFloor() {
         if (t < 1100) return 1
         return 1 - ease01((t - 1100) / 700)
       }
-      sprite(SPRITES.kernel, wd && !kill ? 'active' : 'idle', -10 * exc(kernelExcT0), 0)
+      const hop = (t0: number) => {
+        const t = now - t0
+        if (reduceMotion || t < 0 || t > 1800) return 0
+        return -2.4 * Math.abs(Math.sin((t / 1800) * Math.PI * 3))
+      }
+      sprite(
+        SPRITES.kernel,
+        wd && !kill ? 'active' : 'idle',
+        5,
+        -10 * exc(kernelExcT0),
+        hop(kernelExcT0),
+      )
       sprite(
         SPRITES.live,
         liveHb ? 'active' : !liveStale ? 'sleep' : 'idle',
+        6,
         10 * exc(liveExcT0),
-        0,
+        hop(liveExcT0),
       )
       sprite(
         SPRITES.paper,
         paperHb ? 'active' : !paperStale ? 'sleep' : 'idle',
+        7,
         8 * exc(paperExcT0),
-        0,
+        hop(paperExcT0),
       )
+
+      // ── firelight: every painted flame flickers, the emblem breathes ──
+      if (!reduceMotion) {
+        ctx.save()
+        ctx.globalCompositeOperation = 'lighter'
+        for (const f of FLAMES) {
+          const n =
+            0.5 + 0.3 * Math.sin(now / 97 + f.seed * 5.1) + 0.2 * Math.sin(now / 233 + f.seed * 2.7)
+          const a = f.lamp ? 0.05 + 0.05 * n : 0.09 + 0.1 * n
+          const r = f.r * (1 + 0.07 * Math.sin(now / 141 + f.seed * 3.3)) * s
+          const fx = X(f.x + (f.follow === 'kernel' ? -10 * exc(kernelExcT0) : 0))
+          const fy = Y(f.y)
+          const g = ctx.createRadialGradient(fx, fy, 1, fx, fy, r)
+          g.addColorStop(0, `rgba(255,190,96,${a})`)
+          g.addColorStop(1, 'rgba(255,170,80,0)')
+          ctx.fillStyle = g
+          ctx.beginPath()
+          ctx.arc(fx, fy, r, 0, Math.PI * 2)
+          ctx.fill()
+        }
+        // the orange floor emblem breathes like a banked forge
+        const eb = 0.045 + 0.045 * Math.sin(now / 2400)
+        const ex2 = X(1410)
+        const ey2 = Y(1160)
+        const eg = ctx.createRadialGradient(ex2, ey2, 10 * s, ex2, ey2, 190 * s)
+        eg.addColorStop(0, `rgba(255,140,60,${eb})`)
+        eg.addColorStop(1, 'rgba(255,120,50,0)')
+        ctx.fillStyle = eg
+        ctx.beginPath()
+        ctx.arc(ex2, ey2, 190 * s, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
+      }
 
       // ── the banner: painted opaquely over the baked strip — doctor truth ──
       {
