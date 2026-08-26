@@ -27,7 +27,7 @@ export function markIntroSeen(): void {
 const ZONES: { name: string; desc: string }[] = [
   {
     name: 'The building',
-    desc: 'center — the company, drawn: Chief up top, Strategy and Build on-call on 2F with the desk annexes, and the ground-floor TRADING PIT with its interlock breaker. Lamps are artifact-driven — an RFC lights Strategy, a commit lights Build, a fresh heartbeat walks the pit robot. Talk lights nothing.',
+    desc: 'center — the Warm Ember cutaway: the 3F hall (the Strategy desk, the hall meet, ELEVATOR RFC), 2F systems (the Build tablet, the Chief with the Nightbell), and the 1F PIT PATROL — KERNEL, LIVE, PAPER. The banner is the doctor truth; lamps follow artifacts; a real RFC rides the elevator as a yellow folder. Talk lights nothing.',
   },
   {
     name: 'Fleet',

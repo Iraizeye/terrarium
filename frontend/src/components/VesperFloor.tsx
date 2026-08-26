@@ -1,354 +1,105 @@
-// The floor — a room drawn in code around Grok's copper robots.
-// Every element is functional: the board carries the live tape, the LED
-// sign is the real session clock, each desk monitor glows with its seat's
-// actual status, and the wall clock reads ET. The room re-lights itself
-// with the market phase. No raster backdrop; crisp at any size.
+// The stage: WARM EMBER TERRARIUM A — a night cutaway in three tiers.
+//
+//   3F  the hall: strategy desk, gold plaque, ELEVATOR RFC, the hall meet
+//   2F  systems: build with tablet, the elevator, the Chief with the
+//       Nightbell and the brief binder
+//   1F  PIT PATROL: KERNEL · LIVE · PAPER in a row, locker, charts,
+//       paper stack, the orange floor emblem
+//
+// Every glow is telemetry: the banner follows the doctor's truth, lamps
+// follow artifacts, the patrol follows the live heartbeat, the RFC packet
+// rides the elevator only when a real RFC lands. Quiet is a state here.
+//
+// Art lock: flat cozy painted vectors. Espresso/mahogany rooms, warm
+// ivory-cream robots with round amber-gold eyes, one copper-red Chief,
+// candle-warm light. No steel, no neon, no crowd.
 
 import { useEffect, useRef, useState } from 'react'
 import { useDashboardStore } from '../store/dashboardStore'
-import { getPhase, type Phase } from '../theme'
-import type { AgentFleet, BoardState, TradingStatus } from '../types'
+import { getPhase } from '../theme'
+import { MONO } from '../ui'
 
-const MONO = '"JetBrains Mono", "Fira Code", monospace'
-const P = {
-  red: '#f0716a',
-  amber: '#e0b34d',
-  gold: '#d9a441',
-  text: '#eaf0e8',
-  ink: '#1a1814',
-  bubble: '#f2f6ea',
-  crt: '#07140e',
-  mint: '#7de8a8',
-}
-
-type SeatStatus = 'ok' | 'failed' | 'pending'
 interface DeskSeat {
   name: string
-  status: SeatStatus
-  brief?: string | null
-  ran_at?: string | null
-}
-type Action = 'sit' | 'work' | 'walk' | 'point'
-interface Station {
-  key: string
-  label: string
-  x: number
-  y: number
-  action: Action
-  flip: boolean
-  present: boolean
-  active: boolean // doing something RIGHT NOW — drives lights + motion
-  down: boolean
-  pending: boolean
-  sleep?: boolean // night + off-shift: eyes closed, deep idle
-  bubble: string | null
+  status: string
+  ran_at: string | null
 }
 
-// three floors, cut open like an ant farm
-const F3 = { top: 0.035, ground: 0.315 }
-const F2 = { top: 0.35, ground: 0.63 }
-const F1 = { top: 0.665, ground: 0.945 }
-const SLABS = [
-  [0.315, 0.35],
-  [0.63, 0.665],
-] as const
-const SHAFT = { x0: 0.645, x1: 0.715 }
-
-interface Bay {
-  key: string
-  x: number
-  top: number
-  ground: number
-  half: number
-  label?: string
-}
-
-// Department lamps are ARTIFACT-driven (the company's light law): Strategy
-// lit iff an RFC changed recently, Build lit iff a commit landed recently.
-// Talk lights nothing; only work does.
 export interface CompanyStatus {
   strategy_at: string | null
   strategy_verdict: string | null
   build_at: string | null
   rfcs: { name: string; verdict: string | null; at: string }[]
 }
-// The company floors: 2F = Strategy + Build (primary) with the desk
-// annexes right of the shaft; 1F = content annex, the lobby, and the
-// TRADING PIT — live + paper terminals side by side with the premarket
-// briefing desk. Trading is the ground-floor plant, never a peer office.
-const BAYS: Bay[] = [
-  { key: 'strategy', x: 0.17, top: F2.top, ground: F2.ground, half: 0.135, label: 'STRATEGY' },
-  { key: 'build', x: 0.48, top: F2.top, ground: F2.ground, half: 0.135, label: 'BUILD' },
-  { key: 'ops', x: 0.762, top: F2.top, ground: F2.ground, half: 0.045 },
-  { key: 'content', x: 0.858, top: F2.top, ground: F2.ground, half: 0.045 },
-  { key: 'projects', x: 0.947, top: F2.top, ground: F2.ground, half: 0.04 },
-  { key: 'pit', x: 0.825, top: F1.top, ground: F1.ground, half: 0.148, label: 'TRADING PIT' },
-]
-const SPOTS: Record<string, { x: number; y: number; action: Action; flip?: boolean }> = {
-  strategy: { x: 0.17, y: F2.ground, action: 'work' },
-  build: { x: 0.48, y: F2.ground, action: 'sit' },
-  ops: { x: 0.762, y: F2.ground, action: 'sit' },
-  content: { x: 0.858, y: F2.ground, action: 'sit' },
-  projects: { x: 0.947, y: F2.ground, action: 'sit' },
-  premarket: { x: 0.8, y: F1.ground, action: 'sit' },
-  paper: { x: 0.935, y: F1.ground, action: 'sit' },
-  chief: { x: 0.5, y: F3.ground, action: 'point' },
-  live: { x: 0.725, y: F1.ground, action: 'walk' },
-}
-const _DESK_SEATS = ['projects', 'premarket', 'ops', 'content', 'paper'] as const
-// each office dressed for its job
-const JOB: Record<string, { notes: [string, string]; accent: string }> = {
-  strategy: { notes: ['#7fb2d9', '#9fc4e8'], accent: '#7fb2d9' },
-  build: { notes: ['#e0b34d', '#d9a441'], accent: '#d9a441' },
-  projects: { notes: ['#e0b34d', '#d9a441'], accent: '#b8933f' },
-  premarket: { notes: ['#f0956a', '#e2b25a'], accent: '#e88a52' },
-  ops: { notes: ['#8fd98f', '#7fb2d9'], accent: '#5abf7a' },
-  content: { notes: ['#d97fa0', '#c48ad9'], accent: '#d97fa0' },
-  paper: { notes: ['#7fb2d9', '#9fc4e8'], accent: '#6fa6d9' },
-  pit: { notes: ['#8fd98f', '#7fb2d9'], accent: '#5abf7a' },
-}
-const WALK = { x0: 0.695, x1: 0.945, y: F1.ground, period: 17000 }
-// bot height per pose, as a fraction of the scene scale S
-const POSE_H: Record<Action, number> = { sit: 0.195, work: 0.195, walk: 0.145, point: 0.26 }
-
-// the executive board, upper floor
-const BOARD = { x: 0.06, y: 0.055, w: 0.365, h: 0.235 }
-const WALL_PANELS: { x: number; y: number; w: number; h: number }[] = [
-  { x: 0.075, y: 0.075, w: 0.16, h: 0.088 },
-  { x: 0.248, y: 0.075, w: 0.16, h: 0.088 },
-  { x: 0.075, y: 0.178, w: 0.16, h: 0.088 },
-  { x: 0.248, y: 0.178, w: 0.16, h: 0.088 },
-]
-const SIGN = { x: 0.745, y: 0.1, w: 0.176, h: 0.048 }
-const SIGN_HOUSE = { x: 0.733, y: 0.086, w: 0.2, h: 0.076 }
-const CLOCK = { x: 0.455, y: 0.76, r: 0.048 }
-
-// room light per market phase — walls, floor, and lamp warmth move with it
-const ROOM: Record<
-  Phase,
-  {
-    wallTop: string
-    wallBot: string
-    floorA: string
-    floorB: string
-    counterTop: string
-    counterFace: string
-    wash: string | null
-  }
-> = {
-  night: {
-    wallTop: '#252e3a',
-    wallBot: '#2f3947',
-    floorA: '#3d2f21',
-    floorB: '#2f241a',
-    counterTop: '#7a5a38',
-    counterFace: '#4a371f',
-    wash: null,
-  },
-  dawn: {
-    wallTop: '#2d3138',
-    wallBot: '#3d3a33',
-    floorA: '#453527',
-    floorB: '#362a1e',
-    counterTop: '#87643c',
-    counterFace: '#523d22',
-    wash: 'rgba(235,170,80,0.10)',
-  },
-  day: {
-    wallTop: '#3a4550',
-    wallBot: '#49535d',
-    floorA: '#4a3a2b',
-    floorB: '#3b2f22',
-    counterTop: '#94714a',
-    counterFace: '#5a4428',
-    wash: 'rgba(255,225,170,0.07)',
-  },
-  dusk: {
-    wallTop: '#2c2f37',
-    wallBot: '#3a332c',
-    floorA: '#41301f',
-    floorB: '#34281b',
-    counterTop: '#7d5c38',
-    counterFace: '#4d3820',
-    wash: 'rgba(240,140,80,0.08)',
-  },
+interface Doctor {
+  line: string | null
+  green: boolean | null
 }
 
-function phaseText(phase: Phase): string {
-  return phase === 'day'
-    ? 'MARKET OPEN'
-    : phase === 'dawn'
-      ? 'DAWN RUN'
-      : phase === 'dusk'
-        ? 'AFTER CLOSE'
-        : 'NIGHT WATCH'
+// ── composition ──────────────────────────────────────────────────────────────
+const FRAME = { x: 0.012, y: 0.012, w: 0.976, h: 0.976, r: 26 }
+const BANNER = { x: 0.045, y: 0.045, w: 0.91, h: 0.052 }
+const T3 = { top: 0.125, ground: 0.39 }
+const T2 = { top: 0.415, ground: 0.675 }
+const T1 = { top: 0.7, ground: 0.935 }
+const ELEV = { x0: 0.445, x1: 0.555 }
+const PATROL = { x0: 0.14, x1: 0.62, period: 19000 }
+
+// ── palette: warm ember ──────────────────────────────────────────────────────
+const P = {
+  night: '#120a07',
+  frame: '#2b1a12',
+  frameEdge: '#40281b',
+  wallTop: '#3b2a1e',
+  wallBot: '#4a3526',
+  floorA: '#2e1f14',
+  floorB: '#271a11',
+  slab: '#1f140d',
+  gold: '#d9a441',
+  goldDim: 'rgba(217,164,65,0.55)',
+  cream: '#efe3c8',
+  creamShade: '#d9c8a6',
+  creamDark: '#b8a37f',
+  amber: '#f5b84a',
+  candle: '#f6c05a',
+  bannerWarn: '#a8501e',
+  bannerCalm: '#241610',
+  red: '#c94f42',
+  chiefHi: '#e8544a',
+  chiefMid: '#b3232a',
+  chiefDk: '#7a1418',
+  green: '#7fb069',
+  dim: 'rgba(239,227,200,0.45)',
 }
 
-function stationsFrom(
-  seats: DeskSeat[],
-  trading: TradingStatus | null,
-  _fleet: AgentFleet | null,
-  company: CompanyStatus | null,
-): Station[] {
-  const ACTIVE_WINDOW = 20 * 60_000
-  const fresh = (iso?: string | null) =>
-    !!iso && Date.now() - new Date(iso).getTime() < ACTIVE_WINDOW
-  const ranRecently = (seat?: DeskSeat) => fresh(seat?.ran_at)
-  const night = getPhase(trading?.market) === 'night'
-  const out: Station[] = []
-  // 2F primaries — on-call departments, lamps lit by their artifacts only
-  const stratOn = fresh(company?.strategy_at)
-  out.push({
-    key: 'strategy',
-    label: 'STRATEGY',
-    x: SPOTS.strategy.x,
-    y: SPOTS.strategy.y,
-    action: 'work',
-    flip: false,
-    present: true,
-    active: stratOn,
-    down: false,
-    pending: !stratOn,
-    sleep: night && !stratOn,
-    bubble: stratOn && company?.strategy_verdict ? company.strategy_verdict.slice(0, 40) : null,
-  })
-  const buildOn = fresh(company?.build_at)
-  out.push({
-    key: 'build',
-    label: 'BUILD',
-    x: SPOTS.build.x,
-    y: SPOTS.build.y,
-    action: 'sit',
-    flip: false,
-    present: true,
-    active: buildOn,
-    down: false,
-    pending: !buildOn,
-    sleep: night && !buildOn,
-    bubble: null,
-  })
-  const names = ['projects', 'premarket', 'ops', 'content'] as const
-  names.forEach((name) => {
-    const seat = seats.find((s) => s.name === name)
-    const st: SeatStatus = seat?.status ?? 'pending'
-    const p = SPOTS[name]
-    const present = st === 'ok'
-    out.push({
-      key: name,
-      label: name.toUpperCase(),
-      x: p.x,
-      y: p.y,
-      action: p.action,
-      flip: !!p.flip,
-      present,
-      active: present && ranRecently(seat),
-      down: st === 'failed',
-      pending: !present && st !== 'failed',
-      sleep: night && !(present && ranRecently(seat)) && st !== 'failed',
-      bubble: st === 'failed' ? 'SEAT DOWN' : null,
-    })
-  })
-  const paper = trading?.modes?.paper
-  const pp = SPOTS.paper
-  const paperOn = paper?.status === 'alive'
-  out.push({
-    key: 'paper',
-    label: 'PAPER',
-    x: pp.x,
-    y: pp.y,
-    action: 'sit',
-    flip: true,
-    present: paperOn,
-    active: paperOn,
-    down: paper?.status === 'stale',
-    pending: !paperOn && paper?.status !== 'stale',
-    bubble: null,
-  })
-  const chiefSeat = seats.find((s) => s.name === 'chief')
-  const cp = SPOTS.chief
-  const chiefOk = chiefSeat?.status === 'ok'
-  // light law: the chief lights only when the CHIEF ran — never because
-  // Build shipped or a session is merely busy
-  out.push({
-    key: 'chief',
-    label: 'CHIEF',
-    x: cp.x,
-    y: cp.y,
-    action: 'point',
-    flip: false,
-    present: chiefOk,
-    active: chiefOk && ranRecently(chiefSeat),
-    down: chiefSeat?.status === 'failed',
-    pending: !chiefOk && chiefSeat?.status !== 'failed',
-    bubble: chiefOk
-      ? 'brief sent — runs the floor'
-      : company?.strategy_verdict
-        ? `strategy: ${company.strategy_verdict.slice(0, 32)}`
-        : null,
-  })
-  const live = trading?.modes?.live
-  const last = trading?.last_decision
-  const p = SPOTS.live
-  const liveWalk = live?.status === 'alive'
-  out.push({
-    key: 'live',
-    label: 'LIVE',
-    x: p.x,
-    y: p.y,
-    action: 'walk',
-    flip: false,
-    present: liveWalk,
-    active: liveWalk,
-    down: live?.status === 'stale',
-    pending: !liveWalk && live?.status !== 'stale',
-    bubble: last?.action
-      ? `${last.action.toUpperCase()}${last.symbol ? ` ${last.symbol}` : ''}`
-      : null,
-  })
-  return out
-}
-
-function walkAt(now: number): { x: number; y: number; flip: boolean } {
-  const p = (now % WALK.period) / WALK.period
-  const goingRight = p < 0.5
-  const u = goingRight ? p * 2 : 1 - (p - 0.5) * 2
-  return { x: WALK.x0 + (WALK.x1 - WALK.x0) * u, y: WALK.y, flip: !goingRight }
-}
-
-function shadow(ctx: CanvasRenderingContext2D, x: number, y: number, w: number) {
-  ctx.save()
-  ctx.fillStyle = 'rgba(8, 10, 14, 0.34)'
-  ctx.beginPath()
-  ctx.ellipse(x, y - 2, w * 0.5, w * 0.1, 0, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.restore()
-}
-
-// ── the copper crew, drawn in code ───────────────────────────────────────────
-// chibi proportions: big head, big eyes, stubby limbs — charm by geometry.
-
-const COPPERS = [
-  { hi: '#eeb98c', mid: '#cf9058', dk: '#a06a38' },
-  { hi: '#e6ab7a', mid: '#c48350', dk: '#946130' },
-  { hi: '#f2c49a', mid: '#d89a64', dk: '#aa7440' },
-]
-// the chief wears bright red with gold trim and a blue tie
-const CHIEF_NAVY = { hi: '#e8544a', mid: '#b3232a', dk: '#7a1418' }
-const GOLD = '#d9a441'
-const LINE = 'rgba(52,30,14,0.55)'
-const CHAIR = { dark: '#2b3036', mid: '#3a4048', metal: '#8a939c' }
-
-interface BotState {
-  sleep?: boolean
+type Pose = 'sit' | 'stand' | 'walk' | 'tablet'
+interface Actor {
+  key: string
+  x: number
+  y: number
+  pose: Pose
+  flip?: boolean
+  chief?: boolean
   working: boolean
-  pending: boolean
+  sleep: boolean
   down: boolean
+  bubble: string | null
+  tag?: string // pit name bubbles: KERNEL / LIVE / PAPER
 }
 
-function eyeColor(st: BotState): string {
-  return st.down ? '#f0716a' : st.pending ? '#e0b34d' : '#8df0c0'
+const ACTIVE_MS = 20 * 60_000
+const freshISO = (iso?: string | null) => !!iso && Date.now() - new Date(iso).getTime() < ACTIVE_MS
+
+function doctorCause(line: string | null | undefined): string {
+  if (!line) return ''
+  const after = line.split(/problem\(s\) — /)[1] ?? line
+  return after
+    .split(/ — |\(/)[0]
+    .trim()
+    .slice(0, 46)
 }
 
+// ── tiny paint helpers ───────────────────────────────────────────────────────
 function rr(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -357,623 +108,262 @@ function rr(
   h: number,
   r: number,
   fill: string,
-  stroke = true,
 ) {
-  ctx.beginPath()
-  ctx.roundRect(x, y, w, h, Math.min(r, w / 2, h / 2))
   ctx.fillStyle = fill
+  ctx.beginPath()
+  ctx.roundRect(x, y, w, h, r)
   ctx.fill()
-  if (stroke) {
-    ctx.strokeStyle = LINE
-    ctx.stroke()
+}
+
+function candleAt(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, t: number) {
+  rr(ctx, x - s * 0.5, y - s * 1.6, s, s * 1.6, s * 0.3, P.cream)
+  const fl = 0.75 + 0.25 * Math.sin(t / 160 + x)
+  ctx.fillStyle = P.candle
+  ctx.beginPath()
+  ctx.ellipse(x, y - s * 2.05, s * 0.34, s * 0.55 * fl, 0, 0, Math.PI * 2)
+  ctx.fill()
+  const g = ctx.createRadialGradient(x, y - s * 2, 1, x, y - s * 2, s * 5)
+  g.addColorStop(0, `rgba(246,192,90,${0.22 * fl})`)
+  g.addColorStop(1, 'rgba(246,192,90,0)')
+  ctx.fillStyle = g
+  ctx.fillRect(x - s * 5, y - s * 7, s * 10, s * 9)
+}
+
+function plantAt(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, tall = false) {
+  rr(ctx, x - s * 0.55, y - s * 0.9, s * 1.1, s * 0.9, s * 0.16, '#5a3a22')
+  ctx.fillStyle = '#4f7d46'
+  const n = tall ? 5 : 3
+  for (let i = 0; i < n; i++) {
+    const a = ((i - (n - 1) / 2) * 0.5) / n + Math.PI / 2
+    const L = s * (tall ? 2.6 : 1.5) * (0.75 + (0.25 * ((i * 37) % 10)) / 10)
+    ctx.beginPath()
+    ctx.ellipse(
+      x + Math.cos(a) * L * 0.45,
+      y - s * 0.9 - Math.sin(a) * L * 0.55,
+      s * 0.28,
+      L * 0.5,
+      Math.PI / 2 - a,
+      0,
+      Math.PI * 2,
+    )
+    ctx.fill()
   }
 }
 
-function plate(
-  ctx: CanvasRenderingContext2D,
-  c: (typeof COPPERS)[0],
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number,
-) {
-  rr(ctx, x, y, w, h, r, c.mid)
-  ctx.save()
+function tableAt(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
+  rr(ctx, x - w / 2, y - h, w, h * 0.16, 3, '#6b4526')
+  rr(ctx, x - w * 0.38, y - h + h * 0.16, w * 0.1, h * 0.84, 2, '#54341c')
+  rr(ctx, x + w * 0.28, y - h + h * 0.16, w * 0.1, h * 0.84, 2, '#54341c')
+}
+
+function crateAt(ctx: CanvasRenderingContext2D, x: number, y: number, s: number) {
+  rr(ctx, x - s / 2, y - s, s, s, 2, '#5f3d22')
+  ctx.strokeStyle = '#4a2e18'
+  ctx.lineWidth = 1
+  ctx.strokeRect(x - s / 2 + 2, y - s + 2, s - 4, s - 4)
   ctx.beginPath()
-  ctx.roundRect(x, y, w, h, Math.min(r, w / 2, h / 2))
-  ctx.clip()
-  ctx.fillStyle = c.hi
-  ctx.fillRect(x, y, w, h * 0.24)
-  ctx.globalAlpha = 0.5
-  ctx.fillStyle = c.dk
-  ctx.fillRect(x, y + h * 0.76, w, h * 0.24)
+  ctx.moveTo(x - s / 2 + 2, y - s + 2)
+  ctx.lineTo(x + s / 2 - 2, y - 2)
+  ctx.stroke()
+}
+
+function bubbleAt(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  yTop: number,
+  text: string,
+  S: number,
+  small = false,
+) {
+  ctx.font = `${small ? '' : 'bold '}${Math.max(8, S * (small ? 0.02 : 0.024))}px ${MONO}`
+  const tw = ctx.measureText(text).width
+  const bw = Math.min(tw + S * 0.045, S * 0.62)
+  const bh = S * (small ? 0.042 : 0.05)
+  const bx = x - bw / 2
+  const by = yTop - bh - S * 0.02
+  ctx.save()
+  ctx.shadowColor = 'rgba(18,10,6,0.4)'
+  ctx.shadowBlur = 8
+  ctx.shadowOffsetY = 2
+  ctx.beginPath()
+  ctx.roundRect(bx, by, bw, bh, S * 0.016)
+  if (!small) {
+    ctx.moveTo(x - S * 0.012, by + bh)
+    ctx.lineTo(x, by + bh + S * 0.016)
+    ctx.lineTo(x + S * 0.012, by + bh)
+  }
+  ctx.closePath()
+  ctx.fillStyle = P.cream
+  ctx.fill()
+  ctx.shadowColor = 'transparent'
+  ctx.strokeStyle = P.goldDim
+  ctx.lineWidth = 1.2
+  ctx.stroke()
+  ctx.fillStyle = '#3b2a1a'
+  ctx.textAlign = 'center'
+  ctx.fillText(text, x, by + bh * 0.68)
+  ctx.textAlign = 'left'
   ctx.restore()
 }
 
-function limb(
+function plaqueAt(
   ctx: CanvasRenderingContext2D,
-  c: (typeof COPPERS)[0],
-  pts: [number, number][],
-  w: number,
-) {
-  ctx.lineCap = 'round'
-  ctx.lineJoin = 'round'
-  ctx.strokeStyle = LINE
-  ctx.lineWidth = w + 2.5
-  ctx.beginPath()
-  for (const [i, [x, y]] of pts.entries()) i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
-  ctx.stroke()
-  ctx.strokeStyle = c.mid
-  ctx.lineWidth = w
-  ctx.beginPath()
-  for (const [i, [x, y]] of pts.entries()) i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
-  ctx.stroke()
-  ctx.lineCap = 'butt'
-}
-
-function hand(
-  ctx: CanvasRenderingContext2D,
-  c: (typeof COPPERS)[0],
   x: number,
   y: number,
-  r: number,
+  w: number,
+  lines: string[],
+  S: number,
 ) {
-  ctx.fillStyle = c.hi
-  ctx.beginPath()
-  ctx.arc(x, y, r, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.strokeStyle = LINE
-  ctx.stroke()
-}
-
-/** big friendly head, bottom of head at yBot (negative up), width w */
-function drawHead(
-  ctx: CanvasRenderingContext2D,
-  c: (typeof COPPERS)[0],
-  u: number,
-  yBot: number,
-  t: number,
-  seed: number,
-  st: BotState,
-) {
-  const hw = u * 0.46,
-    hh = u * 0.34
-  const topY = yBot - hh
-  // antenna
-  ctx.strokeStyle = c.dk
-  ctx.lineWidth = Math.max(1.2, u * 0.02)
-  ctx.beginPath()
-  ctx.moveTo(0, topY)
-  ctx.lineTo(0, topY - u * 0.07)
-  ctx.stroke()
-  const tipOn = st.down ? true : Math.floor((t + seed * 700) / 900) % 2 === 0
-  ctx.fillStyle = tipOn ? eyeColor(st) : '#3a4a40'
-  ctx.beginPath()
-  ctx.arc(0, topY - u * 0.088, u * 0.026, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.strokeStyle = LINE
-  ctx.stroke()
-  // head + ear bolts
-  plate(ctx, c, -hw / 2, topY, hw, hh, u * 0.09)
-  rr(ctx, -hw / 2 - u * 0.028, topY + hh * 0.32, u * 0.032, hh * 0.34, u * 0.012, c.dk)
-  rr(ctx, hw / 2 - u * 0.004, topY + hh * 0.32, u * 0.032, hh * 0.34, u * 0.012, c.dk)
-  // visor fills most of the face
-  rr(ctx, -hw / 2 + u * 0.045, topY + hh * 0.18, hw - u * 0.09, hh * 0.52, u * 0.07, '#141b1e')
-  // big eyes
-  const blink = Math.floor((t + seed * 900) / 190) % 26 === 0
-  const ec = eyeColor(st)
-  const eyeY = topY + hh * 0.44
-  if (st.down) {
-    ctx.fillStyle = ec
-    ctx.fillRect(-u * 0.115, eyeY - u * 0.008, u * 0.075, u * 0.016)
-    ctx.fillRect(u * 0.04, eyeY - u * 0.008, u * 0.075, u * 0.016)
-  } else if (st.sleep) {
-    // asleep: soft closed lids, gently dimmed — the night shift's off-duty look
-    ctx.fillStyle = 'rgba(141,240,192,0.35)'
-    ctx.fillRect(-u * 0.115, eyeY, u * 0.075, u * 0.01)
-    ctx.fillRect(u * 0.04, eyeY, u * 0.075, u * 0.01)
-  } else {
-    const er = blink ? u * 0.008 : u * 0.042
-    ctx.fillStyle = ec
-    ctx.beginPath()
-    ctx.ellipse(-u * 0.085, eyeY, u * 0.042, er, 0, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.beginPath()
-    ctx.ellipse(u * 0.085, eyeY, u * 0.042, er, 0, 0, Math.PI * 2)
-    ctx.fill()
-    if (!blink) {
-      ctx.fillStyle = 'rgba(255,255,255,0.75)'
-      ctx.beginPath()
-      ctx.arc(-u * 0.098, eyeY - u * 0.014, u * 0.011, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.beginPath()
-      ctx.arc(u * 0.072, eyeY - u * 0.014, u * 0.011, 0, Math.PI * 2)
-      ctx.fill()
-    }
-  }
-  // mouth grill under the visor
-  ctx.fillStyle = st.down ? 'rgba(240,113,106,0.7)' : c.dk
-  for (const mx of [-u * 0.045, -u * 0.005, u * 0.035]) {
-    ctx.fillRect(mx, topY + hh * 0.8, u * 0.024, u * 0.014)
-  }
-}
-
-function drawTorso(
-  ctx: CanvasRenderingContext2D,
-  c: (typeof COPPERS)[0],
-  u: number,
-  yTop: number,
-  hgt: number,
-  t: number,
-  seed: number,
-  st: BotState,
-) {
-  const w = u * 0.4
-  plate(ctx, c, -w / 2, yTop, w, hgt, u * 0.08)
-  rr(ctx, -u * 0.1, yTop + hgt * 0.22, u * 0.2, hgt * 0.42, u * 0.035, c.dk)
-  const on = st.working && Math.sin(t / 600 + seed * 2) > -0.2
-  ctx.fillStyle = st.down ? '#f0716a' : on ? '#8df0c0' : '#3a4a40'
-  ctx.beginPath()
-  ctx.arc(0, yTop + hgt * 0.8, u * 0.022, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.strokeStyle = LINE
-  ctx.stroke()
-}
-
-function drawChair(ctx: CanvasRenderingContext2D, u: number) {
-  ctx.strokeStyle = CHAIR.metal
-  ctx.lineWidth = Math.max(1.5, u * 0.022)
-  for (const a of [-1, -0.5, 0, 0.5, 1]) {
-    ctx.beginPath()
-    ctx.moveTo(0, -u * 0.09)
-    ctx.lineTo(Math.sin(a) * u * 0.19, -u * 0.015)
-    ctx.stroke()
-    ctx.fillStyle = '#20242a'
-    ctx.beginPath()
-    ctx.arc(Math.sin(a) * u * 0.19, -u * 0.012, u * 0.022, 0, Math.PI * 2)
-    ctx.fill()
-  }
-  ctx.strokeStyle = CHAIR.metal
-  ctx.lineWidth = Math.max(2, u * 0.032)
-  ctx.beginPath()
-  ctx.moveTo(0, -u * 0.08)
-  ctx.lineTo(0, -u * 0.3)
-  ctx.stroke()
-  rr(ctx, -u * 0.205, -u * 0.66, u * 0.41, u * 0.38, u * 0.07, CHAIR.dark)
-  rr(ctx, -u * 0.25, -u * 0.345, u * 0.5, u * 0.075, u * 0.035, CHAIR.mid)
-}
-
-function drawSeated(
-  ctx: CanvasRenderingContext2D,
-  c: (typeof COPPERS)[0],
-  u: number,
-  t: number,
-  seed: number,
-  st: BotState,
-) {
-  drawChair(ctx, u)
-  const bob = st.working ? Math.sin(t / 420 + seed * 7) * u * 0.008 : 0
-  // stubby legs off the seat, feet dangling near the base
-  limb(
-    ctx,
-    c,
-    [
-      [-u * 0.1, -u * 0.3],
-      [-u * 0.185, -u * 0.22],
-      [-u * 0.165, -u * 0.055],
-    ],
-    u * 0.062,
-  )
-  limb(
-    ctx,
-    c,
-    [
-      [u * 0.1, -u * 0.3],
-      [u * 0.185, -u * 0.22],
-      [u * 0.165, -u * 0.055],
-    ],
-    u * 0.062,
-  )
-  rr(ctx, -u * 0.225, -u * 0.06, u * 0.12, u * 0.05, u * 0.025, c.dk)
-  rr(ctx, u * 0.105, -u * 0.06, u * 0.12, u * 0.05, u * 0.025, c.dk)
-  // torso
-  drawTorso(ctx, c, u, -u * 0.62 + bob, u * 0.3, t, seed, st)
-  // laptop on lap, screen back to us with a mint logo
-  rr(ctx, -u * 0.16, -u * 0.475, u * 0.32, u * 0.15, u * 0.025, '#3a4048')
-  ctx.fillStyle = '#8df0c0'
-  ctx.globalAlpha = st.working ? 0.9 : 0.25
-  ctx.beginPath()
-  ctx.arc(0, -u * 0.4, u * 0.02, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.globalAlpha = st.down ? 0.6 : st.pending ? 0.8 : 1
-  // arms typing on the laptop rim
-  const lt = st.working ? Math.sin(t / 130 + seed * 3) * u * 0.014 : 0
-  const rt2 = st.working ? Math.sin(t / 130 + seed * 3 + Math.PI) * u * 0.014 : 0
-  limb(
-    ctx,
-    c,
-    [
-      [-u * 0.2, -u * 0.56 + bob],
-      [-u * 0.27, -u * 0.44],
-      [-u * 0.12, -u * 0.345 + lt],
-    ],
-    u * 0.052,
-  )
-  limb(
-    ctx,
-    c,
-    [
-      [u * 0.2, -u * 0.56 + bob],
-      [u * 0.27, -u * 0.44],
-      [u * 0.12, -u * 0.345 + rt2],
-    ],
-    u * 0.052,
-  )
-  hand(ctx, c, -u * 0.105, -u * 0.335 + lt, u * 0.036)
-  hand(ctx, c, u * 0.105, -u * 0.335 + rt2, u * 0.036)
-  drawHead(ctx, c, u, -u * 0.63 + bob, t, seed, st)
-}
-
-function drawStandingPoint(
-  ctx: CanvasRenderingContext2D,
-  c: (typeof COPPERS)[0],
-  u: number,
-  t: number,
-  seed: number,
-  st: BotState,
-) {
-  const sway = st.working ? Math.sin(t / 900 + seed) * u * 0.008 : 0
-  limb(
-    ctx,
-    c,
-    [
-      [-u * 0.085, -u * 0.34],
-      [-u * 0.095, -u * 0.055],
-    ],
-    u * 0.062,
-  )
-  limb(
-    ctx,
-    c,
-    [
-      [u * 0.085, -u * 0.34],
-      [u * 0.095, -u * 0.055],
-    ],
-    u * 0.062,
-  )
-  rr(ctx, -u * 0.165, -u * 0.06, u * 0.13, u * 0.05, u * 0.025, c.dk)
-  rr(ctx, u * 0.035, -u * 0.06, u * 0.13, u * 0.05, u * 0.025, c.dk)
-  rr(ctx, -u * 0.14, -u * 0.375, u * 0.28, u * 0.06, u * 0.03, c.dk)
-  drawTorso(ctx, c, u, -u * 0.66 + sway, u * 0.3, t, seed, st)
-  // presidential kit: red tie, gold epaulets, gold buttons
-  {
-    const ty = -u * 0.66 + sway
-    ctx.fillStyle = GOLD
-    ctx.beginPath()
-    ctx.moveTo(-u * 0.03, ty + u * 0.015)
-    ctx.lineTo(u * 0.03, ty + u * 0.015)
-    ctx.lineTo(u * 0.015, ty + u * 0.2)
-    ctx.lineTo(0, ty + u * 0.235)
-    ctx.lineTo(-u * 0.015, ty + u * 0.2)
-    ctx.closePath()
-    ctx.fill()
-    ctx.strokeStyle = 'rgba(90,60,10,0.55)'
-    ctx.stroke()
-    ctx.fillStyle = '#eebc5e'
-    ctx.fillRect(-u * 0.022, ty + u * 0.005, u * 0.044, u * 0.028)
-    ctx.fillStyle = GOLD
-    rr(ctx, -u * 0.215, ty - u * 0.005, u * 0.075, u * 0.026, u * 0.01, GOLD)
-    rr(ctx, u * 0.14, ty - u * 0.005, u * 0.075, u * 0.026, u * 0.01, GOLD)
-    for (const by2 of [0.09, 0.15]) {
-      ctx.fillStyle = GOLD
-      ctx.beginPath()
-      ctx.arc(u * 0.065, ty + u * by2, u * 0.012, 0, Math.PI * 2)
-      ctx.fill()
-    }
-    // armor gloss: specular sweeps on torso and helmet
-    ctx.save()
-    ctx.beginPath()
-    ctx.roundRect(-u * 0.2, ty, u * 0.4, u * 0.3, u * 0.08)
-    ctx.clip()
-    ctx.fillStyle = 'rgba(255,255,255,0.16)'
-    ctx.beginPath()
-    ctx.moveTo(-u * 0.2, ty + u * 0.02)
-    ctx.lineTo(-u * 0.06, ty)
-    ctx.lineTo(-u * 0.16, ty + u * 0.3)
-    ctx.lineTo(-u * 0.2, ty + u * 0.3)
-    ctx.closePath()
-    ctx.fill()
-    ctx.restore()
-    const hh2 = u * 0.34,
-      hw2 = u * 0.46
-    const hTop = -u * 0.67 + sway - hh2
-    ctx.save()
-    ctx.beginPath()
-    ctx.roundRect(-hw2 / 2, hTop, hw2, hh2, u * 0.09)
-    ctx.clip()
-    ctx.fillStyle = 'rgba(255,255,255,0.18)'
-    ctx.beginPath()
-    ctx.moveTo(-hw2 / 2, hTop + u * 0.015)
-    ctx.lineTo(-hw2 / 2 + u * 0.14, hTop)
-    ctx.lineTo(-hw2 / 2 + u * 0.05, hTop + hh2)
-    ctx.lineTo(-hw2 / 2, hTop + hh2)
-    ctx.closePath()
-    ctx.fill()
-    ctx.restore()
-  }
-  // left arm relaxed
-  limb(
-    ctx,
-    c,
-    [
-      [-u * 0.2, -u * 0.6 + sway],
-      [-u * 0.245, -u * 0.46],
-      [-u * 0.19, -u * 0.38],
-    ],
-    u * 0.052,
-  )
-  hand(ctx, c, -u * 0.185, -u * 0.37, u * 0.034)
-  // right arm up, pointing at the board with a red marker
-  const lift = st.working ? Math.sin(t / 700 + seed * 5) * u * 0.018 : 0
-  limb(
-    ctx,
-    c,
-    [
-      [u * 0.19, -u * 0.62 + sway],
-      [u * 0.31, -u * 0.76 + lift],
-      [u * 0.43, -u * 0.83 + lift],
-    ],
-    u * 0.052,
-  )
-  hand(ctx, c, u * 0.445, -u * 0.835 + lift, u * 0.036)
-  ctx.strokeStyle = '#d84a3a'
-  ctx.lineWidth = Math.max(1.5, u * 0.024)
-  ctx.lineCap = 'round'
-  ctx.beginPath()
-  ctx.moveTo(u * 0.465, -u * 0.85 + lift)
-  ctx.lineTo(u * 0.525, -u * 0.9 + lift)
-  ctx.stroke()
-  ctx.lineCap = 'butt'
-  drawHead(ctx, c, u, -u * 0.67 + sway, t, seed, st)
-  // gold band across the brow
-  {
-    const hh = u * 0.34,
-      hw = u * 0.46
-    const topY = -u * 0.67 + sway - hh
-    ctx.fillStyle = GOLD
-    ctx.fillRect(-hw / 2 + u * 0.02, topY + hh * 0.1, hw - u * 0.04, u * 0.018)
-  }
-}
-
-function drawWalker(
-  ctx: CanvasRenderingContext2D,
-  c: (typeof COPPERS)[0],
-  u: number,
-  t: number,
-  seed: number,
-  st: BotState,
-) {
-  const step = Math.sin(t / 150 + seed)
-  const bob = Math.abs(Math.cos(t / 150 + seed)) * u * 0.022
-  limb(
-    ctx,
-    c,
-    [
-      [-u * 0.055, -u * 0.32 - bob],
-      [-u * 0.065 + step * u * 0.1, -u * 0.05],
-    ],
-    u * 0.06,
-  )
-  limb(
-    ctx,
-    c,
-    [
-      [u * 0.055, -u * 0.32 - bob],
-      [u * 0.065 - step * u * 0.1, -u * 0.05],
-    ],
-    u * 0.06,
-  )
-  rr(ctx, -u * 0.125 + step * u * 0.1, -u * 0.055, u * 0.12, u * 0.05, u * 0.025, c.dk)
-  rr(ctx, u * 0.005 - step * u * 0.1, -u * 0.055, u * 0.12, u * 0.05, u * 0.025, c.dk)
-  rr(ctx, -u * 0.125, -u * 0.355 - bob, u * 0.25, u * 0.055, u * 0.027, c.dk)
-  drawTorso(ctx, c, u, -u * 0.63 - bob, u * 0.28, t, seed, st)
-  // clipboard held with both hands
-  limb(
-    ctx,
-    c,
-    [
-      [-u * 0.185, -u * 0.56 - bob],
-      [-u * 0.185, -u * 0.42 - bob],
-    ],
-    u * 0.05,
-  )
-  limb(
-    ctx,
-    c,
-    [
-      [u * 0.185, -u * 0.56 - bob],
-      [u * 0.185, -u * 0.42 - bob],
-    ],
-    u * 0.05,
-  )
-  rr(ctx, -u * 0.14, -u * 0.5 - bob, u * 0.28, u * 0.18, u * 0.02, '#d9d4c4')
-  rr(ctx, -u * 0.045, -u * 0.525 - bob, u * 0.09, u * 0.03, u * 0.012, '#8a939c')
-  ctx.strokeStyle = 'rgba(60,60,70,0.5)'
+  const lh = S * 0.026
+  const h = lh * lines.length + S * 0.02
+  rr(ctx, x - w / 2 - 2, y - 2, w + 4, h + 4, 4, '#54341c')
+  rr(ctx, x - w / 2, y, w, h, 3, '#2c1c10')
+  ctx.strokeStyle = P.goldDim
   ctx.lineWidth = 1
-  for (const ly of [0.455, 0.415, 0.375]) {
-    ctx.beginPath()
-    ctx.moveTo(-u * 0.105, -u * ly - bob)
-    ctx.lineTo(u * 0.105, -u * ly - bob)
-    ctx.stroke()
-  }
-  hand(ctx, c, -u * 0.18, -u * 0.41 - bob, u * 0.034)
-  hand(ctx, c, u * 0.18, -u * 0.41 - bob, u * 0.034)
-  drawHead(ctx, c, u, -u * 0.64 - bob, t, seed, st)
+  ctx.strokeRect(x - w / 2 + 2, y + 2, w - 4, h - 4)
+  ctx.textAlign = 'center'
+  lines.forEach((ln, i) => {
+    ctx.font = `${i === 0 ? 'bold ' : ''}${Math.max(7, S * (i === 0 ? 0.02 : 0.015))}px ${MONO}`
+    ctx.fillStyle = i === 0 ? P.gold : P.goldDim
+    ctx.fillText(ln, x, y + S * 0.026 + i * lh)
+  })
+  ctx.textAlign = 'left'
 }
 
-function drawBot(
+// ── the robots: ivory-cream, round amber eyes, one red chief ────────────────
+function drawEyes(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  u: number,
+  a: Actor,
+  t: number,
+) {
+  const r = u * 0.052
+  const gap = u * 0.085
+  if (a.sleep) {
+    ctx.fillStyle = 'rgba(245,184,74,0.35)'
+    ctx.fillRect(x - gap - r, y, r * 2, u * 0.012)
+    ctx.fillRect(x + gap - r, y, r * 2, u * 0.012)
+    return
+  }
+  const blink = Math.floor((t + x * 13) / 210) % 24 === 0
+  const color = a.down ? P.red : P.amber
+  if (a.working && !blink) {
+    const g = ctx.createRadialGradient(x, y, 1, x, y, r * 3.4)
+    g.addColorStop(0, 'rgba(245,184,74,0.5)')
+    g.addColorStop(1, 'rgba(245,184,74,0)')
+    ctx.fillStyle = g
+    ctx.fillRect(x - r * 4 - gap, y - r * 4, (r * 4 + gap) * 2, r * 8)
+  }
+  ctx.fillStyle = color
+  for (const s of [-1, 1]) {
+    ctx.beginPath()
+    ctx.ellipse(x + s * gap, y, r, blink ? r * 0.15 : r, 0, 0, Math.PI * 2)
+    ctx.fill()
+  }
+}
+
+function drawRobot(
   ctx: CanvasRenderingContext2D,
   x: number,
   groundY: number,
   H: number,
-  pose: Action,
+  a: Actor,
   t: number,
-  seed: number,
-  st: BotState,
-  flip: boolean,
 ) {
-  const c = pose === 'point' ? CHIEF_NAVY : COPPERS[seed % COPPERS.length]
+  const u = H
+  const bob = a.working ? Math.sin(t / 420 + x) * u * 0.012 : 0
+  const body = a.chief ? P.chiefMid : P.cream
+  const bodyHi = a.chief ? P.chiefHi : '#f7eeda'
+  const bodyDk = a.chief ? P.chiefDk : P.creamShade
   ctx.save()
   ctx.translate(x, groundY)
-  if (flip) ctx.scale(-1, 1)
-  ctx.globalAlpha = st.down ? 0.6 : st.pending ? 0.8 : 1
-  ctx.lineWidth = Math.max(1, H * 0.014)
-  if (st.down) ctx.rotate(0.05)
-  const u = H
-  if (pose === 'walk') drawWalker(ctx, c, u, t, seed, st)
-  else if (pose === 'point') drawStandingPoint(ctx, c, u, t, seed, st)
-  else drawSeated(ctx, c, u, t, seed, st)
-  ctx.restore()
-}
-
-interface Quote {
-  symbol: string
-  last: number
-  move: number
-}
-
-function quotesFrom(board: BoardState | null, trading: TradingStatus | null): Quote[] {
-  const out: Quote[] = []
-  for (const c of board?.arms?.live?.candidates ?? []) {
-    if (c.symbol) out.push({ symbol: c.symbol, last: c.last ?? 0, move: c.move_pct ?? 0 })
-  }
-  if (!out.length) {
-    for (const c of board?.arms?.paper?.candidates ?? []) {
-      if (c.symbol) out.push({ symbol: c.symbol, last: c.last ?? 0, move: c.move_pct ?? 0 })
-    }
-  }
-  for (const mode of ['live', 'paper'] as const) {
-    for (const p of trading?.modes?.[mode]?.open_positions ?? []) {
-      if (!out.find((q) => q.symbol === p.symbol)) {
-        out.push({ symbol: p.symbol, last: p.entry, move: 0 })
-      }
-    }
-  }
-  return out
-}
-
-function drawScreen(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  q: Quote | null,
-  hist: number[],
-  now: number,
-) {
-  const r = Math.min(6, w * 0.06, h * 0.1)
-  ctx.save()
+  if (a.flip) ctx.scale(-1, 1)
+  ctx.fillStyle = 'rgba(10,6,3,0.4)'
   ctx.beginPath()
-  ctx.roundRect(x, y, w, h, r)
-  ctx.clip()
-  ctx.fillStyle = P.crt
-  ctx.fillRect(x, y, w, h)
-  const scan = ((now / 45) % (h + 10)) - 5
-  ctx.fillStyle = 'rgba(120,230,160,0.05)'
-  ctx.fillRect(x, y + scan, w, 2)
-  // faint screen grid so an idle panel still reads as glass, not a hole
-  ctx.strokeStyle = 'rgba(120,230,160,0.06)'
-  ctx.lineWidth = 1
-  for (const fy of [0.33, 0.55]) {
-    ctx.beginPath()
-    ctx.moveTo(x + 3, y + h * fy)
-    ctx.lineTo(x + w - 3, y + h * fy)
-    ctx.stroke()
+  ctx.ellipse(0, 0, u * 0.3, u * 0.06, 0, 0, Math.PI * 2)
+  ctx.fill()
+
+  const walk = a.pose === 'walk'
+  const step = walk ? Math.sin(t / 150) : 0
+  if (a.pose === 'sit') {
+    rr(ctx, -u * 0.2, -u * 0.16, u * 0.16, u * 0.16, u * 0.04, bodyDk)
+    rr(ctx, u * 0.04, -u * 0.16, u * 0.16, u * 0.16, u * 0.04, bodyDk)
+  } else {
+    rr(ctx, -u * 0.17 + step * u * 0.05, -u * 0.22, u * 0.13, u * 0.22, u * 0.04, bodyDk)
+    rr(ctx, u * 0.04 - step * u * 0.05, -u * 0.22, u * 0.13, u * 0.22, u * 0.04, bodyDk)
   }
-  if (!q) {
-    ctx.fillStyle = 'rgba(120,200,160,0.30)'
-    ctx.font = `${Math.max(6, h * 0.12)}px ${MONO}`
-    ctx.fillText('awaiting tape…', x + w * 0.08, y + h * 0.5)
-  }
-  if (q) {
-    const up = q.move >= 0
-    const line = up ? '#56d98f' : '#e0837c'
-    const pad = Math.max(3, w * 0.05)
-    const series = hist.length > 2 ? hist : [q.last * 0.996, q.last]
-    const min = Math.min(...series)
-    const max = Math.max(...series)
-    const flat = max - min < Math.max(0.01, (q.last || 1) * 0.0008)
-    const span = flat ? Math.max(0.02, (q.last || 1) * 0.004) : max - min
-    const base = flat ? (min + max) / 2 - span / 2 : min
-    const chartY = y + h * 0.14
-    const chartH = h * 0.58
+  const torsoY = a.pose === 'sit' ? -u * 0.5 : -u * 0.58
+  rr(ctx, -u * 0.24, torsoY - bob, u * 0.48, u * 0.4, u * 0.09, body)
+  rr(ctx, -u * 0.24, torsoY - bob, u * 0.48, u * 0.14, u * 0.09, bodyHi)
+  if (a.chief) {
+    ctx.fillStyle = P.gold
     ctx.beginPath()
-    series.forEach((v, i) => {
-      const px = x + pad + (i / Math.max(1, series.length - 1)) * (w - pad * 2)
-      const py = chartY + chartH - ((v - base) / span) * chartH
-      if (i === 0) ctx.moveTo(px, py)
-      else ctx.lineTo(px, py)
-    })
-    ctx.strokeStyle = line
-    ctx.lineWidth = 1.4
-    ctx.stroke()
-    ctx.lineTo(x + w - pad, chartY + chartH + 2)
-    ctx.lineTo(x + pad, chartY + chartH + 2)
+    ctx.moveTo(0, torsoY - bob + u * 0.06)
+    ctx.lineTo(-u * 0.045, torsoY - bob + u * 0.2)
+    ctx.lineTo(0, torsoY - bob + u * 0.34)
+    ctx.lineTo(u * 0.045, torsoY - bob + u * 0.2)
     ctx.closePath()
-    ctx.fillStyle = up ? 'rgba(70,190,120,0.18)' : 'rgba(220,120,110,0.15)'
     ctx.fill()
-    ctx.textAlign = 'left'
-    ctx.fillStyle = '#9fe8c0'
-    ctx.font = `bold ${Math.max(7, Math.min(10, h * 0.15))}px ${MONO}`
-    ctx.fillText(
-      `${q.symbol.slice(0, 5)}  ${q.last ? q.last.toFixed(2) : ''}  ${up ? '+' : ''}${(q.move * 100).toFixed(1)}%`,
-      x + pad + 1,
-      y + h - pad - 2,
-    )
+  } else {
+    ctx.fillStyle = P.creamDark
+    ctx.beginPath()
+    ctx.arc(0, torsoY - bob + u * 0.22, u * 0.035, 0, Math.PI * 2)
+    ctx.fill()
   }
-  ctx.strokeStyle = 'rgba(160,255,200,0.10)'
-  ctx.lineWidth = 1
-  ctx.stroke()
+  const armY = torsoY - bob + u * 0.06
+  if (a.pose === 'tablet') {
+    rr(ctx, -u * 0.32, armY + u * 0.1, u * 0.14, u * 0.08, u * 0.03, body)
+    rr(ctx, u * 0.18, armY + u * 0.1, u * 0.14, u * 0.08, u * 0.03, body)
+    ctx.save()
+    ctx.translate(0, armY + u * 0.13)
+    ctx.rotate(-0.12)
+    rr(ctx, -u * 0.16, -u * 0.1, u * 0.32, u * 0.2, u * 0.02, '#3b2c1c')
+    rr(ctx, -u * 0.14, -u * 0.08, u * 0.28, u * 0.16, u * 0.015, a.working ? '#5a7d52' : '#2c2118')
+    ctx.restore()
+  } else {
+    const sw = walk ? step * u * 0.06 : 0
+    rr(ctx, -u * 0.335 - sw, armY, u * 0.1, u * 0.26, u * 0.045, body)
+    rr(ctx, u * 0.235 + sw, armY, u * 0.1, u * 0.26, u * 0.045, body)
+  }
+  const headY = torsoY - bob - u * 0.36
+  rr(ctx, -u * 0.28, headY, u * 0.56, u * 0.36, u * 0.11, body)
+  rr(ctx, -u * 0.28, headY, u * 0.56, u * 0.12, u * 0.11, bodyHi)
+  drawEyes(ctx, 0, headY + u * 0.21, u, a, t)
+  ctx.fillStyle = bodyDk
+  ctx.fillRect(-u * 0.015, headY - u * 0.05, u * 0.03, u * 0.05)
+  ctx.beginPath()
+  ctx.arc(0, headY - u * 0.06, u * 0.028, 0, Math.PI * 2)
+  ctx.fillStyle = a.working ? P.amber : bodyDk
+  ctx.fill()
   ctx.restore()
 }
 
+// ── the component ────────────────────────────────────────────────────────────
 export default function VesperFloor() {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const sparkRef = useRef<Record<string, number[]>>({})
-  const [seats, setSeats] = useState<DeskSeat[]>([])
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const trading = useDashboardStore((s) => s.trading)
-  const fleet = useDashboardStore((s) => s.fleet)
-  const board = useDashboardStore((s) => s.board)
-
+  const [seats, setSeats] = useState<DeskSeat[]>([])
   const [company, setCompany] = useState<CompanyStatus | null>(null)
-  useEffect(() => {
-    let alive = true
-    const load = () =>
-      fetch('/api/company')
-        .then((r) => r.json())
-        .then((d) => {
-          if (alive) setCompany(d)
-        })
-        .catch(() => {})
-    load()
-    const id = setInterval(load, 60_000)
-    return () => {
-      alive = false
-      clearInterval(id)
-    }
-  }, [])
+  const [doctor, setDoctor] = useState<Doctor | null>(null)
 
   useEffect(() => {
     let alive = true
-    const load = () =>
+    const load = () => {
       fetch('/api/desk')
         .then((r) => r.json())
-        .then((d) => {
-          if (alive) setSeats(d.seats)
-        })
+        .then((d) => alive && setSeats(d.seats))
         .catch(() => {})
+      fetch('/api/company')
+        .then((r) => r.json())
+        .then((d) => alive && setCompany(d))
+        .catch(() => {})
+      fetch('/api/home')
+        .then((r) => r.json())
+        .then((d) => alive && setDoctor(d.doctor ?? null))
+        .catch(() => {})
+    }
     load()
     const id = setInterval(load, 60_000)
     return () => {
@@ -982,8 +372,8 @@ export default function VesperFloor() {
     }
   }, [])
 
-  const dataRef = useRef({ seats, trading, fleet, board, company })
-  dataRef.current = { seats, trading, fleet, board, company }
+  const dataRef = useRef({ seats, trading, company, doctor })
+  dataRef.current = { seats, trading, company, doctor }
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -991,1090 +381,646 @@ export default function VesperFloor() {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     let raf = 0
-    let lastPush = 0
-    let bubbleKey = ''
-    let bubbleAt = 0
 
-    // ── office mail: an envelope per REAL message, never fiction ──
-    // A seat finishing a run sends its output to the chief's desk (the chief
-    // seat genuinely digests every seat's output); the chief finishing sends
-    // the brief out of the building (Telegram); a fresh trader alert sends a
-    // note from the lobby toward the trading-desk rail.
-    interface Memo {
+    const params = new URLSearchParams(window.location.search)
+    const frozenMs = Number(params.get('freeze')) || null
+    const mailPreview = params.get('mail') === 'test'
+    let lastPreview = 0
+
+    interface Packet {
       pts: [number, number][]
       t0: number
       dur: number
-      tint: string
+      kind: 'rfc' | 'brief'
     }
-    const memos: Memo[] = []
-    let seenRuns: Record<string, string | null> | null = null
-    let seenStrategyAt: string | null | undefined // undefined = unprimed
-    let seenAlert: string | null = null
-    let alertPrimed = false
-    const mailPreview = new URLSearchParams(window.location.search).get('mail') === 'test'
-    // ?freeze=<ms> pins the animation clock to one instant — deterministic
-    // frames for visual-regression tests (same dev-knob class as ?phase=).
-    const frozenMs = Number(new URLSearchParams(window.location.search).get('freeze')) || null
-    let lastPreview = 0
-    const spawnMemo = (pts: [number, number][], tint: string, now: number, dur = 3000) => {
-      if (memos.length > 12) memos.shift()
-      memos.push({ pts, t0: now, dur, tint })
-    }
-    const shaftMid = (SHAFT.x0 + SHAFT.x1) / 2
-    const chiefDesk: [number, number] = [0.545, F3.ground - 0.12]
-    const seatMemo = (name: string, now: number) => {
-      const p = SPOTS[name]
-      if (!p) return
-      spawnMemo(
-        [[p.x, p.y - 0.1], [shaftMid, p.y - 0.1], [shaftMid, F3.ground - 0.1], chiefDesk],
-        JOB[name]?.accent ?? '#d9a441',
-        now,
-      )
-    }
-    const chiefMemo = (now: number) =>
-      spawnMemo([chiefDesk, [0.66, 0.16], [0.86, 0.09], [1.03, 0.06]], '#d9a441', now, 2400)
-    const alertMemo = (now: number) =>
-      spawnMemo(
-        [
-          [SPOTS.live.x, F1.ground - 0.1],
-          [0.9, F1.ground - 0.16],
-          [1.03, F1.ground - 0.2],
+    const packets: Packet[] = []
+    let seenStrategyAt: string | null | undefined
+    let seenChiefRan: string | null | undefined
+    const elevMid = (ELEV.x0 + ELEV.x1) / 2
+    const spawnRfc = (now: number) =>
+      packets.length < 2 &&
+      packets.push({
+        kind: 'rfc',
+        t0: now,
+        dur: 4200,
+        pts: [
+          [0.175, T3.ground - 0.1],
+          [elevMid, T3.ground - 0.1],
+          [elevMid, T2.ground - 0.1],
+          [0.165, T2.ground - 0.1],
         ],
-        '#5abf7a',
-        now,
-        2200,
-      )
+      })
+    const spawnBrief = (now: number) =>
+      packets.length < 2 &&
+      packets.push({
+        kind: 'brief',
+        t0: now,
+        dur: 2600,
+        pts: [
+          [0.84, T2.ground - 0.14],
+          [0.985, T2.ground - 0.2],
+        ],
+      })
 
     const draw = (rafNow: number) => {
       const now = frozenMs ?? rafNow
-      const { seats, trading, fleet, board, company } = dataRef.current
+      const { seats, trading, company, doctor } = dataRef.current
       const dpr = Math.min(window.devicePixelRatio || 1, 2)
       const rect = canvas.getBoundingClientRect()
       canvas.width = rect.width * dpr
       canvas.height = rect.height * dpr
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.imageSmoothingEnabled = true
-      ctx.imageSmoothingQuality = 'high'
-      ctx.fillStyle = '#0b1116'
-      ctx.fillRect(0, 0, rect.width, rect.height)
+      const dw = rect.width
+      const dh = rect.height
+      const X = (f: number) => f * dw
+      const Y = (f: number) => f * dh
+      const S = Math.min(dh, dw * 0.62)
 
-      const dx = 0,
-        dy = 0,
-        dw = rect.width,
-        dh = rect.height
-      const X = (fx: number) => fx * dw
-      const Y = (fy: number) => fy * dh
-      // sprites keep sane proportions at any aspect
-      const S = Math.min(dh, dw * 0.6)
       const phase = getPhase(trading?.market)
-      const room = ROOM[phase]
+      const night = phase === 'night'
 
-      // office-mail transitions: diff real state, spawn envelopes on change
-      if (seats.length) {
-        // prime on the first NON-EMPTY snapshot — a page load is not a message
-        const runs: Record<string, string | null> = {}
-        for (const s of seats) runs[s.name] = s.ran_at ?? null
-        if (seenRuns) {
-          for (const name of Object.keys(runs)) {
-            if (runs[name] && runs[name] !== seenRuns[name]) {
-              if (name === 'chief') chiefMemo(now)
-              else seatMemo(name, now)
-            }
-          }
-        }
-        seenRuns = runs
+      // ── outside: deep night, pines, distant lights ──
+      ctx.fillStyle = P.night
+      ctx.fillRect(0, 0, dw, dh)
+      for (let i = 0; i < 9; i++) {
+        const px = (i * 0.117 + 0.03) % 1
+        const ph = S * (0.1 + ((i * 53) % 7) * 0.014)
+        const py = i % 2 ? Y(0.06) + ph : Y(0.97)
+        ctx.fillStyle = '#0d1410'
+        ctx.beginPath()
+        ctx.moveTo(X(px), py - ph)
+        ctx.lineTo(X(px) - ph * 0.42, py)
+        ctx.lineTo(X(px) + ph * 0.42, py)
+        ctx.closePath()
+        ctx.fill()
       }
-      // the handoff: a new RFC sends the yellow folder Strategy -> Build
+      for (let i = 0; i < 14; i++) {
+        const lx = X((i * 0.073 + 0.05) % 1)
+        const ly = Y(i % 2 ? 0.03 : 0.985)
+        ctx.fillStyle = `rgba(246,192,90,${0.16 + ((i * 31) % 5) * 0.05})`
+        ctx.fillRect(lx, ly, 2, 2)
+      }
+
+      // ── the shell ──
+      ctx.save()
+      ctx.shadowColor = 'rgba(0,0,0,0.55)'
+      ctx.shadowBlur = 30
+      rr(ctx, X(FRAME.x), Y(FRAME.y), dw * FRAME.w, dh * FRAME.h, FRAME.r, P.frame)
+      ctx.restore()
+      ctx.strokeStyle = P.frameEdge
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.roundRect(
+        X(FRAME.x) + 5,
+        Y(FRAME.y) + 5,
+        dw * FRAME.w - 10,
+        dh * FRAME.h - 10,
+        FRAME.r - 4,
+      )
+      ctx.stroke()
+
+      // ── the banner: the doctor's truth ──
+      {
+        const kill = !!trading?.kill_switch
+        const notReady = /NOT READY/i.test(doctor?.line ?? '')
+        const degraded = doctor?.green === false
+        const noTel = !trading
+        const flat =
+          (trading?.modes?.live?.open_positions?.length ?? 0) === 0 &&
+          (trading?.modes?.paper?.open_positions?.length ?? 0) === 0
+        let text: string
+        let warn = true
+        if (noTel) text = 'TELEMETRY DOWN — NOT A VERDICT'
+        else if (kill) text = 'KILL ACTIVE — BUYS HALTED'
+        else if (notReady) text = `NOT READY — ${doctorCause(doctor?.line).toUpperCase()}`
+        else if (degraded) text = `DEGRADED — ${doctorCause(doctor?.line).toUpperCase()}`
+        else {
+          warn = false
+          text = night && flat ? 'NIGHT WATCH · ALL QUIET' : 'ALL SYSTEMS GO'
+        }
+        const bx = X(BANNER.x)
+        const by = Y(BANNER.y)
+        const bw = dw * BANNER.w
+        const bh = dh * BANNER.h
+        rr(ctx, bx, by, bw, bh, 8, warn ? P.bannerWarn : P.bannerCalm)
+        const ix = bx + S * 0.035
+        const iy = by + bh / 2
+        if (warn) {
+          ctx.fillStyle = P.cream
+          ctx.beginPath()
+          ctx.moveTo(ix, iy - bh * 0.24)
+          ctx.lineTo(ix - bh * 0.24, iy + bh * 0.2)
+          ctx.lineTo(ix + bh * 0.24, iy + bh * 0.2)
+          ctx.closePath()
+          ctx.fill()
+          ctx.fillStyle = P.bannerWarn
+          ctx.font = `bold ${bh * 0.42}px ${MONO}`
+          ctx.textAlign = 'center'
+          ctx.fillText('!', ix, iy + bh * 0.14)
+        } else {
+          ctx.fillStyle = P.green
+          ctx.beginPath()
+          ctx.arc(ix, iy, bh * 0.12, 0, Math.PI * 2)
+          ctx.fill()
+        }
+        ctx.fillStyle = warn ? P.cream : P.dim
+        ctx.font = `bold ${Math.max(9, bh * 0.36)}px ${MONO}`
+        ctx.textAlign = 'left'
+        ctx.fillText(text, ix + S * 0.03, iy + bh * 0.13)
+        for (let i = 0; i < 3; i++) {
+          ctx.fillStyle = warn ? 'rgba(239,227,200,0.7)' : P.dim
+          ctx.fillRect(
+            bx + bw - S * 0.03 - i * S * 0.014,
+            iy + bh * 0.16 - (i + 1) * bh * 0.14,
+            S * 0.008,
+            (i + 1) * bh * 0.14,
+          )
+        }
+      }
+
+      // ── tiers ──
+      for (const T of [T3, T2, T1]) {
+        const g = ctx.createLinearGradient(0, Y(T.top), 0, Y(T.ground))
+        g.addColorStop(0, P.wallTop)
+        g.addColorStop(1, P.wallBot)
+        ctx.fillStyle = g
+        ctx.fillRect(X(0.05), Y(T.top), dw * 0.9, dh * (T.ground - T.top))
+        if (!night) {
+          ctx.fillStyle = phase === 'day' ? 'rgba(255,225,170,0.05)' : 'rgba(240,150,80,0.06)'
+          ctx.fillRect(X(0.05), Y(T.top), dw * 0.9, dh * (T.ground - T.top))
+        }
+        const fg = ctx.createLinearGradient(0, Y(T.ground - 0.016), 0, Y(T.ground + 0.012))
+        fg.addColorStop(0, P.floorA)
+        fg.addColorStop(1, P.floorB)
+        ctx.fillStyle = fg
+        ctx.fillRect(X(0.05), Y(T.ground - 0.016), dw * 0.9, dh * 0.028)
+        ctx.fillStyle = P.slab
+        ctx.fillRect(X(0.05), Y(T.ground + 0.012), dw * 0.9, dh * 0.02)
+      }
+
+      // ── the elevator (RFC shaft), 3F + 2F ──
+      {
+        ctx.fillStyle = '#241812'
+        ctx.fillRect(
+          X(ELEV.x0),
+          Y(T3.top),
+          dw * (ELEV.x1 - ELEV.x0),
+          dh * (T2.ground - T3.top + 0.012),
+        )
+        for (const T of [T3, T2]) {
+          const doorW = dw * (ELEV.x1 - ELEV.x0) - S * 0.024
+          const doorH = dh * (T.ground - T.top) * 0.72
+          const dx2 = X(ELEV.x0) + S * 0.012
+          const dy2 = Y(T.ground) - doorH
+          rr(ctx, dx2, dy2, doorW, doorH, 4, '#3a2417')
+          ctx.fillStyle = '#54341c'
+          ctx.fillRect(dx2 + doorW / 2 - 1, dy2, 2, doorH)
+          ctx.strokeStyle = P.goldDim
+          ctx.lineWidth = 1
+          ctx.strokeRect(dx2 + 3, dy2 + 3, doorW - 6, doorH - 6)
+          ctx.font = `bold ${Math.max(7, S * 0.016)}px ${MONO}`
+          ctx.fillStyle = P.goldDim
+          ctx.textAlign = 'center'
+          ctx.fillText('ELEVATOR RFC', X(elevMid), dy2 - S * 0.012)
+          ctx.textAlign = 'left'
+        }
+        const rfcHot = freshISO(company?.strategy_at) || packets.some((p) => p.kind === 'rfc')
+        ctx.fillStyle = rfcHot ? P.amber : '#3a2c1a'
+        ctx.beginPath()
+        ctx.arc(X(elevMid), Y(T2.top) + S * 0.012, S * 0.009, 0, Math.PI * 2)
+        ctx.fill()
+      }
+
+      // ── data → actors ──
+      const chiefSeat = seats.find((s) => s.name === 'chief')
+      const chiefRan = freshISO(chiefSeat?.ran_at)
+      const chiefOk = chiefSeat?.status === 'ok'
+      const stratOn = freshISO(company?.strategy_at)
+      const buildOn = freshISO(company?.build_at)
+      const meetOn = stratOn && buildOn
+      const liveHb = trading?.modes?.live?.status === 'alive'
+      const paperHb = trading?.modes?.paper?.status === 'alive'
+      const kill = !!trading?.kill_switch
+      const wd = !!trading?.modes?.live?.watchdog_armed || !!trading?.modes?.paper?.watchdog_armed
+
       {
         const at = company?.strategy_at ?? null
         if (seenStrategyAt === undefined) seenStrategyAt = at
         else if (at && at !== seenStrategyAt) {
-          spawnMemo(
-            [
-              [SPOTS.strategy.x, F2.ground - 0.1],
-              [SPOTS.build.x, F2.ground - 0.1],
-            ],
-            '#e8c94a',
-            now,
-            2600,
-          )
+          spawnRfc(now)
           seenStrategyAt = at
         }
-      }
-      {
-        const alerts = trading?.alerts
-        const tail = alerts?.length ? alerts[alerts.length - 1] : null
-        if (!alertPrimed) {
-          alertPrimed = trading != null
-          seenAlert = tail
-        } else if (tail && tail !== seenAlert) {
-          alertMemo(now)
-          seenAlert = tail
+        const cr = chiefSeat?.ran_at ?? null
+        if (seenChiefRan === undefined) seenChiefRan = cr
+        else if (cr && cr !== seenChiefRan) {
+          spawnBrief(now)
+          seenChiefRan = cr
         }
-        if (mailPreview && now - lastPreview > 4200) {
+        if (mailPreview && now - lastPreview > 5200) {
           lastPreview = now
-          const cycle = ['projects', 'ops', 'premarket', 'content', 'paper', 'chief', 'alert']
-          const pick = cycle[Math.floor(now / 4200) % cycle.length]
-          pick === 'chief'
-            ? chiefMemo(now)
-            : pick === 'alert'
-              ? alertMemo(now)
-              : seatMemo(pick, now)
+          if (Math.floor(now / 5200) % 2) spawnBrief(now)
+          else spawnRfc(now)
         }
       }
 
-      // ── the building, cut open ──
-      // backdrop behind the structure
-      ctx.fillStyle = '#0b1015'
-      ctx.fillRect(0, 0, rect.width, rect.height)
+      const chiefBubble = chiefOk
+        ? 'brief sent — floor is yours'
+        : company?.strategy_verdict
+          ? `strategy: ${company.strategy_verdict.slice(0, 26)}`
+          : night
+            ? 'night watch — no brief'
+            : null
 
-      // each floor: wall + wash + skirting
-      for (const F of [F3, F2, F1]) {
-        const g = ctx.createLinearGradient(0, Y(F.top), 0, Y(F.ground))
-        g.addColorStop(0, room.wallTop)
-        g.addColorStop(1, room.wallBot)
-        ctx.fillStyle = g
-        ctx.fillRect(X(0.015), Y(F.top), dw * 0.97, dh * (F.ground - F.top))
-        if (room.wash) {
-          ctx.fillStyle = room.wash
-          ctx.fillRect(X(0.015), Y(F.top), dw * 0.97, dh * (F.ground - F.top))
+      const actors: Actor[] = [
+        {
+          key: 'strategy',
+          x: 0.155,
+          y: T3.ground,
+          pose: 'sit',
+          working: stratOn,
+          sleep: night && !stratOn,
+          down: false,
+          bubble: stratOn
+            ? (company?.strategy_verdict ?? 'writing the RFC').slice(0, 30)
+            : night
+              ? 'Quiet shift tonight'
+              : null,
+        },
+        {
+          key: 'meetA',
+          x: 0.72,
+          y: T3.ground,
+          pose: 'stand',
+          working: meetOn,
+          sleep: night && !meetOn,
+          down: false,
+          bubble: meetOn ? 'RFC looks steady.' : null,
+        },
+        {
+          key: 'meetB',
+          x: 0.795,
+          y: T3.ground,
+          pose: 'stand',
+          flip: true,
+          working: meetOn,
+          sleep: night && !meetOn,
+          down: false,
+          bubble: null,
+        },
+        {
+          key: 'build',
+          x: 0.16,
+          y: T2.ground,
+          pose: 'tablet',
+          working: buildOn,
+          sleep: night && !buildOn,
+          down: false,
+          bubble: null,
+        },
+        {
+          key: 'chief',
+          x: 0.84,
+          y: T2.ground,
+          pose: 'stand',
+          chief: true,
+          flip: true,
+          working: chiefRan,
+          sleep: night && !chiefRan,
+          down: chiefSeat?.status === 'failed',
+          bubble: chiefBubble,
+        },
+        {
+          key: 'kernel',
+          x: 0.2,
+          y: T1.ground,
+          pose: 'stand',
+          working: wd && !kill,
+          sleep: false,
+          down: kill,
+          bubble: null,
+          tag: 'KERNEL',
+        },
+        {
+          key: 'live',
+          x: 0.36,
+          y: T1.ground,
+          pose: liveHb ? 'walk' : 'stand',
+          working: liveHb,
+          sleep: night && !liveHb,
+          down: trading?.modes?.live?.status === 'stale',
+          bubble: null,
+          tag: 'LIVE',
+        },
+        {
+          key: 'paper',
+          x: 0.52,
+          y: T1.ground,
+          pose: 'stand',
+          working: paperHb,
+          sleep: night && !paperHb,
+          down: trading?.modes?.paper?.status === 'stale',
+          bubble: null,
+          tag: 'PAPER',
+        },
+      ]
+
+      // ── 3F set dressing ──
+      plantAt(ctx, X(0.075), Y(T3.ground), S * 0.032, true)
+      {
+        const bx = X(0.24)
+        const by = Y(T3.ground)
+        rr(ctx, bx, by - S * 0.11, S * 0.09, S * 0.11, 3, '#54341c')
+        for (let r = 0; r < 2; r++)
+          for (let b = 0; b < 4; b++) {
+            ctx.fillStyle = ['#8a5a3a', '#4f7d46', '#a8843c', '#6b4526'][(r + b) % 4]
+            ctx.fillRect(bx + 4 + b * S * 0.02, by - S * 0.1 + r * S * 0.055, S * 0.014, S * 0.045)
+          }
+      }
+      tableAt(ctx, X(0.175), Y(T3.ground), S * 0.14, S * 0.062)
+      rr(ctx, X(0.175) - S * 0.028, Y(T3.ground) - S * 0.095, S * 0.05, S * 0.034, 2, '#3b2c1c')
+      ctx.fillStyle = freshISO(company?.strategy_at) ? '#5a7d52' : '#241a12'
+      ctx.fillRect(X(0.175) - S * 0.024, Y(T3.ground) - S * 0.09, S * 0.042, S * 0.024)
+      for (let i = 0; i < 3; i++) {
+        ctx.fillStyle = ['#e8c94a', '#d9a441', '#c9a26b'][i]
+        ctx.fillRect(X(0.115 + i * 0.024), Y(T3.top + 0.05), S * 0.016, S * 0.016)
+      }
+      plaqueAt(
+        ctx,
+        X(0.365),
+        Y(T3.top + 0.035),
+        S * 0.16,
+        ['TERRARIUM A', 'OFFICE · SYSTEMS', 'GROWTH'],
+        S,
+      )
+      {
+        const dwid = S * 0.085
+        const dhig = dh * (T3.ground - T3.top) * 0.6
+        rr(ctx, X(0.365) - dwid / 2, Y(T3.ground) - dhig, dwid, dhig, 4, '#2c1a0f')
+        ctx.strokeStyle = '#54341c'
+        ctx.strokeRect(X(0.365) - dwid / 2 + 3, Y(T3.ground) - dhig + 3, dwid - 6, dhig - 6)
+        ctx.fillStyle = P.gold
+        ctx.beginPath()
+        ctx.arc(X(0.365) + dwid * 0.28, Y(T3.ground) - dhig * 0.45, S * 0.006, 0, Math.PI * 2)
+        ctx.fill()
+      }
+      tableAt(ctx, X(0.9), Y(T3.ground), S * 0.09, S * 0.055)
+      candleAt(ctx, X(0.885), Y(T3.ground) - S * 0.055, S * 0.012, now)
+      plantAt(ctx, X(0.925), Y(T3.ground) - S * 0.055, S * 0.014)
+      rr(ctx, X(0.885), Y(T3.top + 0.05), S * 0.055, S * 0.045, 2, '#54341c')
+      rr(ctx, X(0.885) + 3, Y(T3.top + 0.05) + 3, S * 0.055 - 6, S * 0.045 - 6, 1, '#e8dfc8')
+      plantAt(ctx, X(0.885) + S * 0.028, Y(T3.top + 0.05) + S * 0.038, S * 0.006)
+      if (freshISO(company?.strategy_at)) {
+        rr(ctx, X(0.905), Y(T3.ground) - S * 0.062, S * 0.028, S * 0.018, 2, '#e8c94a')
+      }
+
+      // ── 2F set dressing ──
+      plaqueAt(ctx, X(0.15), Y(T2.top + 0.035), S * 0.17, ['SYSTEMS NEVER SLEEP'], S)
+      {
+        const gx = X(0.252)
+        const gy = Y(T2.top + 0.052)
+        ctx.strokeStyle = P.goldDim
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        ctx.arc(gx, gy, S * 0.011, 0, Math.PI * 2)
+        ctx.stroke()
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2
+          ctx.beginPath()
+          ctx.moveTo(gx + Math.cos(a) * S * 0.011, gy + Math.sin(a) * S * 0.011)
+          ctx.lineTo(gx + Math.cos(a) * S * 0.017, gy + Math.sin(a) * S * 0.017)
+          ctx.stroke()
         }
-        // floor surface band at the bottom of each storey
-        const fg = ctx.createLinearGradient(0, Y(F.ground - 0.02), 0, Y(F.ground + 0.012))
-        fg.addColorStop(0, room.floorA)
-        fg.addColorStop(1, room.floorB)
-        ctx.fillStyle = fg
-        ctx.fillRect(X(0.015), Y(F.ground - 0.018), dw * 0.97, dh * 0.03)
-        ctx.fillStyle = 'rgba(0,0,0,0.20)'
-        ctx.fillRect(X(0.015), Y(F.ground - 0.018), dw * 0.97, dh * 0.004)
       }
-
-      // slabs between floors, roof, side columns, foundation
-      ctx.fillStyle = '#231a10'
-      for (const [a, b] of SLABS) {
-        ctx.fillRect(X(0), Y(a + 0.001), dw, dh * (b - a))
-        ctx.fillStyle = 'rgba(255,255,255,0.05)'
-        ctx.fillRect(X(0), Y(a + 0.001), dw, dh * 0.006)
-        ctx.fillStyle = '#231a10'
-      }
-      ctx.fillRect(X(0), Y(0), dw, dh * F3.top)
-      ctx.fillRect(X(0), Y(F1.ground + 0.012), dw, dh * (1 - F1.ground - 0.012))
-      ctx.fillRect(X(0), Y(0), dw * 0.015, dh)
-      ctx.fillRect(X(0.985), Y(0), dw * 0.015, dh)
-
-      // roof furniture: mast with beacon, small dish
-      {
-        const rx = X(0.205),
-          ry = Y(F3.top)
-        ctx.strokeStyle = '#3a3128'
-        ctx.lineWidth = Math.max(1.5, S * 0.006)
+      crateAt(ctx, X(0.075), Y(T2.ground), S * 0.045)
+      crateAt(ctx, X(0.115), Y(T2.ground), S * 0.034)
+      rr(ctx, X(0.24), Y(T2.ground) - S * 0.03, S * 0.05, S * 0.03, 3, '#a8501e')
+      rr(ctx, X(0.24) + S * 0.018, Y(T2.ground) - S * 0.038, S * 0.014, S * 0.01, 2, '#7d3a14')
+      rr(ctx, X(0.255), Y(T2.top + 0.06), S * 0.045, S * 0.06, 2, '#e8dfc8')
+      ctx.strokeStyle = '#5a8a52'
+      ctx.lineWidth = 1.4
+      for (let i = 0; i < 3; i++) {
+        const cy = Y(T2.top + 0.075) + i * S * 0.016
         ctx.beginPath()
-        ctx.moveTo(rx, ry)
-        ctx.lineTo(rx, ry - S * 0.055)
-        ctx.stroke()
-        ctx.beginPath()
-        ctx.moveTo(rx - S * 0.016, ry)
-        ctx.lineTo(rx, ry - S * 0.03)
-        ctx.stroke()
-        ctx.beginPath()
-        ctx.moveTo(rx + S * 0.016, ry)
-        ctx.lineTo(rx, ry - S * 0.03)
-        ctx.stroke()
-        const on = Math.floor(now / 1100) % 2 === 0
-        ctx.fillStyle = on ? '#f0716a' : '#4a3a38'
-        ctx.beginPath()
-        ctx.arc(rx, ry - S * 0.062, S * 0.009, 0, Math.PI * 2)
-        ctx.fill()
-        const dxx = X(0.8),
-          dyy = Y(F3.top)
-        ctx.fillStyle = '#3a3128'
-        ctx.fillRect(dxx - S * 0.005, dyy - S * 0.026, S * 0.01, S * 0.026)
-        ctx.fillStyle = '#8a939c'
-        ctx.beginPath()
-        ctx.ellipse(dxx - S * 0.012, dyy - S * 0.034, S * 0.02, S * 0.013, -0.6, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.strokeStyle = 'rgba(0,0,0,0.3)'
-        ctx.lineWidth = 1
+        ctx.moveTo(X(0.255) + 4, cy)
+        ctx.lineTo(X(0.255) + 8, cy + 4)
+        ctx.lineTo(X(0.255) + 14, cy - 3)
         ctx.stroke()
       }
-
-      // floor 3 wainscot — dark wood paneling with a gold trim line
-      {
-        const wy = Y(0.243),
-          wh2 = dh * (F3.ground - 0.243 - 0.016)
-        ctx.fillStyle = '#4a3220'
-        ctx.fillRect(X(0.015), wy, dw * 0.97, wh2)
-        ctx.fillStyle = 'rgba(0,0,0,0.22)'
-        for (let i = 1; i < 13; i++) ctx.fillRect(X(0.015 + i * 0.075), wy + 3, 2, wh2 - 6)
-        ctx.fillStyle = GOLD
-        ctx.globalAlpha = 0.55
-        ctx.fillRect(X(0.015), wy, dw * 0.97, 2)
-        ctx.globalAlpha = 1
-      }
-      ctx.fillStyle = '#1a2026'
-      ctx.fillRect(
-        X(SHAFT.x0),
-        Y(F3.top),
-        dw * (SHAFT.x1 - SHAFT.x0),
-        dh * (F1.ground - F3.top + 0.012),
-      )
-      for (const F of [F3, F2, F1]) {
-        const doorW = dw * (SHAFT.x1 - SHAFT.x0) - S * 0.03
-        const doorH = dh * (F.ground - F.top) * 0.62
-        const dx2 = X(SHAFT.x0) + S * 0.015
-        const dy2 = Y(F.ground) - doorH - dh * 0.006
-        ctx.fillStyle = '#39424c'
-        ctx.fillRect(dx2, dy2, doorW, doorH)
-        ctx.fillStyle = 'rgba(255,255,255,0.06)'
-        ctx.fillRect(dx2, dy2, doorW, 2)
-        ctx.fillStyle = '#1a2026'
-        ctx.fillRect(dx2 + doorW / 2 - 1, dy2, 2, doorH)
-        const here = F === F1
-        ctx.fillStyle = here ? '#8df0c0' : '#3a4a40'
-        ctx.beginPath()
-        ctx.arc(dx2 + doorW / 2, dy2 - dh * 0.012, S * 0.008, 0, Math.PI * 2)
-        ctx.fill()
-      }
-
-      // ── floor 3: the board room ──
-      ctx.fillStyle = '#10161d'
-      ctx.strokeStyle = '#0b0f14'
-      ctx.lineWidth = 3
-      ctx.beginPath()
-      ctx.roundRect(X(BOARD.x), Y(BOARD.y), dw * BOARD.w, dh * BOARD.h, 8)
-      ctx.fill()
-      ctx.stroke()
-      ctx.fillStyle = 'rgba(255,255,255,0.045)'
-      ctx.fillRect(X(BOARD.x) + 3, Y(BOARD.y) + 2, dw * BOARD.w - 6, 2)
-      ctx.fillStyle = 'rgba(160,200,180,0.4)'
-      ctx.font = `${Math.max(6, dh * 0.013)}px ${MONO}`
-      ctx.fillText(
-        'THE TAPE — judged this session',
-        X(BOARD.x + 0.006),
-        Y(BOARD.y + BOARD.h) - dh * 0.01,
-      )
-
-      // LED sign housing (right of the shaft)
-      ctx.fillStyle = '#1a1113'
-      ctx.strokeStyle = '#33201d'
-      ctx.lineWidth = 2
-      ctx.beginPath()
-      ctx.roundRect(X(SIGN_HOUSE.x), Y(SIGN_HOUSE.y), dw * SIGN_HOUSE.w, dh * SIGN_HOUSE.h, 6)
-      ctx.fill()
-      ctx.stroke()
-
-      // presidential red carpet with gold border
-      ctx.fillStyle = 'rgba(138,36,48,0.75)'
-      ctx.beginPath()
-      ctx.ellipse(X(0.5), Y(F3.ground - 0.006), S * 0.27, dh * 0.024, 0, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.strokeStyle = 'rgba(217,164,65,0.65)'
-      ctx.lineWidth = 2
-      ctx.stroke()
-      ctx.strokeStyle = 'rgba(217,164,65,0.35)'
-      ctx.lineWidth = 1
-      ctx.beginPath()
-      ctx.ellipse(X(0.5), Y(F3.ground - 0.006), S * 0.22, dh * 0.018, 0, 0, Math.PI * 2)
-      ctx.stroke()
-
-      // standing flags flanking the chief, gold finials
-      for (const fx4 of [0.428, 0.607]) {
-        const px3 = X(fx4),
-          base = Y(F3.ground - 0.004)
-        const topy = base - dh * 0.155
-        ctx.fillStyle = '#3a2a18'
-        ctx.beginPath()
-        ctx.ellipse(px3, base, S * 0.02, S * 0.007, 0, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.strokeStyle = '#8a7a4a'
-        ctx.lineWidth = Math.max(1.5, S * 0.006)
-        ctx.beginPath()
-        ctx.moveTo(px3, base)
-        ctx.lineTo(px3, topy)
-        ctx.stroke()
-        ctx.fillStyle = GOLD
-        ctx.beginPath()
-        ctx.arc(px3, topy - S * 0.008, S * 0.008, 0, Math.PI * 2)
-        ctx.fill()
-        // draped cloth: deep green with gold fringe
-        const sway2 = Math.sin(now / 1600 + fx4 * 40) * S * 0.004
-        ctx.fillStyle = '#1e4d38'
-        ctx.beginPath()
-        ctx.moveTo(px3, topy + S * 0.004)
-        ctx.quadraticCurveTo(
-          px3 + S * 0.03 + sway2,
-          topy + S * 0.03,
-          px3 + S * 0.02 + sway2,
-          topy + S * 0.075,
-        )
-        ctx.lineTo(px3, topy + S * 0.062)
-        ctx.closePath()
-        ctx.fill()
-        ctx.strokeStyle = 'rgba(217,164,65,0.7)'
-        ctx.lineWidth = 1.2
-        ctx.beginPath()
-        ctx.moveTo(px3 + S * 0.02 + sway2, topy + S * 0.075)
-        ctx.lineTo(px3, topy + S * 0.062)
-        ctx.stroke()
-      }
-
-      // the NIGHTBELL: brass bell by the shaft on the executive floor.
-      // Unlit ornament in peace; glows and swings when the phone-worthy
-      // alarms are firing (doctor NOT READY, KILL, stranded, stale, SEAT
-      // DOWN) — the same patterns nightbell pushes to Iris's pocket.
+      plaqueAt(ctx, X(0.855), Y(T2.top + 0.035), S * 0.17, ['CHIEF', 'PAPER & PARCHMENT'], S)
+      tableAt(ctx, X(0.92), Y(T2.ground), S * 0.095, S * 0.055)
+      candleAt(ctx, X(0.9), Y(T2.ground) - S * 0.055, S * 0.011, now)
+      rr(ctx, X(0.925), Y(T2.ground) - S * 0.072, S * 0.016, S * 0.017, 2, '#8a5a3a')
+      plantAt(ctx, X(0.95), Y(T2.ground) - S * 0.055, S * 0.011)
+      rr(ctx, X(0.937), Y(T2.ground) - S * 0.064, S * 0.026, S * 0.009, 1, '#8a2f28')
+      rr(ctx, X(0.937), Y(T2.ground) - S * 0.073, S * 0.026, S * 0.009, 1, '#a8433a')
       {
         const tail3 = (trading?.alerts ?? []).slice(-3).join(' ')
         const ringing = /NOT READY|KILL|stranded|SEAT DOWN|stale/i.test(tail3)
-        const bx3 = X(0.605)
-        const by3 = Y(0.145)
-        const br3 = S * 0.016
-        const swing = ringing ? Math.sin(now / 130) * 0.35 : 0
+        const bx3 = X(0.79)
+        const by3 = Y(T2.top + 0.075)
+        const br3 = S * 0.014
+        const swing = ringing ? Math.sin(now / 130) * 0.3 : 0
         ctx.save()
-        ctx.translate(bx3, by3 - br3 * 1.4)
+        ctx.translate(bx3, by3)
         ctx.rotate(swing)
-        // hanger
-        ctx.strokeStyle = '#7a5a38'
-        ctx.lineWidth = Math.max(1, S * 0.003)
+        ctx.strokeStyle = '#54341c'
+        ctx.lineWidth = 1.5
         ctx.beginPath()
-        ctx.moveTo(0, -br3 * 0.7)
+        ctx.moveTo(0, -br3)
         ctx.lineTo(0, 0)
         ctx.stroke()
-        // bell body
         if (ringing) {
-          const g3 = ctx.createRadialGradient(0, br3, 1, 0, br3, br3 * 3.2)
+          const g3 = ctx.createRadialGradient(0, br3, 1, 0, br3, br3 * 3.4)
           g3.addColorStop(0, 'rgba(240,113,106,0.35)')
           g3.addColorStop(1, 'rgba(240,113,106,0)')
           ctx.fillStyle = g3
-          ctx.fillRect(-br3 * 3.2, -br3, br3 * 6.4, br3 * 5)
+          ctx.fillRect(-br3 * 3.4, -br3, br3 * 6.8, br3 * 5)
         }
-        ctx.fillStyle = ringing ? '#e8b54a' : '#a8843c'
+        ctx.fillStyle = ringing ? '#e8b54a' : '#8a6a34'
         ctx.beginPath()
-        ctx.arc(0, br3 * 0.85, br3, Math.PI, 0)
-        ctx.lineTo(br3 * 1.15, br3 * 1.75)
-        ctx.lineTo(-br3 * 1.15, br3 * 1.75)
+        ctx.arc(0, br3 * 0.8, br3, Math.PI, 0)
+        ctx.lineTo(br3 * 1.12, br3 * 1.6)
+        ctx.lineTo(-br3 * 1.12, br3 * 1.6)
         ctx.closePath()
         ctx.fill()
-        ctx.fillStyle = ringing ? '#f0716a' : '#6b5326'
+        ctx.fillStyle = ringing ? '#f0716a' : '#5f4826'
         ctx.beginPath()
-        ctx.arc(0, br3 * 1.85, br3 * 0.22, 0, Math.PI * 2)
+        ctx.arc(0, br3 * 1.72, br3 * 0.2, 0, Math.PI * 2)
         ctx.fill()
         ctx.restore()
       }
 
-      // gold seal on the wall
+      // ── 1F: PIT PATROL ──
+      plaqueAt(
+        ctx,
+        X(0.175),
+        Y(T1.top + 0.03),
+        S * 0.21,
+        ['PIT PATROL', 'KERNEL · LIVE · PAPER'],
+        S,
+      )
       {
-        const sx2 = X(0.632),
-          sy2 = Y(0.105),
-          r2 = S * 0.026
-        ctx.strokeStyle = GOLD
-        ctx.lineWidth = Math.max(1.5, S * 0.005)
+        const kx = X(0.115)
+        const ky = Y(T1.ground) - S * 0.115
+        const kw = S * 0.05
+        const kh = S * 0.115
+        rr(ctx, kx - 2, ky - 2, kw + 4, kh + 2, 3, '#4a3a2c')
+        rr(ctx, kx, ky, kw, kh, 2, '#3a2d20')
+        ctx.strokeStyle = '#241a10'
+        ctx.strokeRect(kx + 2, ky + 2, kw - 4, kh - 4)
+        ctx.fillStyle = '#241a10'
+        for (let v = 0; v < 3; v++)
+          ctx.fillRect(kx + kw * 0.25, ky + kh * 0.1 + v * kh * 0.07, kw * 0.5, 2)
+        const lockC = kill ? P.red : wd ? P.green : P.amber
+        ctx.strokeStyle = lockC
+        ctx.lineWidth = Math.max(1.5, S * 0.0035)
         ctx.beginPath()
-        ctx.arc(sx2, sy2, r2, 0, Math.PI * 2)
+        if (kill)
+          ctx.arc(kx + kw / 2 + kw * 0.16, ky + kh * 0.52, kw * 0.15, Math.PI * 0.9, Math.PI * 1.9)
+        else ctx.arc(kx + kw / 2, ky + kh * 0.52, kw * 0.15, Math.PI, 0)
         ctx.stroke()
-        ctx.lineWidth = 1
+        ctx.fillStyle = lockC
+        ctx.fillRect(kx + kw / 2 - kw * 0.18, ky + kh * 0.55, kw * 0.36, kh * 0.12)
+      }
+      for (let i = 0; i < 2; i++) {
+        const cx2 = X(0.315 + i * 0.062)
+        const cy2 = Y(T1.top + 0.042)
+        rr(ctx, cx2, cy2, S * 0.05, S * 0.036, 2, '#241a10')
+        ctx.strokeStyle = liveHb ? '#7fb069' : '#4a3a28'
+        ctx.lineWidth = 1.2
         ctx.beginPath()
-        ctx.arc(sx2, sy2, r2 * 0.72, 0, Math.PI * 2)
-        ctx.stroke()
-        ctx.fillStyle = GOLD
-        ctx.font = `bold ${Math.max(8, r2 * 1.1)}px ${MONO}`
-        ctx.textAlign = 'center'
-        ctx.fillText('T', sx2, sy2 + r2 * 0.38)
-        ctx.textAlign = 'left'
-        for (let i = 0; i < 8; i++) {
-          const a = (i / 8) * Math.PI * 2
-          ctx.beginPath()
-          ctx.arc(
-            sx2 + Math.cos(a) * r2 * 0.86,
-            sy2 + Math.sin(a) * r2 * 0.86,
-            r2 * 0.05,
-            0,
-            Math.PI * 2,
-          )
-          ctx.fill()
+        for (let px2 = 0; px2 <= 10; px2++) {
+          const vx = cx2 + 3 + (px2 * (S * 0.05 - 6)) / 10
+          const vy = cy2 + S * 0.026 - Math.abs(Math.sin(px2 * 1.7 + i * 3)) * S * 0.014
+          if (px2 === 0) ctx.moveTo(vx, vy)
+          else ctx.lineTo(vx, vy)
         }
+        ctx.stroke()
       }
-      // chief's ficus and coffee table
-      {
-        const fx2 = X(0.615),
-          fy2 = Y(F3.ground - 0.006)
-        ctx.fillStyle = '#7a5230'
-        ctx.fillRect(fx2 - S * 0.02, fy2 - S * 0.04, S * 0.04, S * 0.04)
-        ctx.fillStyle = '#4f8f4a'
-        ctx.beginPath()
-        ctx.ellipse(fx2, fy2 - S * 0.075, S * 0.03, S * 0.038, 0, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.fillStyle = '#356534'
-        ctx.beginPath()
-        ctx.ellipse(fx2 - S * 0.016, fy2 - S * 0.058, S * 0.016, S * 0.02, 0, 0, Math.PI * 2)
-        ctx.fill()
-        const tx2 = X(0.385),
-          ty2 = Y(F3.ground - 0.006)
-        ctx.fillStyle = '#5a4428'
-        ctx.fillRect(tx2 - S * 0.03, ty2 - S * 0.036, S * 0.06, S * 0.008)
-        ctx.fillRect(tx2 - S * 0.024, ty2 - S * 0.028, S * 0.006, S * 0.028)
-        ctx.fillRect(tx2 + S * 0.018, ty2 - S * 0.028, S * 0.006, S * 0.028)
-        ctx.fillStyle = '#b45a4a'
-        ctx.fillRect(tx2 - S * 0.008, ty2 - S * 0.052, S * 0.016, S * 0.016)
-        ctx.fillStyle = '#8a4536'
-        ctx.fillRect(tx2 + S * 0.008, ty2 - S * 0.048, S * 0.006, S * 0.004)
-      }
-
-      const stations = stationsFrom(seats, trading, fleet, company)
-
-      // ── offices: a room of one's own ──
-      const cubTint = room.wash ? 'rgba(255,255,255,0.045)' : 'rgba(255,255,255,0.03)'
-      const noteC = ['#d9b24a', '#7fb2d9', '#d97fa0', '#8fd98f']
-      for (const bay of BAYS) {
-        const left = X(bay.x - bay.half),
-          right = X(bay.x + bay.half)
-        ctx.fillStyle = cubTint
-        ctx.fillRect(left, Y(bay.top + 0.012), right - left, dh * (bay.ground - bay.top - 0.028))
-        // department color: header beam + floor mat
-        const accent = JOB[bay.key]?.accent ?? '#d9a441'
-        ctx.fillStyle = accent
-        ctx.globalAlpha = 0.75
-        ctx.fillRect(left + S * 0.004, Y(bay.top + 0.008), right - left - S * 0.008, dh * 0.01)
-        ctx.globalAlpha = 0.16
-        ctx.fillStyle = accent
-        ctx.beginPath()
-        ctx.ellipse(
-          X(bay.x),
-          Y(bay.ground - 0.006),
-          (right - left) * 0.34,
-          dh * 0.02,
-          0,
-          0,
-          Math.PI * 2,
+      tableAt(ctx, X(0.585), Y(T1.ground), S * 0.08, S * 0.05)
+      for (let i = 0; i < 3; i++)
+        rr(
+          ctx,
+          X(0.567),
+          Y(T1.ground) - S * 0.056 - i * S * 0.007,
+          S * 0.036,
+          S * 0.006,
+          1,
+          '#e8dfc8',
         )
-        ctx.fill()
-        ctx.globalAlpha = 1
-        // pinboard notes
-        const b0 = Math.floor(bay.x * 23 + bay.top * 31)
+      rr(ctx, X(0.605), Y(T1.ground) - S * 0.068, S * 0.018, S * 0.016, 2, '#8a2f28')
+      crateAt(ctx, X(0.685), Y(T1.ground), S * 0.04)
+      {
+        const ex = X(0.84)
+        const ey = Y(T1.ground) - S * 0.012
         ctx.save()
-        ctx.translate(X(bay.x + bay.half * 0.52), Y(bay.top + 0.055))
-        ctx.rotate(-0.04)
-        ctx.fillStyle = noteC[b0 % 4]
-        ctx.fillRect(0, 0, S * 0.024, S * 0.024)
-        ctx.rotate(0.09)
-        ctx.fillStyle = noteC[(b0 + 1) % 4]
-        ctx.fillRect(S * 0.01, S * 0.03, S * 0.024, S * 0.024)
+        ctx.translate(ex, ey)
+        ctx.scale(1, 0.42)
+        ctx.fillStyle = '#b45a1e'
+        ctx.beginPath()
+        ctx.arc(0, 0, S * 0.085, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.strokeStyle = '#d9822e'
+        ctx.lineWidth = 3
+        ctx.beginPath()
+        ctx.arc(0, 0, S * 0.062, 0, Math.PI * 2)
+        ctx.stroke()
+        ctx.fillStyle = '#e8dfc8'
+        ctx.beginPath()
+        ctx.ellipse(0, -S * 0.01, S * 0.016, S * 0.038, 0.5, 0, Math.PI * 2)
+        ctx.fill()
         ctx.restore()
-        // the office's own gear on the floor
-        const ax = X(bay.x - bay.half * 0.62),
-          ay = Y(bay.ground - 0.014)
-        if (bay.key === 'projects') {
-          // red toolbox
-          ctx.fillStyle = '#b03a30'
-          ctx.fillRect(ax - S * 0.02, ay - S * 0.024, S * 0.04, S * 0.024)
-          ctx.fillStyle = '#8a2a22'
-          ctx.fillRect(ax - S * 0.02, ay - S * 0.03, S * 0.04, S * 0.007)
-          ctx.strokeStyle = '#3a1a16'
-          ctx.lineWidth = Math.max(1, S * 0.004)
-          ctx.beginPath()
-          ctx.arc(ax, ay - S * 0.03, S * 0.01, Math.PI, 0)
-          ctx.stroke()
-          // rolled blueprints leaning on the wall
-          for (const [ox, rot] of [
-            [0.036, 0.12],
-            [0.046, 0.05],
-          ] as const) {
-            ctx.save()
-            ctx.translate(ax + S * ox, ay)
-            ctx.rotate(rot)
-            ctx.fillStyle = '#7fb2d9'
-            ctx.fillRect(-S * 0.004, -S * 0.052, S * 0.008, S * 0.052)
-            ctx.fillStyle = '#e8e2d0'
-            ctx.fillRect(-S * 0.004, -S * 0.052, S * 0.008, S * 0.006)
-            ctx.restore()
-          }
-        } else if (bay.key === 'premarket') {
-          // coffee station: machine + warm pot + rising steam
-          ctx.fillStyle = '#2e343c'
-          ctx.fillRect(ax - S * 0.018, ay - S * 0.04, S * 0.036, S * 0.04)
-          ctx.fillStyle = '#c9a06a'
-          ctx.fillRect(ax - S * 0.01, ay - S * 0.02, S * 0.02, S * 0.014)
-          ctx.fillStyle = 'rgba(255,200,120,0.8)'
-          ctx.fillRect(ax - S * 0.012, ay - S * 0.036, S * 0.024, S * 0.004)
-          ctx.strokeStyle = 'rgba(230,230,230,0.35)'
-          ctx.lineWidth = Math.max(1, S * 0.004)
-          for (const sxo of [-0.006, 0.006]) {
-            ctx.beginPath()
-            for (let i = 0; i <= 6; i++) {
-              const yy = ay - S * 0.044 - i * S * 0.006
-              const xx = ax + sxo * S * 1 + Math.sin(now / 300 + i + sxo * 400) * S * 0.004
-              i === 0 ? ctx.moveTo(xx, yy) : ctx.lineTo(xx, yy)
-            }
-            ctx.stroke()
-          }
-        } else if (bay.key === 'ops') {
-          // full server rack, LEDs alive, traffic cone on standby
-          ctx.fillStyle = '#232a30'
-          ctx.fillRect(ax - S * 0.018, ay - S * 0.068, S * 0.036, S * 0.068)
-          ctx.fillStyle = '#151a1f'
-          ctx.fillRect(ax - S * 0.018, ay - S * 0.068, S * 0.036, S * 0.005)
-          for (let r = 0; r < 4; r++) {
-            const on = Math.floor(now / 700 + r + bay.x * 10) % 3 !== 0
-            ctx.fillStyle = on ? '#8df0c0' : '#3a4a40'
-            ctx.beginPath()
-            ctx.arc(ax + S * 0.01, ay - S * 0.058 + r * S * 0.015, S * 0.0038, 0, Math.PI * 2)
-            ctx.fill()
-            ctx.fillStyle = '#39424c'
-            ctx.fillRect(ax - S * 0.014, ay - S * 0.06 + r * S * 0.015, S * 0.016, S * 0.005)
-          }
-          const cx3 = ax + S * 0.042
-          ctx.fillStyle = '#e07a3a'
-          ctx.beginPath()
-          ctx.moveTo(cx3, ay - S * 0.03)
-          ctx.lineTo(cx3 - S * 0.011, ay)
-          ctx.lineTo(cx3 + S * 0.011, ay)
-          ctx.closePath()
-          ctx.fill()
-          ctx.fillStyle = '#f2ede0'
-          ctx.fillRect(cx3 - S * 0.006, ay - S * 0.016, S * 0.012, S * 0.004)
-        } else if (bay.key === 'content') {
-          // clapperboard on a little easel
-          ctx.strokeStyle = '#5a4428'
-          ctx.lineWidth = Math.max(1, S * 0.005)
-          ctx.beginPath()
-          ctx.moveTo(ax - S * 0.014, ay)
-          ctx.lineTo(ax, ay - S * 0.034)
-          ctx.moveTo(ax + S * 0.014, ay)
-          ctx.lineTo(ax, ay - S * 0.034)
-          ctx.stroke()
-          ctx.fillStyle = '#1c2126'
-          ctx.fillRect(ax - S * 0.016, ay - S * 0.04, S * 0.032, S * 0.02)
-          ctx.save()
-          ctx.translate(ax - S * 0.016, ay - S * 0.04)
-          ctx.rotate(-0.18)
-          ctx.fillStyle = '#e8e2d0'
-          ctx.fillRect(0, -S * 0.008, S * 0.034, S * 0.008)
-          ctx.fillStyle = '#1c2126'
-          for (let i = 0; i < 3; i++)
-            ctx.fillRect(S * 0.004 + i * S * 0.011, -S * 0.008, S * 0.005, S * 0.008)
-          ctx.restore()
-          // camera on tripod
-          const tx3 = ax + S * 0.052
-          ctx.strokeStyle = '#39424c'
-          ctx.lineWidth = Math.max(1, S * 0.005)
-          ctx.beginPath()
-          ctx.moveTo(tx3 - S * 0.012, ay)
-          ctx.lineTo(tx3, ay - S * 0.036)
-          ctx.moveTo(tx3 + S * 0.012, ay)
-          ctx.lineTo(tx3, ay - S * 0.036)
-          ctx.moveTo(tx3, ay - S * 0.01)
-          ctx.lineTo(tx3, ay - S * 0.036)
-          ctx.stroke()
-          ctx.fillStyle = '#2b3036'
-          ctx.fillRect(tx3 - S * 0.012, ay - S * 0.052, S * 0.024, S * 0.016)
-          ctx.fillStyle = '#d97fa0'
-          ctx.beginPath()
-          ctx.arc(tx3 + S * 0.008, ay - S * 0.044, S * 0.005, 0, Math.PI * 2)
-          ctx.fill()
-          const rec = Math.floor(now / 800) % 2 === 0
-          ctx.fillStyle = rec ? '#f0716a' : '#5a3a38'
-          ctx.beginPath()
-          ctx.arc(tx3 - S * 0.008, ay - S * 0.048, S * 0.003, 0, Math.PI * 2)
-          ctx.fill()
-        } else {
-          // tall filing cabinet + paper stacks
-          ctx.fillStyle = '#39424c'
-          ctx.fillRect(ax - S * 0.016, ay - S * 0.068, S * 0.032, S * 0.068)
-          ctx.fillStyle = '#8a939c'
-          for (const hy of [0.056, 0.036, 0.016]) {
-            ctx.fillRect(ax - S * 0.009, ay - S * hy, S * 0.018, S * 0.004)
-          }
-          ctx.fillStyle = '#d9d4c4'
-          ctx.fillRect(ax + S * 0.02, ay - S * 0.012, S * 0.03, S * 0.012)
-          ctx.fillRect(ax + S * 0.024, ay - S * 0.02, S * 0.024, S * 0.008)
-          ctx.fillStyle = '#c9c4b4'
-          ctx.fillRect(ax + S * 0.022, ay - S * 0.026, S * 0.02, S * 0.006)
-        }
-        // divider walls
-        for (const side of [-1, 1]) {
-          const wx = X(bay.x + side * bay.half)
-          ctx.fillStyle = '#39424c'
-          ctx.fillRect(
-            wx - S * 0.006,
-            Y(bay.top + 0.008),
-            S * 0.012,
-            dh * (bay.ground - bay.top - 0.016),
-          )
-          ctx.fillStyle = 'rgba(255,255,255,0.10)'
-          ctx.fillRect(wx - S * 0.006, Y(bay.top + 0.008), S * 0.012, dh * 0.01)
-        }
       }
+      tableAt(ctx, X(0.93), Y(T1.ground), S * 0.07, S * 0.05)
+      candleAt(ctx, X(0.93), Y(T1.ground) - S * 0.05, S * 0.011, now)
 
-      // office cosmetics — light strips, wall art, side desks
-      for (const bay of BAYS) {
-        const st = stations.find((s) => s.key === bay.key)
-        let occupied = !!st && st.active && !st.down
-        // the pit is the plant: lit when either trading daemon is alive
-        if (bay.key === 'pit') {
-          occupied =
-            trading?.modes?.live?.status === 'alive' || trading?.modes?.paper?.status === 'alive'
-        }
-        // ceiling light strip + a light that clearly reads ON
-        const lx = X(bay.x)
-        ctx.fillStyle = '#39424c'
-        ctx.fillRect(lx - S * 0.045, Y(bay.top + 0.012), S * 0.09, dh * 0.008)
-        if (occupied) {
-          // hot tube + halo
-          ctx.fillStyle = '#fff3cf'
-          ctx.fillRect(lx - S * 0.042, Y(bay.top + 0.019), S * 0.084, dh * 0.006)
-          const halo = ctx.createRadialGradient(
-            lx,
-            Y(bay.top + 0.022),
-            1,
-            lx,
-            Y(bay.top + 0.022),
-            S * 0.09,
-          )
-          halo.addColorStop(0, 'rgba(255,240,190,0.35)')
-          halo.addColorStop(1, 'rgba(255,240,190,0)')
-          ctx.fillStyle = halo
-          ctx.fillRect(lx - S * 0.09, Y(bay.top), S * 0.18, dh * 0.05)
-          // strong cone
-          const cone = ctx.createLinearGradient(0, Y(bay.top + 0.02), 0, Y(bay.ground))
-          cone.addColorStop(0, 'rgba(255,240,195,0.26)')
-          cone.addColorStop(1, 'rgba(255,240,195,0.02)')
+      // ── warm cone lamps over working spots ──
+      const lampSpots: [number, { top: number; ground: number }, boolean][] = [
+        [0.175, T3, stratOn],
+        [0.757, T3, meetOn],
+        [0.16, T2, buildOn],
+        [0.84, T2, chiefRan],
+        [0.36, T1, liveHb || paperHb],
+      ]
+      for (const [lxF, T, on] of lampSpots) {
+        const lx = X(lxF)
+        rr(ctx, lx - S * 0.03, Y(T.top + 0.012), S * 0.06, dh * 0.007, 2, '#241a10')
+        if (on) {
+          ctx.fillStyle = '#ffedc4'
+          ctx.fillRect(lx - S * 0.026, Y(T.top + 0.018), S * 0.052, dh * 0.005)
+          const cone = ctx.createLinearGradient(0, Y(T.top + 0.02), 0, Y(T.ground))
+          cone.addColorStop(0, 'rgba(246,197,110,0.2)')
+          cone.addColorStop(1, 'rgba(246,197,110,0.015)')
           ctx.fillStyle = cone
           ctx.beginPath()
-          ctx.moveTo(lx - S * 0.042, Y(bay.top + 0.022))
-          ctx.lineTo(lx + S * 0.042, Y(bay.top + 0.022))
-          ctx.lineTo(lx + S * 0.115, Y(bay.ground))
-          ctx.lineTo(lx - S * 0.115, Y(bay.ground))
+          ctx.moveTo(lx - S * 0.026, Y(T.top + 0.02))
+          ctx.lineTo(lx + S * 0.026, Y(T.top + 0.02))
+          ctx.lineTo(lx + S * 0.1, Y(T.ground))
+          ctx.lineTo(lx - S * 0.1, Y(T.ground))
           ctx.closePath()
           ctx.fill()
-          // the whole room warms up
-          ctx.fillStyle = 'rgba(255,236,190,0.085)'
-          ctx.fillRect(
-            X(bay.x - bay.half) + S * 0.006,
-            Y(bay.top + 0.008),
-            dw * bay.half * 2 - S * 0.012,
-            dh * (bay.ground - bay.top - 0.016),
-          )
         } else {
-          ctx.fillStyle = 'rgba(120,130,140,0.45)'
-          ctx.fillRect(lx - S * 0.04, Y(bay.top + 0.019), S * 0.08, dh * 0.004)
-        }
-        // room placard (the pit announces itself; primaries speak via bots)
-        if (bay.label && bay.key === 'pit') {
-          ctx.font = `bold ${Math.max(8, S * 0.017)}px ${MONO}`
-          ctx.textAlign = 'center'
-          ctx.fillStyle = 'rgba(6,8,10,0.6)'
-          const pw = ctx.measureText(bay.label).width + 10
-          ctx.fillRect(X(bay.x) - pw / 2, Y(bay.top + 0.028), pw, S * 0.026)
-          ctx.fillStyle = '#d9a441'
-          ctx.fillText(bay.label, X(bay.x), Y(bay.top + 0.028) + S * 0.019)
-          ctx.textAlign = 'left'
-        }
-        // the KERNEL locker: the risk kernel as furniture. Locked green =
-        // armed & watched; red + open padlock = KILL (buys halted). Drawn
-        // from real kill-switch + watchdog telemetry; display only.
-        if (bay.key === 'pit') {
-          const kill = !!trading?.kill_switch
-          const wd =
-            !!trading?.modes?.live?.watchdog_armed || !!trading?.modes?.paper?.watchdog_armed
-          const kx = X(bay.x - bay.half) + S * 0.012
-          const ky = Y(bay.ground) - S * 0.118
-          const kw = S * 0.046
-          const kh = S * 0.115
-          // cabinet
-          ctx.fillStyle = '#39424c'
-          ctx.fillRect(kx - 2, ky - 2, kw + 4, kh + 2)
-          ctx.fillStyle = '#2a323b'
-          ctx.fillRect(kx, ky, kw, kh)
-          // door seam + vents
-          ctx.strokeStyle = '#1d242b'
-          ctx.lineWidth = 1
-          ctx.strokeRect(kx + 2, ky + 2, kw - 4, kh - 4)
-          ctx.fillStyle = '#1d242b'
-          for (let v = 0; v < 3; v++)
-            ctx.fillRect(kx + kw * 0.25, ky + kh * 0.12 + v * kh * 0.07, kw * 0.5, 2)
-          // padlock: closed body when armed, swung-open shackle on KILL
-          const px2 = kx + kw / 2
-          const py2 = ky + kh * 0.62
-          ctx.strokeStyle = kill ? '#f0716a' : '#5abf7a'
-          ctx.lineWidth = Math.max(1.5, S * 0.004)
-          ctx.beginPath()
-          if (kill)
-            ctx.arc(px2 + kw * 0.16, py2 - kh * 0.05, kw * 0.16, Math.PI * 0.9, Math.PI * 1.9)
-          else ctx.arc(px2, py2 - kh * 0.05, kw * 0.16, Math.PI, 0)
-          ctx.stroke()
-          ctx.fillStyle = kill ? '#f0716a' : '#5abf7a'
-          ctx.fillRect(px2 - kw * 0.2, py2 - kh * 0.02, kw * 0.4, kh * 0.14)
-          // status LED (amber if watchdogs unwatched)
-          ctx.fillStyle = kill ? '#f0716a' : wd ? '#5abf7a' : '#e0b34d'
-          ctx.beginPath()
-          ctx.arc(px2, ky + kh * 0.9, S * 0.005, 0, Math.PI * 2)
-          ctx.fill()
-          ctx.font = `bold ${Math.max(6, S * 0.011)}px ${MONO}`
-          ctx.textAlign = 'center'
-          ctx.fillStyle = 'rgba(220,215,200,0.6)'
-          ctx.fillText('KERNEL', px2, ky - S * 0.008)
-          ctx.textAlign = 'left'
-        }
-        // framed wall art: tiny seeded chart doodle
-        {
-          const fw = Math.min(S * 0.078, dw * bay.half * 0.82),
-            fh = Math.min(S * 0.058, dw * bay.half * 0.6)
-          const fx3 = Math.min(X(bay.x + bay.half * 0.46), X(bay.x + bay.half) - fw - S * 0.008),
-            fy3 = Y(bay.top + 0.125)
-          ctx.fillStyle = '#5a4428'
-          ctx.fillRect(fx3 - 2, fy3 - 2, fw + 4, fh + 4)
-          ctx.fillStyle = '#e8e2d0'
-          ctx.fillRect(fx3, fy3, fw, fh)
-          const key2 = bay.key
-          if (key2 === 'projects') {
-            for (let col = 0; col < 3; col++) {
-              ctx.fillStyle = '#c9c2ae'
-              ctx.fillRect(fx3 + 2 + col * (fw / 3), fy3 + 2, fw / 3 - 3, fh - 4)
-              ctx.fillStyle = ['#e0b34d', '#7fb2d9', '#8fd98f'][col]
-              for (let card = 0; card < 2 - (col % 2); card++) {
-                ctx.fillRect(fx3 + 3 + col * (fw / 3), fy3 + 4 + card * 7, fw / 3 - 5, 5)
-              }
-            }
-          } else if (key2 === 'premarket') {
-            ctx.fillStyle = '#f0b45a'
-            ctx.beginPath()
-            ctx.arc(fx3 + fw / 2, fy3 + fh * 0.72, fw * 0.22, Math.PI, 0)
-            ctx.fill()
-            ctx.strokeStyle = '#c98a3a'
-            ctx.lineWidth = 1
-            ctx.beginPath()
-            ctx.moveTo(fx3 + 2, fy3 + fh * 0.72)
-            ctx.lineTo(fx3 + fw - 2, fy3 + fh * 0.72)
-            ctx.stroke()
-            for (const a of [-0.9, -0.45, 0, 0.45, 0.9]) {
-              ctx.beginPath()
-              ctx.moveTo(
-                fx3 + fw / 2 + Math.sin(a) * fw * 0.28,
-                fy3 + fh * 0.72 - Math.cos(a) * fh * 0.42,
-              )
-              ctx.lineTo(
-                fx3 + fw / 2 + Math.sin(a) * fw * 0.36,
-                fy3 + fh * 0.72 - Math.cos(a) * fh * 0.58,
-              )
-              ctx.stroke()
-            }
-          } else if (key2 === 'ops') {
-            ctx.fillStyle = '#8fd98f'
-            for (let b2 = 0; b2 < 4; b2++) {
-              const bh2 = fh * (0.25 + 0.16 * ((b2 * 2) % 3))
-              ctx.fillRect(fx3 + 3 + b2 * (fw / 4), fy3 + fh - 2 - bh2, fw / 4 - 4, bh2)
-            }
-          } else if (key2 === 'content') {
-            ctx.fillStyle = '#d97fa0'
-            ctx.beginPath()
-            ctx.arc(fx3 + fw / 2, fy3 + fh / 2, Math.min(fw, fh) * 0.34, 0, Math.PI * 2)
-            ctx.fill()
-            ctx.fillStyle = '#e8e2d0'
-            ctx.beginPath()
-            ctx.moveTo(fx3 + fw / 2 - 2, fy3 + fh / 2 - 4)
-            ctx.lineTo(fx3 + fw / 2 + 4, fy3 + fh / 2)
-            ctx.lineTo(fx3 + fw / 2 - 2, fy3 + fh / 2 + 4)
-            ctx.closePath()
-            ctx.fill()
-          } else {
-            ctx.strokeStyle = '#8a7a5a'
-            ctx.lineWidth = 1
-            for (let l2 = 0; l2 < 4; l2++) {
-              ctx.beginPath()
-              ctx.moveTo(fx3 + 3, fy3 + 4 + l2 * (fh / 4.5))
-              ctx.lineTo(fx3 + fw - 3, fy3 + 4 + l2 * (fh / 4.5))
-              ctx.stroke()
-            }
-            ctx.fillStyle = '#7fb2d9'
-            ctx.fillRect(fx3 + fw - 10, fy3 + 3, 7, 5)
-          }
-        }
-        // side desk with lamp and mug (opposite the floor accessory)
-        {
-          const dxc = X(bay.x + bay.half * 0.58),
-            dyg = Y(bay.ground - 0.012)
-          const dwj = S * 0.085,
-            dhj = S * 0.062
-          ctx.fillStyle = '#5a4428'
-          ctx.fillRect(dxc - dwj / 2, dyg - dhj, dwj, S * 0.01)
-          ctx.fillRect(dxc - dwj / 2 + S * 0.006, dyg - dhj + S * 0.01, S * 0.008, dhj - S * 0.01)
-          ctx.fillRect(dxc + dwj / 2 - S * 0.014, dyg - dhj + S * 0.01, S * 0.008, dhj - S * 0.01)
-          // warm desk lamp, lit with the office
-          const lx2 = dxc + dwj * 0.28,
-            ly2 = dyg - dhj
-          if (occupied) {
-            const glow = ctx.createRadialGradient(
-              lx2,
-              ly2 - S * 0.02,
-              1,
-              lx2,
-              ly2 - S * 0.02,
-              S * 0.095,
-            )
-            glow.addColorStop(0, 'rgba(255,220,150,0.40)')
-            glow.addColorStop(1, 'rgba(255,220,150,0)')
-            ctx.fillStyle = glow
-            ctx.fillRect(lx2 - S * 0.095, ly2 - S * 0.11, S * 0.19, S * 0.15)
-          }
-          ctx.strokeStyle = '#8a7a4a'
-          ctx.lineWidth = Math.max(1, S * 0.005)
-          ctx.beginPath()
-          ctx.moveTo(lx2, ly2)
-          ctx.lineTo(lx2, ly2 - S * 0.022)
-          ctx.stroke()
-          ctx.fillStyle = '#3f9a52'
-          ctx.beginPath()
-          ctx.ellipse(lx2, ly2 - S * 0.025, S * 0.016, S * 0.008, 0, Math.PI, 0)
-          ctx.fill()
-          // mug
-          ctx.fillStyle = '#b45a4a'
-          ctx.fillRect(dxc - dwj * 0.28, ly2 - S * 0.014, S * 0.013, S * 0.014)
+          ctx.fillStyle = 'rgba(120,100,80,0.35)'
+          ctx.fillRect(lx - S * 0.024, Y(T.top + 0.018), S * 0.048, dh * 0.004)
         }
       }
 
-      // ── floor 1 lobby: wall clock, house letters, bench plants ──
-      {
-        const cx = X(CLOCK.x),
-          cy = Y(CLOCK.y),
-          r = S * CLOCK.r
-        ctx.beginPath()
-        ctx.arc(cx, cy, r, 0, Math.PI * 2)
-        ctx.fillStyle = '#e6e2d4'
-        ctx.fill()
-        ctx.lineWidth = Math.max(2, r * 0.09)
-        ctx.strokeStyle = '#2a2320'
-        ctx.stroke()
-        const et = trading?.market?.et?.match(/(\d{1,2}):(\d{2})/)
-        if (et) {
-          const hh = (parseInt(et[1], 10) % 12) + parseInt(et[2], 10) / 60
-          const mm = parseInt(et[2], 10)
-          const ha = (hh / 12) * Math.PI * 2 - Math.PI / 2
-          const ma = (mm / 60) * Math.PI * 2 - Math.PI / 2
-          ctx.strokeStyle = '#2a2320'
-          ctx.lineWidth = Math.max(1.5, r * 0.09)
-          ctx.beginPath()
-          ctx.moveTo(cx, cy)
-          ctx.lineTo(cx + Math.cos(ha) * r * 0.5, cy + Math.sin(ha) * r * 0.5)
-          ctx.stroke()
-          ctx.lineWidth = Math.max(1, r * 0.055)
-          ctx.beginPath()
-          ctx.moveTo(cx, cy)
-          ctx.lineTo(cx + Math.cos(ma) * r * 0.78, cy + Math.sin(ma) * r * 0.78)
-          ctx.stroke()
-          ctx.fillStyle = '#2a2320'
-          ctx.beginPath()
-          ctx.arc(cx, cy, r * 0.08, 0, Math.PI * 2)
-          ctx.fill()
+      // ── actors ──
+      const H = S * 0.16
+      for (const a of actors) {
+        let ax = X(a.x)
+        let flip = !!a.flip
+        if (a.pose === 'walk') {
+          const p = (now % PATROL.period) / PATROL.period
+          const goingRight = p < 0.5
+          const uu = goingRight ? p * 2 : 1 - (p - 0.5) * 2
+          ax = X(PATROL.x0 + (PATROL.x1 - PATROL.x0) * uu)
+          flip = !goingRight
         }
-        ctx.fillStyle = 'rgba(160,200,180,0.45)'
-        ctx.font = `${Math.max(7, S * 0.02)}px ${MONO}`
+        drawRobot(ctx, ax, Y(a.y), a.chief ? H * 1.3 : H, { ...a, flip }, now)
+        if (a.tag) bubbleAt(ctx, ax, Y(a.y) - (a.chief ? H * 1.3 : H) * 1.05, a.tag, S, true)
+      }
+      const plates: [number, number, string][] = [
+        [0.155, T3.ground, 'STRATEGY'],
+        [0.16, T2.ground, 'BUILD'],
+        [0.84, T2.ground, 'CHIEF'],
+      ]
+      for (const [pxF, pyF, txt] of plates) {
+        ctx.font = `bold ${Math.max(7, S * 0.016)}px ${MONO}`
+        const w = ctx.measureText(txt).width + S * 0.02
+        rr(ctx, X(pxF) - w / 2, Y(pyF) + dh * 0.014, w, S * 0.026, 3, '#54341c')
+        rr(ctx, X(pxF) - w / 2 + 1.5, Y(pyF) + dh * 0.014 + 1.5, w - 3, S * 0.026 - 3, 2, P.gold)
+        ctx.fillStyle = '#3b240f'
         ctx.textAlign = 'center'
-        ctx.fillText('T E R R A R I U M', cx, cy + r + S * 0.032)
-        ctx.textAlign = 'left'
-      }
-      // lobby bench under the clock + elevator doormat
-      {
-        const bx2 = X(CLOCK.x),
-          by2 = Y(F1.ground - 0.01)
-        ctx.fillStyle = '#5a4428'
-        ctx.fillRect(bx2 - S * 0.07, by2 - S * 0.03, S * 0.14, S * 0.012)
-        ctx.fillRect(bx2 - S * 0.058, by2 - S * 0.018, S * 0.008, S * 0.018)
-        ctx.fillRect(bx2 + S * 0.05, by2 - S * 0.018, S * 0.008, S * 0.018)
-        ctx.fillStyle = 'rgba(255,255,255,0.06)'
-        ctx.fillRect(bx2 - S * 0.07, by2 - S * 0.03, S * 0.14, S * 0.004)
-        const mx2 = X((SHAFT.x0 + SHAFT.x1) / 2)
-        ctx.fillStyle = 'rgba(120,90,50,0.45)'
-        ctx.fillRect(mx2 - S * 0.055, Y(F1.ground - 0.004), S * 0.11, dh * 0.012)
-      }
-      for (const fx of [0.305, 0.605]) {
-        const px2 = X(fx),
-          py2 = Y(F1.ground - 0.01)
-        ctx.fillStyle = '#7a5230'
-        ctx.fillRect(px2 - S * 0.02, py2 - S * 0.036, S * 0.04, S * 0.036)
-        ctx.fillStyle = '#4f8f4a'
-        ctx.beginPath()
-        ctx.ellipse(px2, py2 - S * 0.056, S * 0.03, S * 0.026, 0, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.fillStyle = '#356534'
-        ctx.beginPath()
-        ctx.ellipse(px2 - S * 0.018, py2 - S * 0.046, S * 0.015, S * 0.013, 0, 0, Math.PI * 2)
-        ctx.fill()
-      }
-
-      // ── live tape on the board ──      // ── live tape on the board ──      // ── live tape on the board ──
-      const quotes = quotesFrom(board, trading)
-      if (now - lastPush > 400) {
-        lastPush = now
-        for (const q of quotes) {
-          const hist = sparkRef.current[q.symbol] ?? []
-          hist.push(q.last)
-          sparkRef.current[q.symbol] = hist.slice(-48)
-        }
-      }
-      for (const [i, scr] of WALL_PANELS.entries()) {
-        const q = quotes[i] ?? null
-        const hist = q ? (sparkRef.current[q.symbol] ?? []) : []
-        drawScreen(ctx, X(scr.x), Y(scr.y), dw * scr.w, dh * scr.h, q, hist, now)
-      }
-
-      // LED sign — the real session phase and clock
-      {
-        const sx = X(SIGN.x),
-          sy = Y(SIGN.y)
-        const sw = dw * SIGN.w,
-          sh = dh * SIGN.h
-        ctx.save()
-        ctx.beginPath()
-        ctx.roundRect(sx, sy, sw, sh, 4)
-        ctx.fillStyle = '#120a0b'
-        ctx.fill()
-        const open = trading?.market?.is_open
-        const label = phaseText(phase)
-        const et = trading?.market?.et?.match(/\d{1,2}:\d{2}/)?.[0] ?? ''
-        const flick = Math.sin(now / 320) > -0.92 ? 1 : 0.55
-        ctx.globalAlpha = flick
-        ctx.fillStyle = open ? '#ff5a4a' : '#e0b34d'
-        ctx.textAlign = 'center'
-        ctx.font = `bold ${Math.max(8, sh * 0.42)}px ${MONO}`
-        ctx.fillText(`${label}${et ? ` · ${et} ET` : ''}`, sx + sw / 2, sy + sh * 0.62)
-        ctx.textAlign = 'left'
-        ctx.restore()
-      }
-
-      // ── the cast ──
-
-      // bay monitors — each office's screen glows with its robot's status
-      for (const bay of BAYS) {
-        const st = stations.find((s) => s.key === bay.key)
-        if (!st) continue
-        const mw = S * 0.085,
-          mh = S * 0.07
-        const mx = X(bay.x) - bay.half * dw * 0.45 - mw / 2,
-          my = Y(bay.top + 0.04)
-        ctx.fillStyle = '#232a30'
-        ctx.beginPath()
-        ctx.roundRect(mx - 3, my - 3, mw + 6, mh + 6, 5)
-        ctx.fill()
-        const on = st.active && !st.down
-        const glow = st.down
-          ? 'rgba(240,113,106,0.5)'
-          : on
-            ? 'rgba(125,232,168,0.35)'
-            : 'rgba(120,130,140,0.20)'
-        ctx.fillStyle = on ? '#0b1a12' : '#10151a'
-        ctx.fillRect(mx, my, mw, mh)
-        ctx.fillStyle = glow
-        ctx.fillRect(mx, my, mw, mh * 0.16)
-        if (on) {
-          ctx.strokeStyle = 'rgba(125,232,168,0.6)'
-          ctx.lineWidth = 1
-          ctx.beginPath()
-          for (let i = 0; i <= 12; i++) {
-            const px = mx + (i / 12) * mw
-            const py = my + mh * 0.62 + Math.sin(now / 260 + i * 0.9 + bay.x * 20) * mh * 0.14
-            i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)
-          }
-          ctx.stroke()
-        }
-      }
-
-      const order = [...stations].sort((a, b) => a.y - b.y)
-
-      for (const [i, s] of order.entries()) {
-        let x = X(s.x)
-        let y = Y(s.y)
-        let flip = s.flip
-        let pose = s.action
-        if (s.action === 'walk') {
-          if (s.present) {
-            const wpos = walkAt(now)
-            x = X(wpos.x)
-            y = Y(wpos.y)
-            flip = wpos.flip
-          } else {
-            pose = 'sit' // heartbeat not fresh: the live bot sits at its pit terminal
-          }
-        }
-        const H = S * POSE_H[pose]
-        const st = {
-          working: s.active && !s.down,
-          pending: s.pending,
-          down: s.down,
-          sleep: s.sleep,
-        }
-        shadow(ctx, x, y, H * 0.55)
-        drawBot(ctx, x, y, H, pose, now, i, st, flip)
-        ctx.font = `bold 11px ${MONO}`
-        ctx.textAlign = 'center'
-        ctx.save()
-        ctx.globalAlpha = 0.9
-        ctx.fillStyle = 'rgba(6,8,10,0.65)'
-        const lw2 = ctx.measureText(s.label).width + 12
-        ctx.fillRect(x - lw2 / 2, y + 6, lw2, 16)
-        ctx.fillStyle = s.down ? P.red : s.pending ? P.amber : P.text
-        ctx.fillText(s.label, x, y + 18)
-        ctx.restore()
+        ctx.fillText(txt, X(pxF), Y(pyF) + dh * 0.014 + S * 0.019)
         ctx.textAlign = 'left'
       }
 
-      const withBubbles = stations.filter((s) => s.bubble)
-      if (withBubbles.length) {
-        const pick = withBubbles[Math.floor(now / 5000) % withBubbles.length]
-        if (pick.key !== bubbleKey) {
-          bubbleKey = pick.key
-          bubbleAt = now
-        }
-        const pop = Math.min(1, (now - bubbleAt) / 240)
-        const ease = 1 - (1 - pop) ** 3
-        ctx.font = `bold 13px ${MONO}`
-        const text = pick.bubble?.slice(0, 40)
-        const tw = ctx.measureText(text).width
-        const bw = Math.min(tw + 28, 330)
-        const bh = 30
-        const tail = 8
-        const cxb = X(pick.x)
-        const bx = Math.max(dx + 6, Math.min(dx + dw - bw - 6, cxb - bw / 2))
-        const by = Math.max(dy + 6, Y(pick.y) - S * POSE_H[pick.action] * 1.14 - dh * 0.045 - bh)
-        const tipX = Math.max(bx + 14, Math.min(bx + bw - 14, cxb))
-        const accent = pick.down ? 'rgba(240,113,106,0.85)' : 'rgba(217,164,65,0.85)'
-        ctx.save()
-        ctx.globalAlpha = ease
-        ctx.translate(tipX, by + bh + tail)
-        ctx.scale(0.86 + 0.14 * ease, 0.86 + 0.14 * ease)
-        ctx.translate(-tipX, -(by + bh + tail))
-        // body + tail as one shape, soft tinted shadow
-        ctx.shadowColor = 'rgba(8,6,3,0.35)'
-        ctx.shadowBlur = 10
-        ctx.shadowOffsetY = 3
-        ctx.beginPath()
-        ctx.roundRect(bx, by, bw, bh, 9)
-        ctx.moveTo(tipX - 7, by + bh)
-        ctx.lineTo(tipX, by + bh + tail)
-        ctx.lineTo(tipX + 7, by + bh)
-        ctx.closePath()
-        ctx.fillStyle = '#f6f2e4'
-        ctx.fill()
-        ctx.shadowColor = 'transparent'
-        ctx.strokeStyle = accent
-        ctx.lineWidth = 1.4
-        ctx.stroke()
-        // text
-        ctx.fillStyle = '#2b241a'
-        ctx.textAlign = 'center'
-        ctx.fillText(text, bx + bw / 2, by + 20)
-        ctx.textAlign = 'left'
-        ctx.restore()
+      // ── one speech bubble at a time ──
+      const speakers = actors.filter((a) => a.bubble)
+      if (speakers.length) {
+        const pick = speakers[Math.floor(now / 5000) % speakers.length]
+        const px3 = pick.pose === 'walk' ? X(0.38) : X(pick.x)
+        bubbleAt(
+          ctx,
+          px3,
+          Y(pick.y) - (pick.chief ? H * 1.35 : H * 1.02) - S * 0.045,
+          pick.bubble as string,
+          S,
+        )
       }
 
-      // office mail in flight — above the rooms, under the vignette
-      for (let i = memos.length - 1; i >= 0; i--) {
-        const m = memos[i]
-        const t = (now - m.t0) / m.dur
-        if (t > 1.15) {
-          memos.splice(i, 1)
+      // ── packets in flight ──
+      for (let i = packets.length - 1; i >= 0; i--) {
+        const p = packets[i]
+        const t = (now - p.t0) / p.dur
+        if (t > 1.1) {
+          packets.splice(i, 1)
           continue
         }
         const tt = Math.min(1, t)
-        const pts = m.pts.map(([fx, fy]) => [X(fx), Y(fy)] as [number, number])
+        const pts = p.pts.map(([fx, fy]) => [X(fx), Y(fy)] as [number, number])
         const segs: number[] = []
         let total = 0
         for (let k = 0; k < pts.length - 1; k++) {
@@ -2084,63 +1030,53 @@ export default function VesperFloor() {
         }
         const e = tt < 0.5 ? 2 * tt * tt : 1 - (-2 * tt + 2) ** 2 / 2
         let dist = e * total
-        let px = pts[pts.length - 1][0],
-          py = pts[pts.length - 1][1]
+        let qx = pts[pts.length - 1][0]
+        let qy = pts[pts.length - 1][1]
         for (let k = 0; k < segs.length; k++) {
           if (dist <= segs[k]) {
             const f = segs[k] ? dist / segs[k] : 1
-            px = pts[k][0] + (pts[k + 1][0] - pts[k][0]) * f
-            py = pts[k][1] + (pts[k + 1][1] - pts[k][1]) * f
+            qx = pts[k][0] + (pts[k + 1][0] - pts[k][0]) * f
+            qy = pts[k][1] + (pts[k + 1][1] - pts[k][1]) * f
             break
           }
           dist -= segs[k]
         }
-        ctx.save()
         if (t <= 1) {
-          py += Math.sin(now / 90 + i * 2) * 1.5
-          const w = S * 0.03,
-            h = w * 0.68
-          ctx.shadowColor = 'rgba(8,6,3,0.35)'
-          ctx.shadowBlur = 6
-          ctx.shadowOffsetY = 2
-          ctx.fillStyle = '#f6f2e4'
-          ctx.fillRect(px - w / 2, py - h / 2, w, h)
-          ctx.shadowColor = 'transparent'
-          ctx.strokeStyle = m.tint
-          ctx.lineWidth = 1.2
-          ctx.strokeRect(px - w / 2, py - h / 2, w, h)
-          ctx.beginPath()
-          ctx.moveTo(px - w / 2, py - h / 2)
-          ctx.lineTo(px, py + h * 0.12)
-          ctx.lineTo(px + w / 2, py - h / 2)
-          ctx.stroke()
+          const w = S * 0.03
+          ctx.save()
+          ctx.shadowColor = 'rgba(10,6,3,0.4)'
+          ctx.shadowBlur = 5
+          if (p.kind === 'rfc') {
+            rr(ctx, qx - w / 2, qy - w * 0.34, w, w * 0.62, 2, '#e8c94a')
+            ctx.shadowColor = 'transparent'
+            rr(ctx, qx - w / 2, qy - w * 0.34, w * 0.45, w * 0.16, 2, '#d9b433')
+          } else {
+            rr(ctx, qx - w / 2, qy - w * 0.3, w, w * 0.58, 2, P.cream)
+            ctx.shadowColor = 'transparent'
+            ctx.strokeStyle = P.goldDim
+            ctx.beginPath()
+            ctx.moveTo(qx - w / 2, qy - w * 0.3)
+            ctx.lineTo(qx, qy + w * 0.05)
+            ctx.lineTo(qx + w / 2, qy - w * 0.3)
+            ctx.stroke()
+          }
+          ctx.restore()
         } else {
-          // delivered — a soft flash where it landed
-          const f = (t - 1) / 0.15
-          const g = ctx.createRadialGradient(px, py, 0, px, py, S * 0.05)
-          g.addColorStop(0, `rgba(246,242,228,${0.5 * (1 - f)})`)
-          g.addColorStop(1, 'rgba(246,242,228,0)')
+          const f = (t - 1) / 0.1
+          const g = ctx.createRadialGradient(qx, qy, 0, qx, qy, S * 0.04)
+          g.addColorStop(0, `rgba(232,201,74,${0.5 * (1 - f)})`)
+          g.addColorStop(1, 'rgba(232,201,74,0)')
           ctx.fillStyle = g
-          ctx.fillRect(px - S * 0.05, py - S * 0.05, S * 0.1, S * 0.1)
+          ctx.fillRect(qx - S * 0.04, qy - S * 0.04, S * 0.08, S * 0.08)
         }
-        ctx.restore()
       }
 
-      // vignette pulls the eye to the cast
-      {
-        const g = ctx.createRadialGradient(
-          rect.width / 2,
-          rect.height * 0.58,
-          rect.height * 0.35,
-          rect.width / 2,
-          rect.height * 0.58,
-          rect.width * 0.72,
-        )
-        g.addColorStop(0, 'rgba(0,0,0,0)')
-        g.addColorStop(1, 'rgba(4,6,8,0.30)')
-        ctx.fillStyle = g
-        ctx.fillRect(0, 0, rect.width, rect.height)
-      }
+      // warm vignette
+      const vg = ctx.createRadialGradient(dw / 2, dh * 0.55, dh * 0.3, dw / 2, dh * 0.55, dw * 0.7)
+      vg.addColorStop(0, 'rgba(0,0,0,0)')
+      vg.addColorStop(1, 'rgba(10,5,2,0.34)')
+      ctx.fillStyle = vg
+      ctx.fillRect(0, 0, dw, dh)
 
       raf = requestAnimationFrame(draw)
     }
@@ -2149,8 +1085,9 @@ export default function VesperFloor() {
   }, [])
 
   return (
-    <div className="floor-frame">
-      <canvas ref={canvasRef} />
-    </div>
+    <canvas
+      ref={canvasRef}
+      style={{ width: '100%', height: '100%', display: 'block', minHeight: 0 }}
+    />
   )
 }

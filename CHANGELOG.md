@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.16.0 - 2026-08-26 — WARM EMBER TERRARIUM A
+
+- The stage reborn to the marked-favorite reference: rounded mahogany
+  shell in a pine night, three tiers — the 3F hall (Strategy desk, house
+  plaque, hall meet), 2F systems (Build's tablet, the Chief with
+  Nightbell + binder), 1F PIT PATROL (KERNEL · LIVE · PAPER, locker,
+  charts, PASS stamp, orange emblem). ELEVATOR RFC spans the shaft; a
+  real RFC rides it as a yellow folder.
+- New cast: ivory-cream robots with round amber-gold glowing eyes; the
+  Chief stays the only red. Candle-warm light everywhere.
+- The in-stage banner carries the doctor's full state matrix — it cannot
+  say GO while the doctor is amber.
+- Every law kept: artifact lamps, sleep at night, one patrol, meet only
+  on live handoff, read-only always. Goldens regenerated (all 4,
+  intentional). Rollback: tag v0.15.1 / branch checkpoint/pre-ember.
+
 ## v0.15.1 - 2026-08-26 — the chrome catches up to the bell
 
 First pass by the new UI/UX seat, scoped to three fixes:

@@ -45,27 +45,28 @@ with the `?` button in the header. Useful URL params: `?phase=night|dawn|day|dus
 previews the room lighting, `?view=home` deep-links the agent's home page,
 `?intro=0` skips the overlay (kiosk displays).
 
-## How to read the building (the company chart, drawn)
+## How to read the building (Warm Ember Terrarium A)
 
-- **3F — Chief / Vesper HQ** — the chief of staff. Bubble = the morning
-  brief when it's in, else the latest Strategy verdict. Lights only when
-  the chief itself ran — never because someone downstairs was busy.
-- **2F — Strategy & Build** — the on-call departments (asleep at night,
-  lids closed), with the desk annexes (ops, content, projects) across
-  the shaft. **Lamps are artifact-driven:**
+- **The banner** — full-width, the doctor's truth: GO / NIGHT WATCH /
+  DEGRADED / NOT READY / KILL / TELEMETRY DOWN, cause included. It can
+  never say GO while the doctor is amber.
+- **3F — the hall** — Strategy at its desk (asleep on quiet nights), the
+  gold house plaque, ELEVATOR RFC, and the hall-meet pair who only speak
+  when a real Strategy→Build handoff is live.
+- **2F — systems** — Build with its tablet (screen lights on a fresh
+  commit) and the Chief by candlelight with the brief binder and the
+  NIGHTBELL, which glows only when phone-worthy alarms fire. Chief's
+  bubble: brief → strategy verdict → "night watch — no brief". **Lamps are artifact-driven:**
   Strategy lights when an RFC file changed in the last 20 minutes; Build
   lights when a commit landed in a hub repo. Talk lights nothing.
-- **1F — one wide TRADING PIT** — the ground-floor plant: LIVE + PAPER
-  terminals, the premarket briefing desk, and the KERNEL locker (green
-  padlock = armed & watched, red open shackle = KILL) drawn from real
-  kill-switch + watchdog telemetry. Display only — no trading controls
-  exist here. The live robot patrols the pit (LIVE → KERNEL → PAPER) on
-  a fresh heartbeat and sits at its terminal when the heartbeat goes
-  stale. The lobby keeps its clock, benches, and letters.
-- **The NIGHTBELL** — a brass bell by the executive shaft: unlit in
-  peace, glowing and swinging only when phone-worthy alarms fire (doctor
-  NOT READY, KILL, stranded, stale) — the same patterns that page the
-  owner. A new RFC also sends a yellow folder Strategy → Build.
+- **1F — PIT PATROL** — KERNEL · LIVE · PAPER, named. The kernel locker's
+  padlock closes green when armed & watched, swings open red on KILL;
+  LIVE patrols only on a fresh heartbeat (stands when stale); PAPER keeps
+  the stack and the PASS stamp by the orange floor emblem. Display only —
+  no trading controls exist anywhere on this surface.
+- **A real RFC** rides the elevator as a yellow folder, Strategy → Build;
+  the chief's finished brief leaves as an envelope. Nothing moves for
+  decoration; the scheduled desk seats report through the left rail.
 - **The big board** — charts the symbols the trading engine judged this
   session, drawn from its real decision log.
 - **The LED sign** — the real market session clock (pre-market, open,
