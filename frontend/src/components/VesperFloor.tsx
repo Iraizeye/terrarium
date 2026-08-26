@@ -229,6 +229,12 @@ export default function VesperFloor() {
     let seenStrategyAt: string | null | undefined
     let seenChiefRan: string | null | undefined
     let meetTalkUntil = 0 // real handoff opens ~8s of hall talk, then idle
+    // pit excursions: a fresh heartbeat sends each bot toward its prop and back
+    let prevLiveAge: number | null = null
+    let prevPaperAge: number | null = null
+    let liveExcT0 = Number.NEGATIVE_INFINITY
+    let paperExcT0 = Number.NEGATIVE_INFINITY
+    let kernelExcT0 = Number.NEGATIVE_INFINITY
     const spawnRfc = (now: number) =>
       packets.length < 2 &&
       packets.push({
@@ -315,6 +321,20 @@ export default function VesperFloor() {
             meetTalkUntil = now + 8000
           }
         }
+        // a heartbeat landing = age dropping back toward zero
+        const la = trading?.modes?.live?.heartbeat_age_s ?? null
+        if (la != null) {
+          if (prevLiveAge != null && la < prevLiveAge - 4) {
+            liveExcT0 = now
+            if (wd && !kill) kernelExcT0 = now + 350 // the guard checks its lock
+          }
+          prevLiveAge = la
+        }
+        const pa = trading?.modes?.paper?.heartbeat_age_s ?? null
+        if (pa != null) {
+          if (prevPaperAge != null && pa < prevPaperAge - 4) paperExcT0 = now
+          prevPaperAge = pa
+        }
       }
 
       // ── the robots: traced sprites with a pose layer, idle by default ──
@@ -359,12 +379,21 @@ export default function VesperFloor() {
       }
       const pose = (on: boolean, sleeps: boolean): Pose =>
         on ? 'active' : night && sleeps ? 'sleep' : 'idle'
+      const ease01 = (u: number) => {
+        const c = Math.max(0, Math.min(1, u))
+        return c < 0.5 ? 2 * c * c : 1 - (-2 * c + 2) ** 2 / 2
+      }
       // strategy at the laptop — active while the RFC artifact is fresh
       sprite(SPRITES.strategy, pose(stratOn, true), 0, bob(3200, 1.5, stratOn))
-      // hall pair — talk sprites for ~8s on a real handoff, then idle
+      // hall pair — on a real handoff they STEP together (500ms ease in),
+      // talk for ~8s with a nod, then ease back to their marks (600ms)
+      const step =
+        meetTalkUntil > 0
+          ? ease01((now - (meetTalkUntil - 8000)) / 500) * (1 - ease01((now - meetTalkUntil) / 600))
+          : 0
       const meetPose: Pose = talking ? 'talk' : night ? 'sleep' : 'idle'
-      sprite(SPRITES.meetA, meetPose, talking ? 3 : 0, bob(1800, 1, talking))
-      sprite(SPRITES.meetB, meetPose, talking ? -3 : 0, bob(1800, 1, talking, Math.PI))
+      sprite(SPRITES.meetA, meetPose, 14 * step, bob(1800, 1, talking))
+      sprite(SPRITES.meetB, meetPose, -14 * step, bob(1800, 1, talking, Math.PI))
       // build at the tablet — active while the last commit is fresh
       sprite(SPRITES.build, pose(buildOn, true), 0, bob(2800, 1.5, buildOn))
       // chief: smoked visor, no eye glow — idle, gentle bob after a real run
@@ -374,18 +403,27 @@ export default function VesperFloor() {
         0,
         bob(3600, 1, chiefRan),
       )
-      // the pit never dims — SYSTEMS NEVER SLEEP — subtle patrol offset on hb
-      sprite(SPRITES.kernel, wd && !kill ? 'active' : 'idle', bob(8400, 2.5, wd && !kill), 0)
+      // the pit never dims — SYSTEMS NEVER SLEEP. A fresh heartbeat sends
+      // each bot easing toward its prop (locker / charts / stack) and back;
+      // between heartbeats they stand on their marks. Never constant walking.
+      const exc = (t0: number) => {
+        const t = now - t0
+        if (t < 0 || t > 1800) return 0
+        if (t < 600) return ease01(t / 600)
+        if (t < 1100) return 1
+        return 1 - ease01((t - 1100) / 700)
+      }
+      sprite(SPRITES.kernel, wd && !kill ? 'active' : 'idle', -10 * exc(kernelExcT0), 0)
       sprite(
         SPRITES.live,
         liveHb ? 'active' : !liveStale ? 'sleep' : 'idle',
-        bob(9200, 3, liveHb),
+        10 * exc(liveExcT0),
         0,
       )
       sprite(
         SPRITES.paper,
         paperHb ? 'active' : !paperStale ? 'sleep' : 'idle',
-        bob(9800, 3, paperHb, Math.PI / 2),
+        8 * exc(paperExcT0),
         0,
       )
 
