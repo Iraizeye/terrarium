@@ -42,7 +42,7 @@ const BANNER = { x: 0.075, y: 0.045, w: 0.85, h: 0.056 }
 const T3 = { top: 0.125, ground: 0.39 }
 const T2 = { top: 0.415, ground: 0.675 }
 const T1 = { top: 0.7, ground: 0.935 }
-const ELEV = { x0: 0.445, x1: 0.555 }
+const ELEV = { x0: 0.465, x1: 0.585 }
 const PATROL = { x0: 0.14, x1: 0.62, period: 19000 }
 
 // ── palette: warm ember ──────────────────────────────────────────────────────
@@ -226,9 +226,10 @@ function plaqueAt(
   w: number,
   lines: string[],
   S: number,
+  icon?: 'gear' | 'shield',
 ) {
   const lh = S * 0.026
-  const h = lh * lines.length + S * 0.02
+  const h = lh * lines.length + S * 0.02 + (icon ? S * 0.034 : 0)
   rr(ctx, x - w / 2 - 2, y - 2, w + 4, h + 4, 4, '#54341c')
   rr(ctx, x - w / 2, y, w, h, 3, '#2c1c10')
   ctx.strokeStyle = P.goldDim
@@ -240,7 +241,65 @@ function plaqueAt(
     ctx.fillStyle = i === 0 ? P.gold : P.goldDim
     ctx.fillText(ln, x, y + S * 0.026 + i * lh)
   })
+  if (icon) {
+    const iy = y + lh * lines.length + S * 0.024
+    ctx.strokeStyle = P.goldDim
+    ctx.fillStyle = P.goldDim
+    if (icon === 'gear') {
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.arc(x, iy, S * 0.009, 0, Math.PI * 2)
+      ctx.stroke()
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2
+        ctx.beginPath()
+        ctx.moveTo(x + Math.cos(a) * S * 0.009, iy + Math.sin(a) * S * 0.009)
+        ctx.lineTo(x + Math.cos(a) * S * 0.014, iy + Math.sin(a) * S * 0.014)
+        ctx.stroke()
+      }
+    } else {
+      ctx.beginPath()
+      ctx.moveTo(x, iy - S * 0.012)
+      ctx.lineTo(x + S * 0.011, iy - S * 0.006)
+      ctx.lineTo(x + S * 0.011, iy + S * 0.004)
+      ctx.lineTo(x, iy + S * 0.014)
+      ctx.lineTo(x - S * 0.011, iy + S * 0.004)
+      ctx.lineTo(x - S * 0.011, iy - S * 0.006)
+      ctx.closePath()
+      ctx.fill()
+    }
+  }
   ctx.textAlign = 'left'
+}
+
+// wall sconce: the fixture is always there; the glow obeys the light law
+function sconceAt(ctx: CanvasRenderingContext2D, x: number, y: number, S: number, on: boolean) {
+  ctx.fillStyle = '#3a281a'
+  ctx.fillRect(x - S * 0.003, y, S * 0.006, S * 0.016)
+  const sg = ctx.createLinearGradient(x, y - S * 0.028, x, y)
+  sg.addColorStop(0, on ? '#8a6a34' : '#4a3826')
+  sg.addColorStop(1, on ? '#5f4826' : '#32241610'.slice(0, 7))
+  ctx.fillStyle = sg
+  ctx.beginPath()
+  ctx.moveTo(x - S * 0.012, y - S * 0.028)
+  ctx.lineTo(x + S * 0.012, y - S * 0.028)
+  ctx.lineTo(x + S * 0.02, y)
+  ctx.lineTo(x - S * 0.02, y)
+  ctx.closePath()
+  ctx.fill()
+  if (on) {
+    ctx.fillStyle = '#ffe9b8'
+    ctx.beginPath()
+    ctx.ellipse(x, y - S * 0.002, S * 0.013, S * 0.005, 0, 0, Math.PI * 2)
+    ctx.fill()
+    const g = ctx.createRadialGradient(x, y + S * 0.01, 1, x, y + S * 0.01, S * 0.09)
+    g.addColorStop(0, 'rgba(246,197,110,0.3)')
+    g.addColorStop(1, 'rgba(246,197,110,0)')
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.arc(x, y + S * 0.01, S * 0.09, 0, Math.PI * 2)
+    ctx.fill()
+  }
 }
 
 // ── the robots: painted cream boxes, big amber eyes, one red chief ──────────
@@ -381,16 +440,21 @@ function drawRobot(
   const torsoY = a.pose === 'sit' ? -u * 0.52 : -u * 0.6
   shadedBox(ctx, -u * 0.25, torsoY - bob, u * 0.5, u * 0.42, u * 0.1, base, hi, lo)
   if (chief) {
+    // gold crest badge on the chest — the reference's emblem
     ctx.fillStyle = P.gold
     ctx.beginPath()
-    ctx.moveTo(0, torsoY - bob + u * 0.05)
-    ctx.lineTo(-u * 0.05, torsoY - bob + u * 0.2)
-    ctx.lineTo(0, torsoY - bob + u * 0.36)
-    ctx.lineTo(u * 0.05, torsoY - bob + u * 0.2)
+    ctx.moveTo(0, torsoY - bob + u * 0.1)
+    ctx.lineTo(u * 0.055, torsoY - bob + u * 0.14)
+    ctx.lineTo(u * 0.055, torsoY - bob + u * 0.2)
+    ctx.lineTo(0, torsoY - bob + u * 0.26)
+    ctx.lineTo(-u * 0.055, torsoY - bob + u * 0.2)
+    ctx.lineTo(-u * 0.055, torsoY - bob + u * 0.14)
     ctx.closePath()
     ctx.fill()
-    ctx.fillStyle = '#eebc5e'
-    ctx.fillRect(-u * 0.03, torsoY - bob + u * 0.05, u * 0.06, u * 0.045)
+    ctx.fillStyle = '#8a5f1e'
+    ctx.beginPath()
+    ctx.arc(0, torsoY - bob + u * 0.175, u * 0.02, 0, Math.PI * 2)
+    ctx.fill()
   } else {
     // chest seam + small badge light
     ctx.strokeStyle = 'rgba(160,130,90,0.4)'
@@ -482,41 +546,56 @@ function drawRobot(
     }
   }
   // head: painted DOME with a dark visor band — the reference's helmet look
-  const headY = torsoY - bob - u * 0.42
-  const hg = ctx.createLinearGradient(0, headY, 0, headY + u * 0.42)
+  const headY = torsoY - bob - u * 0.5
+  const hg = ctx.createLinearGradient(0, headY, 0, headY + u * 0.56)
   hg.addColorStop(0, hi)
   hg.addColorStop(0.55, base)
   hg.addColorStop(1, lo)
   ctx.fillStyle = hg
   ctx.beginPath()
-  ctx.moveTo(-u * 0.3, headY + u * 0.42)
-  ctx.lineTo(-u * 0.3, headY + u * 0.2)
-  ctx.arc(0, headY + u * 0.2, u * 0.3, Math.PI, 0)
-  ctx.lineTo(u * 0.3, headY + u * 0.42)
+  ctx.moveTo(-u * 0.33, headY + u * 0.5)
+  ctx.lineTo(-u * 0.33, headY + u * 0.3)
+  ctx.arc(0, headY + u * 0.3, u * 0.33, Math.PI, 0)
+  ctx.lineTo(u * 0.33, headY + u * 0.5)
+  ctx.quadraticCurveTo(u * 0.33, headY + u * 0.56, u * 0.22, headY + u * 0.56)
+  ctx.lineTo(-u * 0.22, headY + u * 0.56)
+  ctx.quadraticCurveTo(-u * 0.33, headY + u * 0.56, -u * 0.33, headY + u * 0.5)
   ctx.closePath()
   ctx.fill()
   // dome spec highlight
   ctx.fillStyle = 'rgba(255,248,230,0.28)'
   ctx.beginPath()
-  ctx.ellipse(-u * 0.1, headY + u * 0.1, u * 0.1, u * 0.05, -0.5, 0, Math.PI * 2)
+  ctx.ellipse(-u * 0.12, headY + u * 0.14, u * 0.11, u * 0.055, -0.5, 0, Math.PI * 2)
   ctx.fill()
   // visor band: dark glass slot the eyes glow out of
-  const vg2 = ctx.createLinearGradient(0, headY + u * 0.14, 0, headY + u * 0.34)
-  vg2.addColorStop(0, chief ? '#38100e' : '#221a10')
-  vg2.addColorStop(1, chief ? '#200706' : '#151009')
+  const vg2 = ctx.createLinearGradient(0, headY + u * 0.2, 0, headY + u * 0.42)
+  vg2.addColorStop(0, chief ? '#1c2b28' : '#221a10')
+  vg2.addColorStop(1, chief ? '#0e1715' : '#151009')
   ctx.fillStyle = vg2
   ctx.beginPath()
-  ctx.roundRect(-u * 0.245, headY + u * 0.14, u * 0.49, u * 0.2, u * 0.1)
+  ctx.roundRect(-u * 0.26, headY + u * 0.2, u * 0.52, u * 0.22, u * 0.11)
   ctx.fill()
-  ctx.strokeStyle = 'rgba(0,0,0,0.4)'
+  ctx.strokeStyle = 'rgba(0,0,0,0.45)'
   ctx.lineWidth = 1
   ctx.stroke()
-  drawEyes(ctx, 0, headY + u * 0.24, u, a, t)
-  // chin plate
-  ctx.fillStyle = lo
-  ctx.beginPath()
-  ctx.roundRect(-u * 0.12, headY + u * 0.36, u * 0.24, u * 0.05, u * 0.02)
-  ctx.fill()
+  if (chief) {
+    // the Chief's visor is dark glass — presence, not eyes (per reference);
+    // a faint sweep keeps it readable as glass, red only when down
+    const sweep = ctx.createLinearGradient(-u * 0.2, headY + u * 0.2, u * 0.2, headY + u * 0.42)
+    sweep.addColorStop(0, 'rgba(120,200,190,0.12)')
+    sweep.addColorStop(0.5, 'rgba(120,200,190,0.02)')
+    sweep.addColorStop(1, 'rgba(120,200,190,0.08)')
+    ctx.fillStyle = sweep
+    ctx.beginPath()
+    ctx.roundRect(-u * 0.26, headY + u * 0.2, u * 0.52, u * 0.22, u * 0.11)
+    ctx.fill()
+    if (a.down) {
+      ctx.fillStyle = 'rgba(240,113,106,0.55)'
+      ctx.fillRect(-u * 0.18, headY + u * 0.29, u * 0.36, u * 0.03)
+    }
+  } else {
+    drawEyes(ctx, 0, headY + u * 0.31, u, a, t)
+  }
   // antenna
   ctx.fillStyle = lo
   ctx.fillRect(-u * 0.016, headY - u * 0.055, u * 0.032, u * 0.055)
@@ -603,7 +682,7 @@ export default function VesperFloor() {
           [0.175, T3.ground - 0.1],
           [elevMid, T3.ground - 0.1],
           [elevMid, T2.ground - 0.1],
-          [0.165, T2.ground - 0.1],
+          [0.31, T2.ground - 0.1],
         ],
       })
     const spawnBrief = (now: number) =>
@@ -788,8 +867,21 @@ export default function VesperFloor() {
         fg.addColorStop(1, P.floorB)
         ctx.fillStyle = fg
         ctx.fillRect(X(0.08), Y(T.ground - 0.016), dw * 0.84, dh * 0.028)
-        ctx.fillStyle = P.slab
-        ctx.fillRect(X(0.08), Y(T.ground + 0.012), dw * 0.84, dh * 0.02)
+        // thick front slab with a warm top lip — the shelf edge of the diorama
+        const sg2 = ctx.createLinearGradient(0, Y(T.ground + 0.012), 0, Y(T.ground + 0.042))
+        sg2.addColorStop(0, '#38230f')
+        sg2.addColorStop(0.25, '#241608')
+        sg2.addColorStop(1, '#170d05')
+        ctx.fillStyle = sg2
+        ctx.fillRect(X(0.07), Y(T.ground + 0.012), dw * 0.86, dh * 0.03)
+        ctx.fillStyle = 'rgba(232,164,78,0.12)'
+        ctx.fillRect(X(0.07), Y(T.ground + 0.012), dw * 0.86, 2)
+        // large wall panels (the reference's paneled backdrop)
+        ctx.strokeStyle = 'rgba(10,5,2,0.35)'
+        ctx.lineWidth = 2
+        for (let pxw = 0.1; pxw < 0.9; pxw += 0.105) {
+          ctx.strokeRect(X(pxw), Y(T.top + 0.03), dw * 0.09, dh * (T.ground - T.top - 0.075))
+        }
         // ceiling shadow: rooms are carved, not printed
         const cs = ctx.createLinearGradient(0, Y(T.top), 0, Y(T.top + 0.05))
         cs.addColorStop(0, 'rgba(15,8,4,0.5)')
@@ -825,7 +917,7 @@ export default function VesperFloor() {
         )
         for (const T of [T3, T2]) {
           const doorW = dw * (ELEV.x1 - ELEV.x0)
-          const doorH = dh * (T.ground - T.top) * 0.88
+          const doorH = dh * (T.ground - T.top) * (T === T3 ? 0.6 : 0.88)
           const dx2 = X(ELEV.x0)
           const dy2 = Y(T.ground) - doorH
           // frame
@@ -904,6 +996,17 @@ export default function VesperFloor() {
           ctx.fill()
         }
       }
+
+      // wall sconces: fixtures always present; glow obeys the light law
+      sconceAt(ctx, X(0.3), Y(T3.top + 0.05), S, freshISO(company?.strategy_at))
+      sconceAt(
+        ctx,
+        X(0.845),
+        Y(T3.top + 0.05),
+        S,
+        freshISO(company?.strategy_at) && freshISO(company?.build_at),
+      )
+      sconceAt(ctx, X(0.265), Y(T2.top + 0.05), S, freshISO(company?.build_at))
 
       // floor label plates, left wall (as the reference draws them)
       plaqueAt(ctx, X(0.115), Y(T3.top + 0.028), S * 0.062, ['3F', 'HALL'], S)
@@ -987,7 +1090,7 @@ export default function VesperFloor() {
         },
         {
           key: 'build',
-          x: 0.16,
+          x: 0.315,
           y: T2.ground,
           pose: 'tablet',
           working: buildOn,
@@ -1100,21 +1203,29 @@ export default function VesperFloor() {
       }
       plaqueAt(
         ctx,
-        X(0.365),
-        Y(T3.top + 0.035),
-        S * 0.16,
-        ['TERRARIUM A', 'OFFICE · SYSTEMS', 'GROWTH'],
+        X(0.5),
+        Y(T3.top + 0.03),
+        S * 0.24,
+        ['TERRARIUM A', 'OFFICE · SYSTEMS · GROWTH'],
         S,
       )
       {
-        const dwid = S * 0.085
-        const dhig = dh * (T3.ground - T3.top) * 0.6
-        rr(ctx, X(0.365) - dwid / 2, Y(T3.ground) - dhig, dwid, dhig, 4, '#2c1a0f')
-        ctx.strokeStyle = '#54341c'
-        ctx.strokeRect(X(0.365) - dwid / 2 + 3, Y(T3.ground) - dhig + 3, dwid - 6, dhig - 6)
+        // the 2F door, left of the elevator, with its mini plate
+        const doorX = 0.405
+        const dwid = S * 0.075
+        const dhig = dh * (T3.ground - T3.top) * 0.62
+        plaqueAt(ctx, X(doorX), Y(T3.ground) - dhig - S * 0.038, S * 0.045, ['2F'], S)
+        rr(ctx, X(doorX) - dwid / 2, Y(T3.ground) - dhig, dwid, dhig, 4, '#241408')
+        const dg2 = ctx.createLinearGradient(0, Y(T3.ground) - dhig, 0, Y(T3.ground))
+        dg2.addColorStop(0, '#3a2412')
+        dg2.addColorStop(1, '#241408')
+        ctx.fillStyle = dg2
+        ctx.fillRect(X(doorX) - dwid / 2 + 2, Y(T3.ground) - dhig + 2, dwid - 4, dhig - 2)
+        ctx.strokeStyle = '#4a2e16'
+        ctx.strokeRect(X(doorX) - dwid / 2 + 5, Y(T3.ground) - dhig + 6, dwid - 10, dhig - 10)
         ctx.fillStyle = P.gold
         ctx.beginPath()
-        ctx.arc(X(0.365) + dwid * 0.28, Y(T3.ground) - dhig * 0.45, S * 0.006, 0, Math.PI * 2)
+        ctx.arc(X(doorX) + dwid * 0.26, Y(T3.ground) - dhig * 0.46, S * 0.006, 0, Math.PI * 2)
         ctx.fill()
       }
       aoAt(ctx, X(0.9), Y(T3.ground), S * 0.07)
@@ -1129,23 +1240,7 @@ export default function VesperFloor() {
       }
 
       // ── 2F set dressing ──
-      plaqueAt(ctx, X(0.15), Y(T2.top + 0.035), S * 0.17, ['SYSTEMS NEVER SLEEP'], S)
-      {
-        const gx = X(0.252)
-        const gy = Y(T2.top + 0.052)
-        ctx.strokeStyle = P.goldDim
-        ctx.lineWidth = 2
-        ctx.beginPath()
-        ctx.arc(gx, gy, S * 0.011, 0, Math.PI * 2)
-        ctx.stroke()
-        for (let i = 0; i < 6; i++) {
-          const a = (i / 6) * Math.PI * 2
-          ctx.beginPath()
-          ctx.moveTo(gx + Math.cos(a) * S * 0.011, gy + Math.sin(a) * S * 0.011)
-          ctx.lineTo(gx + Math.cos(a) * S * 0.017, gy + Math.sin(a) * S * 0.017)
-          ctx.stroke()
-        }
-      }
+      plaqueAt(ctx, X(0.185), Y(T2.top + 0.07), S * 0.14, ['SYSTEMS', 'NEVER SLEEP'], S, 'gear')
       crateAt(ctx, X(0.075), Y(T2.ground), S * 0.045)
       crateAt(ctx, X(0.115), Y(T2.ground), S * 0.034)
       rr(ctx, X(0.24), Y(T2.ground) - S * 0.03, S * 0.05, S * 0.03, 3, '#a8501e')
@@ -1161,7 +1256,15 @@ export default function VesperFloor() {
         ctx.lineTo(X(0.255) + 14, cy - 3)
         ctx.stroke()
       }
-      plaqueAt(ctx, X(0.855), Y(T2.top + 0.035), S * 0.17, ['CHIEF', 'PAPER & PARCHMENT'], S)
+      plaqueAt(
+        ctx,
+        X(0.775),
+        Y(T2.top + 0.05),
+        S * 0.16,
+        ['CHIEF', 'PAPER & PARCHMENT'],
+        S,
+        'shield',
+      )
       aoAt(ctx, X(0.92), Y(T2.ground), S * 0.075)
       tableAt(ctx, X(0.92), Y(T2.ground), S * 0.095, S * 0.055)
       candleAt(ctx, X(0.9), Y(T2.ground) - S * 0.055, S * 0.011, now)
@@ -1172,8 +1275,8 @@ export default function VesperFloor() {
       {
         const tail3 = (trading?.alerts ?? []).slice(-3).join(' ')
         const ringing = /NOT READY|KILL|stranded|SEAT DOWN|stale/i.test(tail3)
-        const bx3 = X(0.79)
-        const by3 = Y(T2.top + 0.075)
+        const bx3 = X(0.878)
+        const by3 = Y(T2.top + 0.062)
         const br3 = S * 0.014
         const swing = ringing ? Math.sin(now / 130) * 0.3 : 0
         ctx.save()
@@ -1333,7 +1436,7 @@ export default function VesperFloor() {
       const lampSpots: [number, { top: number; ground: number }, boolean][] = [
         [0.175, T3, stratOn],
         [0.757, T3, meetOn],
-        [0.16, T2, buildOn],
+        [0.315, T2, buildOn],
         [0.84, T2, chiefRan],
         [0.36, T1, liveHb || paperHb],
       ]
@@ -1377,7 +1480,7 @@ export default function VesperFloor() {
       }
       const plates: [number, number, string][] = [
         [0.155, T3.ground, 'STRATEGY'],
-        [0.16, T2.ground, 'BUILD'],
+        [0.315, T2.ground, 'BUILD'],
         [0.84, T2.ground, 'CHIEF'],
       ]
       for (const [pxF, pyF, txt] of plates) {

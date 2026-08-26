@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.17.1 - 2026-08-26 — reference convergence
+
+Iteration against the favorite image, element by element: TERRARIUM A
+plaque centered over a shorter upper elevator with its plate at the door
+top; the 2F door with mini-plate beside it; rounder chibi domes; the
+Chief's dark glass visor and gold chest crest (red eye-strip only when
+down); sconce fixtures whose glow obeys the light law; gear and shield
+glyphs inside the plaques; brighter on-door ELEVATOR RFC plate; paneled
+walls, thick diorama slabs with warm lips; the bell hung by the Chief.
+
 ## v0.17.0 - 2026-08-26 — Warm Ember, matched to the reference
 
 The stage now reproduces the marked-favorite illustration, verified
