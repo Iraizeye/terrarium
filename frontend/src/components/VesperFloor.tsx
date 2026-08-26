@@ -550,6 +550,25 @@ export default function VesperFloor() {
           ctx.fillStyle = phase === 'day' ? 'rgba(255,225,170,0.05)' : 'rgba(240,150,80,0.06)'
           ctx.fillRect(X(0.05), Y(T.top), dw * 0.9, dh * (T.ground - T.top))
         }
+        // wood paneling: soft vertical seams + a wainscot band
+        ctx.strokeStyle = 'rgba(24,13,7,0.5)'
+        ctx.lineWidth = 1
+        for (let sx = 0.05; sx < 0.95; sx += 0.075) {
+          ctx.beginPath()
+          ctx.moveTo(X(sx), Y(T.top))
+          ctx.lineTo(X(sx), Y(T.ground))
+          ctx.stroke()
+        }
+        ctx.fillStyle = 'rgba(30,17,9,0.75)'
+        ctx.fillRect(X(0.05), Y(T.ground - 0.055), dw * 0.9, dh * 0.007)
+        ctx.fillStyle = 'rgba(217,164,65,0.12)'
+        ctx.fillRect(X(0.05), Y(T.ground - 0.048), dw * 0.9, dh * 0.002)
+        // night is dim, not empty: a faint ember haze near each floor
+        const haze = ctx.createLinearGradient(0, Y(T.ground - 0.09), 0, Y(T.ground))
+        haze.addColorStop(0, 'rgba(246,192,90,0)')
+        haze.addColorStop(1, 'rgba(246,192,90,0.08)')
+        ctx.fillStyle = haze
+        ctx.fillRect(X(0.05), Y(T.ground - 0.09), dw * 0.9, dh * 0.09)
         const fg = ctx.createLinearGradient(0, Y(T.ground - 0.016), 0, Y(T.ground + 0.012))
         fg.addColorStop(0, P.floorA)
         fg.addColorStop(1, P.floorB)
@@ -744,6 +763,32 @@ export default function VesperFloor() {
       for (let i = 0; i < 3; i++) {
         ctx.fillStyle = ['#e8c94a', '#d9a441', '#c9a26b'][i]
         ctx.fillRect(X(0.115 + i * 0.024), Y(T3.top + 0.05), S * 0.016, S * 0.016)
+      }
+      // the strategy map: parchment, a route, a pin
+      {
+        const mx = X(0.262)
+        const my = Y(T3.top + 0.038)
+        const mw = S * 0.055
+        const mh = S * 0.046
+        rr(ctx, mx - 3, my - 3, mw + 6, mh + 6, 2, '#54341c')
+        rr(ctx, mx, my, mw, mh, 1, '#e6d9b8')
+        ctx.strokeStyle = '#b8a37f'
+        ctx.lineWidth = 1
+        ctx.beginPath()
+        ctx.moveTo(mx + mw * 0.12, my + mh * 0.75)
+        ctx.bezierCurveTo(mx + mw * 0.4, my + mh * 0.2, mx + mw * 0.55, my + mh * 0.85, mx + mw * 0.85, my + mh * 0.3)
+        ctx.stroke()
+        ctx.setLineDash([2, 2])
+        ctx.strokeStyle = '#a8501e'
+        ctx.beginPath()
+        ctx.moveTo(mx + mw * 0.15, my + mh * 0.6)
+        ctx.lineTo(mx + mw * 0.8, my + mh * 0.35)
+        ctx.stroke()
+        ctx.setLineDash([])
+        ctx.fillStyle = '#c94f42'
+        ctx.beginPath()
+        ctx.arc(mx + mw * 0.8, my + mh * 0.35, S * 0.004, 0, Math.PI * 2)
+        ctx.fill()
       }
       plaqueAt(
         ctx,
