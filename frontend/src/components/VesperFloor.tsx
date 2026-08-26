@@ -1,18 +1,32 @@
-// The stage IS the reference painting (skill: terrarium-art).
+// Path B — motion-rich sprites, traced from the reference (skill: terrarium-art).
 //
-// docs/art/warm-ember-reference.png is drawn as the full stage — no robot
-// geometry is invented here. The code owns only the LIVE layer on top:
+// assets/terrarium/traced/* is the Warm Ember painting taken apart:
+// stage-bg.png is the illustration with the characters and baked bubbles
+// inpainted away, and each robot is a feathered-alpha crop of the SAME
+// painted pixels, pasted back at its origin — so at rest the stage is the
+// reference, and every character can move. No robot geometry is invented.
+// The code owns the LIVE layer:
 //   · the banner region (painted opaquely over the baked one — doctor truth)
-//   · speech bubbles (live text over the baked spots; soft shadow-patches
-//     when state says silence, so the painting never speaks out of turn)
+//   · the eight robot sprites — idle by default; motion only when state
+//     says so (typing bob on fresh strategy, hall lean-in on a real
+//     handoff, pit sway on fresh heartbeats). Never constant walking.
+//   · speech bubbles — drawn only when there is something true to say
 //   · station state LEDs (STRATEGY BUILD CHIEF KERNEL LIVE PAPER)
 //   · a patrol light gliding the pit floor on a fresh live heartbeat
 //   · the RFC folder / brief envelope packets
-// Baked lamp-light and eyes are accepted as the painting's own; state is
-// carried by the LED layer, which never lies.
+// Baked lamp-light and eyes are the painting's own; sleeping stations dim
+// their sprite, and state is carried by the LED layer, which never lies.
 
 import { useEffect, useRef, useState } from 'react'
-import referenceUrl from '../assets-stage-reference.png'
+import buildBotUrl from '../../../assets/terrarium/traced/robot-build.png'
+import chiefBotUrl from '../../../assets/terrarium/traced/robot-chief.png'
+import kernelBotUrl from '../../../assets/terrarium/traced/robot-kernel.png'
+import liveBotUrl from '../../../assets/terrarium/traced/robot-live.png'
+import meetABotUrl from '../../../assets/terrarium/traced/robot-meet-a.png'
+import meetBBotUrl from '../../../assets/terrarium/traced/robot-meet-b.png'
+import paperBotUrl from '../../../assets/terrarium/traced/robot-paper.png'
+import strategyBotUrl from '../../../assets/terrarium/traced/robot-strategy.png'
+import stageBgUrl from '../../../assets/terrarium/traced/stage-bg.png'
 import { useDashboardStore } from '../store/dashboardStore'
 import { getPhase } from '../theme'
 import { MONO } from '../ui'
@@ -45,21 +59,35 @@ function doctorCause(line: string | null | undefined): string {
     .slice(0, 46)
 }
 
-let REF: HTMLImageElement | null = null
-function refImage(): HTMLImageElement {
-  if (!REF) {
-    REF = new Image()
-    REF.src = referenceUrl
+const IMG_CACHE = new Map<string, HTMLImageElement>()
+function image(url: string): HTMLImageElement {
+  let im = IMG_CACHE.get(url)
+  if (!im) {
+    im = new Image()
+    im.src = url
+    IMG_CACHE.set(url, im)
   }
-  return REF
+  return im
 }
 
 // ── the crop of the illustration inside the source PNG ──────────────────────
 const CROP = { sx: 55, sy: 95, sw: 1893, sh: 1350 }
+// sprite origins: the full-image trace boxes shifted into CROP space
+// (generate_traced.py box minus the crop offset)
+const SPRITES = {
+  strategy: { url: strategyBotUrl, x: 489, y: 345, w: 156, h: 210 },
+  meetA: { url: meetABotUrl, x: 1217, y: 351, w: 160, h: 212 },
+  meetB: { url: meetBBotUrl, x: 1363, y: 351, w: 142, h: 212 },
+  build: { url: buildBotUrl, x: 533, y: 680, w: 174, h: 260 },
+  chief: { url: chiefBotUrl, x: 1360, y: 655, w: 170, h: 285 },
+  kernel: { url: kernelBotUrl, x: 420, y: 1050, w: 150, h: 205 },
+  live: { url: liveBotUrl, x: 660, y: 1050, w: 143, h: 205 },
+  paper: { url: paperBotUrl, x: 950, y: 1050, w: 160, h: 205 },
+}
 // regions/anchors in CROP space
 const BANNER = { x: 128, y: 42, w: 1648, h: 98 }
-const BUBBLE_STRAT = { cx: 605, top: 270, w: 370, h: 96 } // baked "Quiet shift tonight"
-const BUBBLE_MEET = { cx: 1415, top: 272, w: 306, h: 82 } // baked "RFC looks steady."
+const BUBBLE_STRAT = { cx: 605, top: 270 } // where "Quiet shift tonight" lived
+const BUBBLE_MEET = { cx: 1415, top: 272 } // where "RFC looks steady." lived
 const CHIEF_BUBBLE = { cx: 1440, top: 640 }
 const LEDS = {
   strategy: { x: 540, y: 585, label: 'STRATEGY' },
@@ -171,7 +199,7 @@ export default function VesperFloor() {
       const Y = (cy: number) => oy + cy * s
       ctx.fillStyle = '#120a07'
       ctx.fillRect(0, 0, rect.width, rect.height)
-      const img = refImage()
+      const img = image(stageBgUrl)
       if (img.complete && img.naturalWidth) {
         ctx.drawImage(img, CROP.sx, CROP.sy, CROP.sw, CROP.sh, ox, oy, CROP.sw * s, CROP.sh * s)
       }
@@ -211,6 +239,34 @@ export default function VesperFloor() {
           else spawnRfc(now)
         }
       }
+
+      // ── the robots: traced sprites, idle by default, motion only on state ──
+      // sub-2px offsets over the inpainted patches; feathered edges hide them
+      const sprite = (
+        sp: { url: string; x: number; y: number; w: number; h: number },
+        dx = 0,
+        dy = 0,
+        dim = false,
+      ) => {
+        const im = image(sp.url)
+        if (!(im.complete && im.naturalWidth)) return
+        if (dim) ctx.filter = 'brightness(0.55) saturate(0.85)'
+        ctx.drawImage(im, X(sp.x + dx), Y(sp.y + dy), sp.w * s, sp.h * s)
+        if (dim) ctx.filter = 'none'
+      }
+      const bob = (period: number, amp: number, on: boolean, phase = 0) =>
+        on ? Math.sin((now / period) * Math.PI * 2 + phase) * amp : 0
+      sprite(SPRITES.strategy, 0, bob(3200, 1.5, stratOn), night && !stratOn)
+      // hall pair: lean toward each other + alternating nod only on a real handoff
+      const lean = meetOn ? 3 : 0
+      sprite(SPRITES.meetA, lean, bob(1800, 1, meetOn), night && !meetOn)
+      sprite(SPRITES.meetB, -lean, bob(1800, 1, meetOn, Math.PI), night && !meetOn)
+      sprite(SPRITES.build, 0, bob(2800, 1.5, buildOn), night && !buildOn)
+      sprite(SPRITES.chief, 0, bob(3600, 1, chiefRan), night && !chiefRan && !chiefDown)
+      // the pit never dims — SYSTEMS NEVER SLEEP — but sways only on fresh hb
+      sprite(SPRITES.kernel, bob(5200, 1.2, wd && !kill), 0)
+      sprite(SPRITES.live, bob(4200, 1.5, liveHb), 0, !liveHb && !liveStale)
+      sprite(SPRITES.paper, bob(4600, 1.5, paperHb, Math.PI / 2), 0, !paperHb && !paperStale)
 
       // ── the banner: painted opaquely over the baked strip — doctor truth ──
       {
@@ -284,20 +340,7 @@ export default function VesperFloor() {
         }
       }
 
-      // ── bubble ownership: patch when silent, live text when speaking ──
-      const patch = (r: { cx: number; top: number; w: number; h: number }) => {
-        ctx.save()
-        ctx.shadowColor = 'rgba(18,10,6,0.9)'
-        ctx.shadowBlur = 22 * s
-        const g = ctx.createLinearGradient(0, Y(r.top), 0, Y(r.top + r.h))
-        g.addColorStop(0, '#241711')
-        g.addColorStop(1, '#2c1c13')
-        ctx.fillStyle = g
-        ctx.beginPath()
-        ctx.roundRect(X(r.cx - r.w / 2), Y(r.top), r.w * s, r.h * s, 14 * s)
-        ctx.fill()
-        ctx.restore()
-      }
+      // ── bubbles: drawn only when there is something true to say ──
       const bubble = (cx: number, top: number, text: string, minW = 0) => {
         ctx.font = `bold ${Math.max(10, 30 * s)}px ${MONO}`
         const tw = Math.max(minW * s, Math.min(ctx.measureText(text).width + 44 * s, 620 * s))
@@ -333,10 +376,8 @@ export default function VesperFloor() {
         : night
           ? 'Quiet shift tonight'
           : null
-      if (stratText) bubble(BUBBLE_STRAT.cx, BUBBLE_STRAT.top, stratText, BUBBLE_STRAT.w)
-      else patch(BUBBLE_STRAT)
-      if (meetOn) bubble(BUBBLE_MEET.cx, BUBBLE_MEET.top, 'RFC looks steady.', BUBBLE_MEET.w)
-      else patch(BUBBLE_MEET)
+      if (stratText) bubble(BUBBLE_STRAT.cx, BUBBLE_STRAT.top, stratText, 320)
+      if (meetOn) bubble(BUBBLE_MEET.cx, BUBBLE_MEET.top, 'RFC looks steady.', 280)
       const chiefBubble = chiefOk
         ? 'brief sent — floor is yours'
         : company?.strategy_verdict
