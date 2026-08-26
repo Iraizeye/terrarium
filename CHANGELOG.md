@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.19.0 - 2026-08-26 — the painting is the stage
+
+The reference illustration itself (docs/art/warm-ember-reference.png)
+now IS the center stage — no robot geometry is drawn in code at all.
+The component owns only the live layer: the banner painted opaquely
+over the baked strip (doctor truth, always), speech bubbles that speak
+live text or patch to shadow when state says silence, six station LEDs
+(the honest state channel over painted light), a patrol glow gliding
+the pit floor on a fresh live heartbeat, and the RFC/brief packets.
+The SVG asset pack remains in assets/terrarium as the reusable art
+system; the sprite composition lives in git history (v0.18) if ever
+wanted back.
+
 ## v0.18.0 - 2026-08-26 — the asset pack
 
 The stage is now COMPOSED, not painted inline: skill `terrarium-art`
