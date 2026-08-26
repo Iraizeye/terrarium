@@ -11,7 +11,7 @@ const VERDICT_COLOR: Record<string, string> = {
   no: UI.red,
 }
 
-export default function RfcRail() {
+function useCompany(): CompanyStatus | null {
   const [company, setCompany] = useState<CompanyStatus | null>(null)
   useEffect(() => {
     let alive = true
@@ -29,7 +29,89 @@ export default function RfcRail() {
       clearInterval(id)
     }
   }, [])
+  return company
+}
 
+function ago(iso: string | null | undefined): string {
+  if (!iso) return 'idle'
+  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000)
+  if (m < 1) return 'now'
+  if (m < 60) return `${m}m ago`
+  if (m < 60 * 48) return `${Math.floor(m / 60)}h ago`
+  return `${Math.floor(m / 1440)}d ago`
+}
+
+const ACTIVE_MS = 20 * 60_000
+function Lamp({ at }: { at: string | null | undefined }) {
+  const on = !!at && Date.now() - new Date(at).getTime() < ACTIVE_MS
+  return (
+    <span
+      style={{
+        width: 7,
+        height: 7,
+        borderRadius: '50%',
+        flexShrink: 0,
+        background: on ? UI.green : 'rgba(148,140,120,0.35)',
+        boxShadow: on ? '0 0 8px rgba(90,191,122,0.6)' : 'none',
+      }}
+    />
+  )
+}
+
+// Departments first: the on-call primaries and their artifact lamps.
+// Strategy's clock is the newest RFC; Build's is the newest hub commit.
+export function DepartmentsPanel() {
+  const company = useCompany()
+  const rows: [string, string | null | undefined, string][] = [
+    ['STRATEGY', company?.strategy_at, company?.strategy_verdict ?? 'no open verdict'],
+    ['BUILD', company?.build_at, 'last shipped commit'],
+  ]
+  return (
+    <Panel style={{ flexShrink: 0 }}>
+      <PanelHeader
+        label="Departments"
+        title="on-call: lamps lit by artifacts (RFCs, commits), never by talk"
+      />
+      <div style={{ display: 'grid', gap: 6, padding: '7px 12px 10px' }}>
+        {rows.map(([name, at, sub]) => (
+          <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Lamp at={at} />
+            <span
+              style={{
+                fontFamily: MONO,
+                fontSize: 10.5,
+                letterSpacing: 1.2,
+                color: UI.text,
+                width: 74,
+              }}
+            >
+              {name}
+            </span>
+            <span
+              style={{
+                fontFamily: MONO,
+                fontSize: 9.5,
+                color: UI.dim,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                flex: 1,
+              }}
+            >
+              {sub}
+            </span>
+            <span style={{ fontFamily: MONO, fontSize: 9, color: UI.dim, flexShrink: 0 }}>
+              {ago(at)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  )
+}
+
+export default function RfcRail() {
+  const company = useCompany()
   const rfcs = company?.rfcs ?? []
   return (
     <Panel style={{ flexShrink: 0 }}>

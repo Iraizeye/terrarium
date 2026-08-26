@@ -50,16 +50,22 @@ previews the room lighting, `?view=home` deep-links the agent's home page,
 - **3F — Chief / Vesper HQ** — the chief of staff. Bubble = the morning
   brief when it's in, else the latest Strategy verdict. Lights only when
   the chief itself ran — never because someone downstairs was busy.
-- **2F — Strategy & Build** — the on-call departments, with the desk
-  annexes (ops, projects) across the shaft. **Lamps are artifact-driven:**
+- **2F — Strategy & Build** — the on-call departments (asleep at night,
+  lids closed), with the desk annexes (ops, content, projects) across
+  the shaft. **Lamps are artifact-driven:**
   Strategy lights when an RFC file changed in the last 20 minutes; Build
   lights when a commit landed in a hub repo. Talk lights nothing.
-- **1F — the TRADING PIT** — the ground-floor plant: live + paper
-  terminals side by side, the premarket briefing desk, and the INTERLOCK
-  breaker (green = armed & watched, red = KILL) drawn from real
-  kill-switch + watchdog telemetry. Display only — this dashboard has no
-  trading controls. The live robot patrols the lobby on a fresh
-  heartbeat; the content annex keeps its studio; the wall clock reads ET.
+- **1F — one wide TRADING PIT** — the ground-floor plant: LIVE + PAPER
+  terminals, the premarket briefing desk, and the KERNEL locker (green
+  padlock = armed & watched, red open shackle = KILL) drawn from real
+  kill-switch + watchdog telemetry. Display only — no trading controls
+  exist here. The live robot patrols the pit (LIVE → KERNEL → PAPER) on
+  a fresh heartbeat and sits at its terminal when the heartbeat goes
+  stale. The lobby keeps its clock, benches, and letters.
+- **The NIGHTBELL** — a brass bell by the executive shaft: unlit in
+  peace, glowing and swinging only when phone-worthy alarms fire (doctor
+  NOT READY, KILL, stranded, stale) — the same patterns that page the
+  owner. A new RFC also sends a yellow folder Strategy → Build.
 - **The big board** — charts the symbols the trading engine judged this
   session, drawn from its real decision log.
 - **The LED sign** — the real market session clock (pre-market, open,

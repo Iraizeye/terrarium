@@ -40,6 +40,7 @@ interface Station {
   active: boolean // doing something RIGHT NOW — drives lights + motion
   down: boolean
   pending: boolean
+  sleep?: boolean // night + off-shift: eyes closed, deep idle
   bubble: string | null
 }
 
@@ -78,21 +79,21 @@ export interface CompanyStatus {
 const BAYS: Bay[] = [
   { key: 'strategy', x: 0.17, top: F2.top, ground: F2.ground, half: 0.135, label: 'STRATEGY' },
   { key: 'build', x: 0.48, top: F2.top, ground: F2.ground, half: 0.135, label: 'BUILD' },
-  { key: 'ops', x: 0.795, top: F2.top, ground: F2.ground, half: 0.062 },
-  { key: 'projects', x: 0.928, top: F2.top, ground: F2.ground, half: 0.055 },
-  { key: 'content', x: 0.16, top: F1.top, ground: F1.ground, half: 0.115 },
-  { key: 'pit', x: 0.845, top: F1.top, ground: F1.ground, half: 0.128, label: 'TRADING PIT' },
+  { key: 'ops', x: 0.762, top: F2.top, ground: F2.ground, half: 0.045 },
+  { key: 'content', x: 0.858, top: F2.top, ground: F2.ground, half: 0.045 },
+  { key: 'projects', x: 0.947, top: F2.top, ground: F2.ground, half: 0.04 },
+  { key: 'pit', x: 0.825, top: F1.top, ground: F1.ground, half: 0.148, label: 'TRADING PIT' },
 ]
 const SPOTS: Record<string, { x: number; y: number; action: Action; flip?: boolean }> = {
   strategy: { x: 0.17, y: F2.ground, action: 'work' },
   build: { x: 0.48, y: F2.ground, action: 'sit' },
-  ops: { x: 0.795, y: F2.ground, action: 'sit' },
-  projects: { x: 0.928, y: F2.ground, action: 'sit' },
-  content: { x: 0.16, y: F1.ground, action: 'work' },
-  premarket: { x: 0.765, y: F1.ground, action: 'sit' },
-  paper: { x: 0.915, y: F1.ground, action: 'sit' },
+  ops: { x: 0.762, y: F2.ground, action: 'sit' },
+  content: { x: 0.858, y: F2.ground, action: 'sit' },
+  projects: { x: 0.947, y: F2.ground, action: 'sit' },
+  premarket: { x: 0.8, y: F1.ground, action: 'sit' },
+  paper: { x: 0.935, y: F1.ground, action: 'sit' },
   chief: { x: 0.5, y: F3.ground, action: 'point' },
-  live: { x: 0.45, y: F1.ground, action: 'walk' },
+  live: { x: 0.725, y: F1.ground, action: 'walk' },
 }
 const _DESK_SEATS = ['projects', 'premarket', 'ops', 'content', 'paper'] as const
 // each office dressed for its job
@@ -106,7 +107,7 @@ const JOB: Record<string, { notes: [string, string]; accent: string }> = {
   paper: { notes: ['#7fb2d9', '#9fc4e8'], accent: '#6fa6d9' },
   pit: { notes: ['#8fd98f', '#7fb2d9'], accent: '#5abf7a' },
 }
-const WALK = { x0: 0.315, x1: 0.6, y: F1.ground, period: 17000 }
+const WALK = { x0: 0.695, x1: 0.945, y: F1.ground, period: 17000 }
 // bot height per pose, as a fraction of the scene scale S
 const POSE_H: Record<Action, number> = { sit: 0.195, work: 0.195, walk: 0.145, point: 0.26 }
 
@@ -193,6 +194,7 @@ function stationsFrom(
   const fresh = (iso?: string | null) =>
     !!iso && Date.now() - new Date(iso).getTime() < ACTIVE_WINDOW
   const ranRecently = (seat?: DeskSeat) => fresh(seat?.ran_at)
+  const night = getPhase(trading?.market) === 'night'
   const out: Station[] = []
   // 2F primaries — on-call departments, lamps lit by their artifacts only
   const stratOn = fresh(company?.strategy_at)
@@ -207,6 +209,7 @@ function stationsFrom(
     active: stratOn,
     down: false,
     pending: !stratOn,
+    sleep: night && !stratOn,
     bubble: stratOn && company?.strategy_verdict ? company.strategy_verdict.slice(0, 40) : null,
   })
   const buildOn = fresh(company?.build_at)
@@ -221,6 +224,7 @@ function stationsFrom(
     active: buildOn,
     down: false,
     pending: !buildOn,
+    sleep: night && !buildOn,
     bubble: null,
   })
   const names = ['projects', 'premarket', 'ops', 'content'] as const
@@ -240,6 +244,7 @@ function stationsFrom(
       active: present && ranRecently(seat),
       down: st === 'failed',
       pending: !present && st !== 'failed',
+      sleep: night && !(present && ranRecently(seat)) && st !== 'failed',
       bubble: st === 'failed' ? 'SEAT DOWN' : null,
     })
   })
@@ -334,6 +339,7 @@ const LINE = 'rgba(52,30,14,0.55)'
 const CHAIR = { dark: '#2b3036', mid: '#3a4048', metal: '#8a939c' }
 
 interface BotState {
+  sleep?: boolean
   working: boolean
   pending: boolean
   down: boolean
@@ -462,6 +468,11 @@ function drawHead(
     ctx.fillStyle = ec
     ctx.fillRect(-u * 0.115, eyeY - u * 0.008, u * 0.075, u * 0.016)
     ctx.fillRect(u * 0.04, eyeY - u * 0.008, u * 0.075, u * 0.016)
+  } else if (st.sleep) {
+    // asleep: soft closed lids, gently dimmed — the night shift's off-duty look
+    ctx.fillStyle = 'rgba(141,240,192,0.35)'
+    ctx.fillRect(-u * 0.115, eyeY, u * 0.075, u * 0.01)
+    ctx.fillRect(u * 0.04, eyeY, u * 0.075, u * 0.01)
   } else {
     const er = blink ? u * 0.008 : u * 0.042
     ctx.fillStyle = ec
@@ -997,6 +1008,7 @@ export default function VesperFloor() {
     }
     const memos: Memo[] = []
     let seenRuns: Record<string, string | null> | null = null
+    let seenStrategyAt: string | null | undefined // undefined = unprimed
     let seenAlert: string | null = null
     let alertPrimed = false
     const mailPreview = new URLSearchParams(window.location.search).get('mail') === 'test'
@@ -1071,6 +1083,23 @@ export default function VesperFloor() {
           }
         }
         seenRuns = runs
+      }
+      // the handoff: a new RFC sends the yellow folder Strategy -> Build
+      {
+        const at = company?.strategy_at ?? null
+        if (seenStrategyAt === undefined) seenStrategyAt = at
+        else if (at && at !== seenStrategyAt) {
+          spawnMemo(
+            [
+              [SPOTS.strategy.x, F2.ground - 0.1],
+              [SPOTS.build.x, F2.ground - 0.1],
+            ],
+            '#e8c94a',
+            now,
+            2600,
+          )
+          seenStrategyAt = at
+        }
       }
       {
         const alerts = trading?.alerts
@@ -1287,6 +1316,49 @@ export default function VesperFloor() {
         ctx.moveTo(px3 + S * 0.02 + sway2, topy + S * 0.075)
         ctx.lineTo(px3, topy + S * 0.062)
         ctx.stroke()
+      }
+
+      // the NIGHTBELL: brass bell by the shaft on the executive floor.
+      // Unlit ornament in peace; glows and swings when the phone-worthy
+      // alarms are firing (doctor NOT READY, KILL, stranded, stale, SEAT
+      // DOWN) — the same patterns nightbell pushes to Iris's pocket.
+      {
+        const tail3 = (trading?.alerts ?? []).slice(-3).join(' ')
+        const ringing = /NOT READY|KILL|stranded|SEAT DOWN|stale/i.test(tail3)
+        const bx3 = X(0.605)
+        const by3 = Y(0.145)
+        const br3 = S * 0.016
+        const swing = ringing ? Math.sin(now / 130) * 0.35 : 0
+        ctx.save()
+        ctx.translate(bx3, by3 - br3 * 1.4)
+        ctx.rotate(swing)
+        // hanger
+        ctx.strokeStyle = '#7a5a38'
+        ctx.lineWidth = Math.max(1, S * 0.003)
+        ctx.beginPath()
+        ctx.moveTo(0, -br3 * 0.7)
+        ctx.lineTo(0, 0)
+        ctx.stroke()
+        // bell body
+        if (ringing) {
+          const g3 = ctx.createRadialGradient(0, br3, 1, 0, br3, br3 * 3.2)
+          g3.addColorStop(0, 'rgba(240,113,106,0.35)')
+          g3.addColorStop(1, 'rgba(240,113,106,0)')
+          ctx.fillStyle = g3
+          ctx.fillRect(-br3 * 3.2, -br3, br3 * 6.4, br3 * 5)
+        }
+        ctx.fillStyle = ringing ? '#e8b54a' : '#a8843c'
+        ctx.beginPath()
+        ctx.arc(0, br3 * 0.85, br3, Math.PI, 0)
+        ctx.lineTo(br3 * 1.15, br3 * 1.75)
+        ctx.lineTo(-br3 * 1.15, br3 * 1.75)
+        ctx.closePath()
+        ctx.fill()
+        ctx.fillStyle = ringing ? '#f0716a' : '#6b5326'
+        ctx.beginPath()
+        ctx.arc(0, br3 * 1.85, br3 * 0.22, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
       }
 
       // gold seal on the wall
@@ -1596,35 +1668,50 @@ export default function VesperFloor() {
           ctx.fillText(bay.label, X(bay.x), Y(bay.top + 0.028) + S * 0.019)
           ctx.textAlign = 'left'
         }
-        // the INTERLOCK: kill-switch + watchdog telemetry as a breaker box,
-        // same blocky geometry as everything else. Green up = armed and
-        // watched; red down = KILL (buys halted). Display only — no controls.
+        // the KERNEL locker: the risk kernel as furniture. Locked green =
+        // armed & watched; red + open padlock = KILL (buys halted). Drawn
+        // from real kill-switch + watchdog telemetry; display only.
         if (bay.key === 'pit') {
           const kill = !!trading?.kill_switch
           const wd =
             !!trading?.modes?.live?.watchdog_armed || !!trading?.modes?.paper?.watchdog_armed
-          const bx2 = X(bay.x - bay.half) + S * 0.018
-          const by2 = Y(bay.top + 0.1)
-          const bw2 = S * 0.034
-          const bh2 = S * 0.062
+          const kx = X(bay.x - bay.half) + S * 0.012
+          const ky = Y(bay.ground) - S * 0.118
+          const kw = S * 0.046
+          const kh = S * 0.115
+          // cabinet
           ctx.fillStyle = '#39424c'
-          ctx.fillRect(bx2 - 2, by2 - 2, bw2 + 4, bh2 + 4)
+          ctx.fillRect(kx - 2, ky - 2, kw + 4, kh + 2)
           ctx.fillStyle = '#2a323b'
-          ctx.fillRect(bx2, by2, bw2, bh2)
-          // lever
-          const leverUp = !kill
-          ctx.fillStyle = leverUp ? '#5abf7a' : '#f0716a'
-          const ly2 = leverUp ? by2 + bh2 * 0.16 : by2 + bh2 * 0.52
-          ctx.fillRect(bx2 + bw2 * 0.32, ly2, bw2 * 0.36, bh2 * 0.34)
-          // status LED: green armed+watched, amber unwatched, red KILL
+          ctx.fillRect(kx, ky, kw, kh)
+          // door seam + vents
+          ctx.strokeStyle = '#1d242b'
+          ctx.lineWidth = 1
+          ctx.strokeRect(kx + 2, ky + 2, kw - 4, kh - 4)
+          ctx.fillStyle = '#1d242b'
+          for (let v = 0; v < 3; v++)
+            ctx.fillRect(kx + kw * 0.25, ky + kh * 0.12 + v * kh * 0.07, kw * 0.5, 2)
+          // padlock: closed body when armed, swung-open shackle on KILL
+          const px2 = kx + kw / 2
+          const py2 = ky + kh * 0.62
+          ctx.strokeStyle = kill ? '#f0716a' : '#5abf7a'
+          ctx.lineWidth = Math.max(1.5, S * 0.004)
+          ctx.beginPath()
+          if (kill)
+            ctx.arc(px2 + kw * 0.16, py2 - kh * 0.05, kw * 0.16, Math.PI * 0.9, Math.PI * 1.9)
+          else ctx.arc(px2, py2 - kh * 0.05, kw * 0.16, Math.PI, 0)
+          ctx.stroke()
+          ctx.fillStyle = kill ? '#f0716a' : '#5abf7a'
+          ctx.fillRect(px2 - kw * 0.2, py2 - kh * 0.02, kw * 0.4, kh * 0.14)
+          // status LED (amber if watchdogs unwatched)
           ctx.fillStyle = kill ? '#f0716a' : wd ? '#5abf7a' : '#e0b34d'
           ctx.beginPath()
-          ctx.arc(bx2 + bw2 / 2, by2 + bh2 + S * 0.012, S * 0.006, 0, Math.PI * 2)
+          ctx.arc(px2, ky + kh * 0.9, S * 0.005, 0, Math.PI * 2)
           ctx.fill()
-          ctx.font = `${Math.max(6, S * 0.011)}px ${MONO}`
-          ctx.fillStyle = 'rgba(220,215,200,0.55)'
+          ctx.font = `bold ${Math.max(6, S * 0.011)}px ${MONO}`
           ctx.textAlign = 'center'
-          ctx.fillText(kill ? 'KILL' : 'ARMED', bx2 + bw2 / 2, by2 + bh2 + S * 0.032)
+          ctx.fillStyle = 'rgba(220,215,200,0.6)'
+          ctx.fillText('KERNEL', px2, ky - S * 0.008)
           ctx.textAlign = 'left'
         }
         // framed wall art: tiny seeded chart doodle
@@ -1896,16 +1983,26 @@ export default function VesperFloor() {
         let x = X(s.x)
         let y = Y(s.y)
         let flip = s.flip
-        if (s.action === 'walk' && s.present) {
-          const wpos = walkAt(now)
-          x = X(wpos.x)
-          y = Y(wpos.y)
-          flip = wpos.flip
+        let pose = s.action
+        if (s.action === 'walk') {
+          if (s.present) {
+            const wpos = walkAt(now)
+            x = X(wpos.x)
+            y = Y(wpos.y)
+            flip = wpos.flip
+          } else {
+            pose = 'sit' // heartbeat not fresh: the live bot sits at its pit terminal
+          }
         }
-        const H = S * POSE_H[s.action]
-        const st = { working: s.active && !s.down, pending: s.pending, down: s.down }
+        const H = S * POSE_H[pose]
+        const st = {
+          working: s.active && !s.down,
+          pending: s.pending,
+          down: s.down,
+          sleep: s.sleep,
+        }
         shadow(ctx, x, y, H * 0.55)
-        drawBot(ctx, x, y, H, s.action, now, i, st, flip)
+        drawBot(ctx, x, y, H, pose, now, i, st, flip)
         ctx.font = `bold 11px ${MONO}`
         ctx.textAlign = 'center'
         ctx.save()

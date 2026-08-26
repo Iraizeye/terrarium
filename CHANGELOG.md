@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.15.0 - 2026-08-26 — art direction A, company behavior
+
+- Same robots, same rooms, deeper truth: departments SLEEP at night
+  (closed-lid eyes) when off shift; the chief's bubble falls back
+  brief → strategy verdict → "night watch — no brief".
+- One wide TRADING PIT: the patrol now loops inside it (LIVE → KERNEL →
+  PAPER); a stale heartbeat sits the live bot at its terminal instead of
+  ghost-standing. The interlock grew into the KERNEL locker — padlock
+  closed green when armed & watched, open red on KILL.
+- The NIGHTBELL hangs by the executive shaft: glows + swings only while
+  phone-worthy alarms are live. A fresh RFC sends the yellow folder
+  Strategy → Build along 2F.
+- Left rail is departments-first: DEPARTMENTS lamps (artifact ages) above
+  the desk seats; annexes (ops, content, projects) now all live on 2F.
+
 ## v0.14.0 - 2026-08-26 — the company floors
 
 - The building now draws Vesper as a company, same art language: 2F is
