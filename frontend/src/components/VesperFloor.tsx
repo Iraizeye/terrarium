@@ -74,15 +74,87 @@ function image(url: string): HTMLImageElement {
 const CROP = { sx: 55, sy: 95, sw: 1893, sh: 1350 }
 // sprite origins: the full-image trace boxes shifted into CROP space
 // (generate_traced.py box minus the crop offset)
+// eyes: the painted amber eyes (CROP space) — the active/talk poses breathe
+// extra glow onto them; the chief's smoked visor has none, so no glow there
 const SPRITES = {
-  strategy: { url: strategyBotUrl, x: 489, y: 345, w: 156, h: 210 },
-  meetA: { url: meetABotUrl, x: 1217, y: 351, w: 160, h: 212 },
-  meetB: { url: meetBBotUrl, x: 1363, y: 351, w: 142, h: 212 },
-  build: { url: buildBotUrl, x: 533, y: 680, w: 174, h: 260 },
-  chief: { url: chiefBotUrl, x: 1360, y: 655, w: 170, h: 285 },
-  kernel: { url: kernelBotUrl, x: 420, y: 1050, w: 150, h: 205 },
-  live: { url: liveBotUrl, x: 660, y: 1050, w: 143, h: 205 },
-  paper: { url: paperBotUrl, x: 950, y: 1050, w: 160, h: 205 },
+  strategy: {
+    url: strategyBotUrl,
+    x: 489,
+    y: 345,
+    w: 156,
+    h: 210,
+    eyes: [
+      [545, 395],
+      [580, 395],
+    ],
+  },
+  meetA: {
+    url: meetABotUrl,
+    x: 1217,
+    y: 351,
+    w: 160,
+    h: 212,
+    eyes: [
+      [1250, 397],
+      [1285, 400],
+    ],
+  },
+  meetB: {
+    url: meetBBotUrl,
+    x: 1363,
+    y: 351,
+    w: 142,
+    h: 212,
+    eyes: [
+      [1407, 403],
+      [1443, 405],
+    ],
+  },
+  build: {
+    url: buildBotUrl,
+    x: 533,
+    y: 680,
+    w: 174,
+    h: 260,
+    eyes: [
+      [617, 733],
+      [647, 733],
+    ],
+  },
+  chief: { url: chiefBotUrl, x: 1360, y: 655, w: 170, h: 285, eyes: [] },
+  kernel: {
+    url: kernelBotUrl,
+    x: 420,
+    y: 1050,
+    w: 150,
+    h: 205,
+    eyes: [
+      [477, 1077],
+      [513, 1079],
+    ],
+  },
+  live: {
+    url: liveBotUrl,
+    x: 660,
+    y: 1050,
+    w: 143,
+    h: 205,
+    eyes: [
+      [747, 1079],
+      [780, 1081],
+    ],
+  },
+  paper: {
+    url: paperBotUrl,
+    x: 950,
+    y: 1050,
+    w: 160,
+    h: 205,
+    eyes: [
+      [1007, 1081],
+      [1043, 1083],
+    ],
+  },
 }
 // regions/anchors in CROP space
 const BANNER = { x: 128, y: 42, w: 1648, h: 98 }
@@ -155,6 +227,7 @@ export default function VesperFloor() {
     const packets: Packet[] = []
     let seenStrategyAt: string | null | undefined
     let seenChiefRan: string | null | undefined
+    let meetTalkUntil = 0 // real handoff opens ~8s of hall talk, then idle
     const spawnRfc = (now: number) =>
       packets.length < 2 &&
       packets.push({
@@ -212,7 +285,6 @@ export default function VesperFloor() {
       const chiefDown = chiefSeat?.status === 'failed'
       const stratOn = freshISO(company?.strategy_at)
       const buildOn = freshISO(company?.build_at)
-      const meetOn = stratOn && buildOn
       const liveHb = trading?.modes?.live?.status === 'alive'
       const liveStale = trading?.modes?.live?.status === 'stale'
       const paperHb = trading?.modes?.paper?.status === 'alive'
@@ -225,6 +297,7 @@ export default function VesperFloor() {
         if (seenStrategyAt === undefined) seenStrategyAt = at
         else if (at && at !== seenStrategyAt) {
           spawnRfc(now)
+          meetTalkUntil = now + 8000
           seenStrategyAt = at
         }
         const cr = chiefSeat?.ran_at ?? null
@@ -236,37 +309,84 @@ export default function VesperFloor() {
         if (mailPreview && now - lastPreview > 5200) {
           lastPreview = now
           if (Math.floor(now / 5200) % 2) spawnBrief(now)
-          else spawnRfc(now)
+          else {
+            spawnRfc(now)
+            meetTalkUntil = now + 8000
+          }
         }
       }
 
-      // ── the robots: traced sprites, idle by default, motion only on state ──
-      // sub-2px offsets over the inpainted patches; feathered edges hide them
+      // ── the robots: traced sprites with a pose layer, idle by default ──
+      // each painted robot already IS its job pose (laptop, tablet, talk);
+      // pose = how the sprite is presented: idle static, active bobs and
+      // breathes glow onto the painted eyes, talk leans in. Motion only on
+      // real state — no constant walking, no fake busy. Sub-3px offsets sit
+      // on the inpainted patches; feathered edges hide them.
+      const talking = now < meetTalkUntil
+      type Pose = 'idle' | 'active' | 'talk' | 'sleep'
+      const bob = (period: number, amp: number, on: boolean, phase = 0) =>
+        on ? Math.sin((now / period) * Math.PI * 2 + phase) * amp : 0
       const sprite = (
-        sp: { url: string; x: number; y: number; w: number; h: number },
+        sp: { url: string; x: number; y: number; w: number; h: number; eyes: number[][] },
+        pose: Pose,
         dx = 0,
         dy = 0,
-        dim = false,
       ) => {
         const im = image(sp.url)
         if (!(im.complete && im.naturalWidth)) return
-        if (dim) ctx.filter = 'brightness(0.55) saturate(0.85)'
+        if (pose === 'sleep') ctx.filter = 'brightness(0.55) saturate(0.85)'
         ctx.drawImage(im, X(sp.x + dx), Y(sp.y + dy), sp.w * s, sp.h * s)
-        if (dim) ctx.filter = 'none'
+        ctx.filter = 'none'
+        if (pose === 'active' || pose === 'talk') {
+          // breathe extra glow onto the painted amber eyes
+          const pulse = 0.28 + 0.1 * Math.sin(now / 640)
+          ctx.save()
+          ctx.globalCompositeOperation = 'lighter'
+          for (const [ex, ey] of sp.eyes) {
+            const gx = X(ex + dx)
+            const gy = Y(ey + dy)
+            const g = ctx.createRadialGradient(gx, gy, 1, gx, gy, 16 * s)
+            g.addColorStop(0, `rgba(255,190,80,${pulse})`)
+            g.addColorStop(1, 'rgba(255,190,80,0)')
+            ctx.fillStyle = g
+            ctx.beginPath()
+            ctx.arc(gx, gy, 16 * s, 0, Math.PI * 2)
+            ctx.fill()
+          }
+          ctx.restore()
+        }
       }
-      const bob = (period: number, amp: number, on: boolean, phase = 0) =>
-        on ? Math.sin((now / period) * Math.PI * 2 + phase) * amp : 0
-      sprite(SPRITES.strategy, 0, bob(3200, 1.5, stratOn), night && !stratOn)
-      // hall pair: lean toward each other + alternating nod only on a real handoff
-      const lean = meetOn ? 3 : 0
-      sprite(SPRITES.meetA, lean, bob(1800, 1, meetOn), night && !meetOn)
-      sprite(SPRITES.meetB, -lean, bob(1800, 1, meetOn, Math.PI), night && !meetOn)
-      sprite(SPRITES.build, 0, bob(2800, 1.5, buildOn), night && !buildOn)
-      sprite(SPRITES.chief, 0, bob(3600, 1, chiefRan), night && !chiefRan && !chiefDown)
-      // the pit never dims — SYSTEMS NEVER SLEEP — but sways only on fresh hb
-      sprite(SPRITES.kernel, bob(5200, 1.2, wd && !kill), 0)
-      sprite(SPRITES.live, bob(4200, 1.5, liveHb), 0, !liveHb && !liveStale)
-      sprite(SPRITES.paper, bob(4600, 1.5, paperHb, Math.PI / 2), 0, !paperHb && !paperStale)
+      const pose = (on: boolean, sleeps: boolean): Pose =>
+        on ? 'active' : night && sleeps ? 'sleep' : 'idle'
+      // strategy at the laptop — active while the RFC artifact is fresh
+      sprite(SPRITES.strategy, pose(stratOn, true), 0, bob(3200, 1.5, stratOn))
+      // hall pair — talk sprites for ~8s on a real handoff, then idle
+      const meetPose: Pose = talking ? 'talk' : night ? 'sleep' : 'idle'
+      sprite(SPRITES.meetA, meetPose, talking ? 3 : 0, bob(1800, 1, talking))
+      sprite(SPRITES.meetB, meetPose, talking ? -3 : 0, bob(1800, 1, talking, Math.PI))
+      // build at the tablet — active while the last commit is fresh
+      sprite(SPRITES.build, pose(buildOn, true), 0, bob(2800, 1.5, buildOn))
+      // chief: smoked visor, no eye glow — idle, gentle bob after a real run
+      sprite(
+        SPRITES.chief,
+        night && !chiefRan && !chiefDown ? 'sleep' : 'idle',
+        0,
+        bob(3600, 1, chiefRan),
+      )
+      // the pit never dims — SYSTEMS NEVER SLEEP — subtle patrol offset on hb
+      sprite(SPRITES.kernel, wd && !kill ? 'active' : 'idle', bob(8400, 2.5, wd && !kill), 0)
+      sprite(
+        SPRITES.live,
+        liveHb ? 'active' : !liveStale ? 'sleep' : 'idle',
+        bob(9200, 3, liveHb),
+        0,
+      )
+      sprite(
+        SPRITES.paper,
+        paperHb ? 'active' : !paperStale ? 'sleep' : 'idle',
+        bob(9800, 3, paperHb, Math.PI / 2),
+        0,
+      )
 
       // ── the banner: painted opaquely over the baked strip — doctor truth ──
       {
@@ -377,7 +497,7 @@ export default function VesperFloor() {
           ? 'Quiet shift tonight'
           : null
       if (stratText) bubble(BUBBLE_STRAT.cx, BUBBLE_STRAT.top, stratText, 320)
-      if (meetOn) bubble(BUBBLE_MEET.cx, BUBBLE_MEET.top, 'RFC looks steady.', 280)
+      if (talking) bubble(BUBBLE_MEET.cx, BUBBLE_MEET.top, 'RFC looks steady.', 280)
       const chiefBubble = chiefOk
         ? 'brief sent — floor is yours'
         : company?.strategy_verdict
