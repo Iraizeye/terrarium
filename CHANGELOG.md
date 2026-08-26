@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.12.0 - 2026-08-26 — the plugin
+
+- Terrarium is now a Claude Code plugin, and this repo is its marketplace:
+  `/plugin marketplace add Iraizeye/terrarium` then
+  `/plugin install terrarium@terrarium`. Hooks stream sessions onto the
+  floor (tool names + file basenames, localhost only, fire-and-forget);
+  `/terrarium:status` and `/terrarium:note` ride along.
+- `TERRARIUM_URL` env overrides the default `http://127.0.0.1:8000`.
+
 ## v0.11.1 - 2026-08-26 — the office mail is real
 
 - Inter-agent traffic is now drawn, never invented: when a seat finishes a

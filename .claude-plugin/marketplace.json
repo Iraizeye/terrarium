@@ -1,0 +1,15 @@
+{
+  "name": "terrarium",
+  "owner": {
+    "name": "Iraizeye"
+  },
+  "plugins": [
+    {
+      "name": "terrarium",
+      "source": "./plugin",
+      "description": "Stream your Claude Code activity to Terrarium \u2014 a local-first mission-control dashboard drawn as a robot office where every pixel is live telemetry.",
+      "category": "productivity"
+    }
+  ],
+  "description": "Terrarium's own marketplace \u2014 the plugin that streams your Claude Code activity to the robot office."
+}

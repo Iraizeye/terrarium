@@ -1,0 +1,12 @@
+{
+  "name": "terrarium",
+  "displayName": "Terrarium",
+  "description": "Stream your Claude Code activity to Terrarium \u2014 a local-first mission-control dashboard drawn as a robot office where every pixel is live telemetry.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Iraizeye"
+  },
+  "homepage": "https://github.com/Iraizeye/terrarium",
+  "repository": "https://github.com/Iraizeye/terrarium",
+  "license": "MIT"
+}

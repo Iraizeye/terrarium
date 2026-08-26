@@ -1,0 +1,19 @@
+{
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "curl -s -m 2 -X POST -H 'Content-Type: application/json' --data-binary @- \"${TERRARIUM_URL:-http://127.0.0.1:8000}/api/crew/hook\" >/dev/null 2>&1 || true", "timeout": 3, "async": true }] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "curl -s -m 2 -X POST -H 'Content-Type: application/json' --data-binary @- \"${TERRARIUM_URL:-http://127.0.0.1:8000}/api/crew/hook\" >/dev/null 2>&1 || true", "timeout": 3, "async": true }] }
+    ],
+    "PreToolUse": [
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "curl -s -m 2 -X POST -H 'Content-Type: application/json' --data-binary @- \"${TERRARIUM_URL:-http://127.0.0.1:8000}/api/crew/hook\" >/dev/null 2>&1 || true", "timeout": 3, "async": true }] }
+    ],
+    "Notification": [
+      { "matcher": "idle_prompt|permission_prompt", "hooks": [{ "type": "command", "command": "curl -s -m 2 -X POST -H 'Content-Type: application/json' --data-binary @- \"${TERRARIUM_URL:-http://127.0.0.1:8000}/api/crew/hook\" >/dev/null 2>&1 || true", "timeout": 3, "async": true }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "curl -s -m 2 -X POST -H 'Content-Type: application/json' --data-binary @- \"${TERRARIUM_URL:-http://127.0.0.1:8000}/api/crew/hook\" >/dev/null 2>&1 || true", "timeout": 3, "async": true }] }
+    ]
+  }
+}

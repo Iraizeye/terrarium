@@ -89,6 +89,20 @@ straight from its own files, so the page can never drift from the truth.
 
 ![The agent's home page in demo mode](docs/media/terrarium-home.jpg)
 
+## The Claude Code plugin
+
+This repo is also a plugin marketplace. With the dashboard running, wire any
+Claude Code session into the building in two commands:
+
+```
+/plugin marketplace add Iraizeye/terrarium
+/plugin install terrarium@terrarium
+```
+
+Hooks stream your sessions onto the floor (tool names and file basenames
+only, localhost only), and you get `/terrarium:status` and
+`/terrarium:note`. Details in [plugin/README.md](plugin/README.md).
+
 ## Architecture
 
 ```
