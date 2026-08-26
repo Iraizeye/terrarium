@@ -7,17 +7,27 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDashboardStore } from '../store/dashboardStore'
 import { getPhase, type Phase } from '../theme'
-import type { TradingStatus, AgentFleet, BoardState } from '../types'
+import type { AgentFleet, BoardState, TradingStatus } from '../types'
 
 const MONO = '"JetBrains Mono", "Fira Code", monospace'
 const P = {
-  red: '#f0716a', amber: '#e0b34d', gold: '#d9a441',
-  text: '#eaf0e8', ink: '#1a1814', bubble: '#f2f6ea',
-  crt: '#07140e', mint: '#7de8a8',
+  red: '#f0716a',
+  amber: '#e0b34d',
+  gold: '#d9a441',
+  text: '#eaf0e8',
+  ink: '#1a1814',
+  bubble: '#f2f6ea',
+  crt: '#07140e',
+  mint: '#7de8a8',
 }
 
 type SeatStatus = 'ok' | 'failed' | 'pending'
-interface DeskSeat { name: string; status: SeatStatus; brief?: string | null; ran_at?: string | null }
+interface DeskSeat {
+  name: string
+  status: SeatStatus
+  brief?: string | null
+  ran_at?: string | null
+}
 type Action = 'sit' | 'work' | 'walk' | 'point'
 interface Station {
   key: string
@@ -27,7 +37,7 @@ interface Station {
   action: Action
   flip: boolean
   present: boolean
-  active: boolean       // doing something RIGHT NOW — drives lights + motion
+  active: boolean // doing something RIGHT NOW — drives lights + motion
   down: boolean
   pending: boolean
   bubble: string | null
@@ -35,70 +45,125 @@ interface Station {
 
 // three floors, cut open like an ant farm
 const F3 = { top: 0.035, ground: 0.315 }
-const F2 = { top: 0.350, ground: 0.630 }
+const F2 = { top: 0.35, ground: 0.63 }
 const F1 = { top: 0.665, ground: 0.945 }
-const SLABS = [[0.315, 0.350], [0.630, 0.665]] as const
+const SLABS = [
+  [0.315, 0.35],
+  [0.63, 0.665],
+] as const
 const SHAFT = { x0: 0.645, x1: 0.715 }
 
-interface Bay { key: string; x: number; top: number; ground: number; half: number }
+interface Bay {
+  key: string
+  x: number
+  top: number
+  ground: number
+  half: number
+}
 const BAYS: Bay[] = [
-  { key: 'projects',  x: 0.16, top: F2.top, ground: F2.ground, half: 0.115 },
-  { key: 'ops',       x: 0.45, top: F2.top, ground: F2.ground, half: 0.115 },
+  { key: 'projects', x: 0.16, top: F2.top, ground: F2.ground, half: 0.115 },
+  { key: 'ops', x: 0.45, top: F2.top, ground: F2.ground, half: 0.115 },
   { key: 'premarket', x: 0.85, top: F2.top, ground: F2.ground, half: 0.115 },
-  { key: 'content',   x: 0.16, top: F1.top, ground: F1.ground, half: 0.115 },
-  { key: 'paper',     x: 0.85, top: F1.top, ground: F1.ground, half: 0.115 },
+  { key: 'content', x: 0.16, top: F1.top, ground: F1.ground, half: 0.115 },
+  { key: 'paper', x: 0.85, top: F1.top, ground: F1.ground, half: 0.115 },
 ]
 const SPOTS: Record<string, { x: number; y: number; action: Action; flip?: boolean }> = {
-  projects:  { x: 0.16, y: F2.ground, action: 'sit' },
-  ops:       { x: 0.45, y: F2.ground, action: 'sit' },
+  projects: { x: 0.16, y: F2.ground, action: 'sit' },
+  ops: { x: 0.45, y: F2.ground, action: 'sit' },
   premarket: { x: 0.85, y: F2.ground, action: 'sit' },
-  content:   { x: 0.16, y: F1.ground, action: 'work' },
-  paper:     { x: 0.85, y: F1.ground, action: 'sit' },
-  chief:     { x: 0.50, y: F3.ground, action: 'point' },
-  live:      { x: 0.45, y: F1.ground, action: 'walk' },
+  content: { x: 0.16, y: F1.ground, action: 'work' },
+  paper: { x: 0.85, y: F1.ground, action: 'sit' },
+  chief: { x: 0.5, y: F3.ground, action: 'point' },
+  live: { x: 0.45, y: F1.ground, action: 'walk' },
 }
-const DESK_SEATS = ['projects', 'premarket', 'ops', 'content', 'paper'] as const
+const _DESK_SEATS = ['projects', 'premarket', 'ops', 'content', 'paper'] as const
 // each office dressed for its job
 const JOB: Record<string, { notes: [string, string]; accent: string }> = {
-  projects:  { notes: ['#e0b34d', '#d9a441'], accent: '#d9a441' },
+  projects: { notes: ['#e0b34d', '#d9a441'], accent: '#d9a441' },
   premarket: { notes: ['#f0956a', '#e2b25a'], accent: '#e88a52' },
-  ops:       { notes: ['#8fd98f', '#7fb2d9'], accent: '#5abf7a' },
-  content:   { notes: ['#d97fa0', '#c48ad9'], accent: '#d97fa0' },
-  paper:     { notes: ['#7fb2d9', '#9fc4e8'], accent: '#6fa6d9' },
+  ops: { notes: ['#8fd98f', '#7fb2d9'], accent: '#5abf7a' },
+  content: { notes: ['#d97fa0', '#c48ad9'], accent: '#d97fa0' },
+  paper: { notes: ['#7fb2d9', '#9fc4e8'], accent: '#6fa6d9' },
 }
-const WALK = { x0: 0.315, x1: 0.600, y: F1.ground, period: 17000 }
+const WALK = { x0: 0.315, x1: 0.6, y: F1.ground, period: 17000 }
 // bot height per pose, as a fraction of the scene scale S
 const POSE_H: Record<Action, number> = { sit: 0.195, work: 0.195, walk: 0.145, point: 0.26 }
 
 // the executive board, upper floor
-const BOARD = { x: 0.060, y: 0.055, w: 0.365, h: 0.235 }
+const BOARD = { x: 0.06, y: 0.055, w: 0.365, h: 0.235 }
 const WALL_PANELS: { x: number; y: number; w: number; h: number }[] = [
-  { x: 0.075, y: 0.075, w: 0.160, h: 0.088 },
-  { x: 0.248, y: 0.075, w: 0.160, h: 0.088 },
-  { x: 0.075, y: 0.178, w: 0.160, h: 0.088 },
-  { x: 0.248, y: 0.178, w: 0.160, h: 0.088 },
+  { x: 0.075, y: 0.075, w: 0.16, h: 0.088 },
+  { x: 0.248, y: 0.075, w: 0.16, h: 0.088 },
+  { x: 0.075, y: 0.178, w: 0.16, h: 0.088 },
+  { x: 0.248, y: 0.178, w: 0.16, h: 0.088 },
 ]
-const SIGN = { x: 0.745, y: 0.100, w: 0.176, h: 0.048 }
-const SIGN_HOUSE = { x: 0.733, y: 0.086, w: 0.200, h: 0.076 }
-const CLOCK = { x: 0.455, y: 0.760, r: 0.048 }
+const SIGN = { x: 0.745, y: 0.1, w: 0.176, h: 0.048 }
+const SIGN_HOUSE = { x: 0.733, y: 0.086, w: 0.2, h: 0.076 }
+const CLOCK = { x: 0.455, y: 0.76, r: 0.048 }
 
 // room light per market phase — walls, floor, and lamp warmth move with it
-const ROOM: Record<Phase, {
-  wallTop: string; wallBot: string; floorA: string; floorB: string
-  counterTop: string; counterFace: string; wash: string | null
-}> = {
-  night: { wallTop: '#252e3a', wallBot: '#2f3947', floorA: '#3d2f21', floorB: '#2f241a', counterTop: '#7a5a38', counterFace: '#4a371f', wash: null },
-  dawn:  { wallTop: '#2d3138', wallBot: '#3d3a33', floorA: '#453527', floorB: '#362a1e', counterTop: '#87643c', counterFace: '#523d22', wash: 'rgba(235,170,80,0.10)' },
-  day:   { wallTop: '#3a4550', wallBot: '#49535d', floorA: '#4a3a2b', floorB: '#3b2f22', counterTop: '#94714a', counterFace: '#5a4428', wash: 'rgba(255,225,170,0.07)' },
-  dusk:  { wallTop: '#2c2f37', wallBot: '#3a332c', floorA: '#41301f', floorB: '#34281b', counterTop: '#7d5c38', counterFace: '#4d3820', wash: 'rgba(240,140,80,0.08)' },
+const ROOM: Record<
+  Phase,
+  {
+    wallTop: string
+    wallBot: string
+    floorA: string
+    floorB: string
+    counterTop: string
+    counterFace: string
+    wash: string | null
+  }
+> = {
+  night: {
+    wallTop: '#252e3a',
+    wallBot: '#2f3947',
+    floorA: '#3d2f21',
+    floorB: '#2f241a',
+    counterTop: '#7a5a38',
+    counterFace: '#4a371f',
+    wash: null,
+  },
+  dawn: {
+    wallTop: '#2d3138',
+    wallBot: '#3d3a33',
+    floorA: '#453527',
+    floorB: '#362a1e',
+    counterTop: '#87643c',
+    counterFace: '#523d22',
+    wash: 'rgba(235,170,80,0.10)',
+  },
+  day: {
+    wallTop: '#3a4550',
+    wallBot: '#49535d',
+    floorA: '#4a3a2b',
+    floorB: '#3b2f22',
+    counterTop: '#94714a',
+    counterFace: '#5a4428',
+    wash: 'rgba(255,225,170,0.07)',
+  },
+  dusk: {
+    wallTop: '#2c2f37',
+    wallBot: '#3a332c',
+    floorA: '#41301f',
+    floorB: '#34281b',
+    counterTop: '#7d5c38',
+    counterFace: '#4d3820',
+    wash: 'rgba(240,140,80,0.08)',
+  },
 }
 
 function phaseText(phase: Phase): string {
-  return phase === 'day' ? 'MARKET OPEN' : phase === 'dawn' ? 'DAWN RUN' : phase === 'dusk' ? 'AFTER CLOSE' : 'NIGHT WATCH'
+  return phase === 'day'
+    ? 'MARKET OPEN'
+    : phase === 'dawn'
+      ? 'DAWN RUN'
+      : phase === 'dusk'
+        ? 'AFTER CLOSE'
+        : 'NIGHT WATCH'
 }
 
 function fleetBusy(fleet: AgentFleet | null): boolean {
-  return !!fleet?.agents?.some(a => a.state === 'live')
+  return !!fleet?.agents?.some((a) => a.state === 'live')
 }
 
 function stationsFrom(
@@ -113,16 +178,21 @@ function stationsFrom(
     !!seat?.ran_at && Date.now() - new Date(seat.ran_at).getTime() < ACTIVE_WINDOW
   const names = ['projects', 'premarket', 'ops', 'content'] as const
   const out: Station[] = names.map((name) => {
-    const seat = seats.find(s => s.name === name)
+    const seat = seats.find((s) => s.name === name)
     const st: SeatStatus = seat?.status ?? 'pending'
     const p = SPOTS[name]
     const present = st === 'ok'
     return {
-      key: name, label: name.toUpperCase(), x: p.x, y: p.y,
-      action: p.action, flip: !!p.flip,
+      key: name,
+      label: name.toUpperCase(),
+      x: p.x,
+      y: p.y,
+      action: p.action,
+      flip: !!p.flip,
       present,
       active: present && ranRecently(seat),
-      down: st === 'failed', pending: !present && st !== 'failed',
+      down: st === 'failed',
+      pending: !present && st !== 'failed',
       bubble: st === 'failed' ? 'SEAT DOWN' : null,
     }
   })
@@ -130,19 +200,28 @@ function stationsFrom(
   const pp = SPOTS.paper
   const paperOn = paper?.status === 'alive'
   out.push({
-    key: 'paper', label: 'PAPER', x: pp.x, y: pp.y,
-    action: 'sit', flip: true,
-    present: paperOn, active: paperOn,
+    key: 'paper',
+    label: 'PAPER',
+    x: pp.x,
+    y: pp.y,
+    action: 'sit',
+    flip: true,
+    present: paperOn,
+    active: paperOn,
     down: paper?.status === 'stale',
     pending: !paperOn && paper?.status !== 'stale',
     bubble: null,
   })
-  const chiefSeat = seats.find(s => s.name === 'chief')
+  const chiefSeat = seats.find((s) => s.name === 'chief')
   const cp = SPOTS.chief
   const chiefOk = chiefSeat?.status === 'ok'
   out.push({
-    key: 'chief', label: 'CHIEF', x: cp.x, y: cp.y,
-    action: 'point', flip: false,
+    key: 'chief',
+    label: 'CHIEF',
+    x: cp.x,
+    y: cp.y,
+    action: 'point',
+    flip: false,
     present: chiefOk || busy,
     active: (chiefOk && ranRecently(chiefSeat)) || busy,
     down: chiefSeat?.status === 'failed',
@@ -154,13 +233,19 @@ function stationsFrom(
   const p = SPOTS.live
   const liveWalk = live?.status === 'alive'
   out.push({
-    key: 'live', label: 'LIVE', x: p.x, y: p.y,
-    action: 'walk', flip: false,
-    present: liveWalk, active: liveWalk,
+    key: 'live',
+    label: 'LIVE',
+    x: p.x,
+    y: p.y,
+    action: 'walk',
+    flip: false,
+    present: liveWalk,
+    active: liveWalk,
     down: live?.status === 'stale',
     pending: !liveWalk && live?.status !== 'stale',
     bubble: last?.action
-      ? `${last.action.toUpperCase()}${last.symbol ? ' ' + last.symbol : ''}` : null,
+      ? `${last.action.toUpperCase()}${last.symbol ? ` ${last.symbol}` : ''}`
+      : null,
   })
   return out
 }
@@ -176,7 +261,7 @@ function shadow(ctx: CanvasRenderingContext2D, x: number, y: number, w: number) 
   ctx.save()
   ctx.fillStyle = 'rgba(8, 10, 14, 0.34)'
   ctx.beginPath()
-  ctx.ellipse(x, y - 2, w * 0.5, w * 0.10, 0, 0, Math.PI * 2)
+  ctx.ellipse(x, y - 2, w * 0.5, w * 0.1, 0, 0, Math.PI * 2)
   ctx.fill()
   ctx.restore()
 }
@@ -195,24 +280,50 @@ const GOLD = '#d9a441'
 const LINE = 'rgba(52,30,14,0.55)'
 const CHAIR = { dark: '#2b3036', mid: '#3a4048', metal: '#8a939c' }
 
-interface BotState { working: boolean; pending: boolean; down: boolean }
+interface BotState {
+  working: boolean
+  pending: boolean
+  down: boolean
+}
 
 function eyeColor(st: BotState): string {
   return st.down ? '#f0716a' : st.pending ? '#e0b34d' : '#8df0c0'
 }
 
-function rr(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number, fill: string, stroke = true) {
+function rr(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+  fill: string,
+  stroke = true,
+) {
   ctx.beginPath()
   ctx.roundRect(x, y, w, h, Math.min(r, w / 2, h / 2))
   ctx.fillStyle = fill
   ctx.fill()
-  if (stroke) { ctx.strokeStyle = LINE; ctx.stroke() }
+  if (stroke) {
+    ctx.strokeStyle = LINE
+    ctx.stroke()
+  }
 }
 
-function plate(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], x: number, y: number, w: number, h: number, r: number) {
+function plate(
+  ctx: CanvasRenderingContext2D,
+  c: (typeof COPPERS)[0],
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+) {
   rr(ctx, x, y, w, h, r, c.mid)
   ctx.save()
-  ctx.beginPath(); ctx.roundRect(x, y, w, h, Math.min(r, w / 2, h / 2)); ctx.clip()
+  ctx.beginPath()
+  ctx.roundRect(x, y, w, h, Math.min(r, w / 2, h / 2))
+  ctx.clip()
   ctx.fillStyle = c.hi
   ctx.fillRect(x, y, w, h * 0.24)
   ctx.globalAlpha = 0.5
@@ -221,40 +332,69 @@ function plate(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], x: number, y
   ctx.restore()
 }
 
-function limb(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], pts: [number, number][], w: number) {
+function limb(
+  ctx: CanvasRenderingContext2D,
+  c: (typeof COPPERS)[0],
+  pts: [number, number][],
+  w: number,
+) {
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   ctx.strokeStyle = LINE
   ctx.lineWidth = w + 2.5
   ctx.beginPath()
-  pts.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y))
+  for (const [i, [x, y]] of pts.entries()) i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
   ctx.stroke()
   ctx.strokeStyle = c.mid
   ctx.lineWidth = w
   ctx.beginPath()
-  pts.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y))
+  for (const [i, [x, y]] of pts.entries()) i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
   ctx.stroke()
   ctx.lineCap = 'butt'
 }
 
-function hand(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], x: number, y: number, r: number) {
+function hand(
+  ctx: CanvasRenderingContext2D,
+  c: (typeof COPPERS)[0],
+  x: number,
+  y: number,
+  r: number,
+) {
   ctx.fillStyle = c.hi
-  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill()
-  ctx.strokeStyle = LINE; ctx.stroke()
+  ctx.beginPath()
+  ctx.arc(x, y, r, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.strokeStyle = LINE
+  ctx.stroke()
 }
 
 /** big friendly head, bottom of head at yBot (negative up), width w */
-function drawHead(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], u: number, yBot: number, t: number, seed: number, st: BotState) {
-  const hw = u * 0.46, hh = u * 0.34
+function drawHead(
+  ctx: CanvasRenderingContext2D,
+  c: (typeof COPPERS)[0],
+  u: number,
+  yBot: number,
+  t: number,
+  seed: number,
+  st: BotState,
+) {
+  const hw = u * 0.46,
+    hh = u * 0.34
   const topY = yBot - hh
   // antenna
   ctx.strokeStyle = c.dk
   ctx.lineWidth = Math.max(1.2, u * 0.02)
-  ctx.beginPath(); ctx.moveTo(0, topY); ctx.lineTo(0, topY - u * 0.07); ctx.stroke()
+  ctx.beginPath()
+  ctx.moveTo(0, topY)
+  ctx.lineTo(0, topY - u * 0.07)
+  ctx.stroke()
   const tipOn = st.down ? true : Math.floor((t + seed * 700) / 900) % 2 === 0
   ctx.fillStyle = tipOn ? eyeColor(st) : '#3a4a40'
-  ctx.beginPath(); ctx.arc(0, topY - u * 0.088, u * 0.026, 0, Math.PI * 2); ctx.fill()
-  ctx.strokeStyle = LINE; ctx.stroke()
+  ctx.beginPath()
+  ctx.arc(0, topY - u * 0.088, u * 0.026, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.strokeStyle = LINE
+  ctx.stroke()
   // head + ear bolts
   plate(ctx, c, -hw / 2, topY, hw, hh, u * 0.09)
   rr(ctx, -hw / 2 - u * 0.028, topY + hh * 0.32, u * 0.032, hh * 0.34, u * 0.012, c.dk)
@@ -272,91 +412,186 @@ function drawHead(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], u: number
   } else {
     const er = blink ? u * 0.008 : u * 0.042
     ctx.fillStyle = ec
-    ctx.beginPath(); ctx.ellipse(-u * 0.085, eyeY, u * 0.042, er, 0, 0, Math.PI * 2); ctx.fill()
-    ctx.beginPath(); ctx.ellipse(u * 0.085, eyeY, u * 0.042, er, 0, 0, Math.PI * 2); ctx.fill()
+    ctx.beginPath()
+    ctx.ellipse(-u * 0.085, eyeY, u * 0.042, er, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.beginPath()
+    ctx.ellipse(u * 0.085, eyeY, u * 0.042, er, 0, 0, Math.PI * 2)
+    ctx.fill()
     if (!blink) {
       ctx.fillStyle = 'rgba(255,255,255,0.75)'
-      ctx.beginPath(); ctx.arc(-u * 0.098, eyeY - u * 0.014, u * 0.011, 0, Math.PI * 2); ctx.fill()
-      ctx.beginPath(); ctx.arc(u * 0.072, eyeY - u * 0.014, u * 0.011, 0, Math.PI * 2); ctx.fill()
+      ctx.beginPath()
+      ctx.arc(-u * 0.098, eyeY - u * 0.014, u * 0.011, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.beginPath()
+      ctx.arc(u * 0.072, eyeY - u * 0.014, u * 0.011, 0, Math.PI * 2)
+      ctx.fill()
     }
   }
   // mouth grill under the visor
   ctx.fillStyle = st.down ? 'rgba(240,113,106,0.7)' : c.dk
   for (const mx of [-u * 0.045, -u * 0.005, u * 0.035]) {
-    ctx.fillRect(mx, topY + hh * 0.80, u * 0.024, u * 0.014)
+    ctx.fillRect(mx, topY + hh * 0.8, u * 0.024, u * 0.014)
   }
 }
 
-function drawTorso(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], u: number, yTop: number, hgt: number, t: number, seed: number, st: BotState) {
-  const w = u * 0.40
+function drawTorso(
+  ctx: CanvasRenderingContext2D,
+  c: (typeof COPPERS)[0],
+  u: number,
+  yTop: number,
+  hgt: number,
+  t: number,
+  seed: number,
+  st: BotState,
+) {
+  const w = u * 0.4
   plate(ctx, c, -w / 2, yTop, w, hgt, u * 0.08)
-  rr(ctx, -u * 0.10, yTop + hgt * 0.22, u * 0.20, hgt * 0.42, u * 0.035, c.dk)
+  rr(ctx, -u * 0.1, yTop + hgt * 0.22, u * 0.2, hgt * 0.42, u * 0.035, c.dk)
   const on = st.working && Math.sin(t / 600 + seed * 2) > -0.2
   ctx.fillStyle = st.down ? '#f0716a' : on ? '#8df0c0' : '#3a4a40'
-  ctx.beginPath(); ctx.arc(0, yTop + hgt * 0.80, u * 0.022, 0, Math.PI * 2); ctx.fill()
-  ctx.strokeStyle = LINE; ctx.stroke()
+  ctx.beginPath()
+  ctx.arc(0, yTop + hgt * 0.8, u * 0.022, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.strokeStyle = LINE
+  ctx.stroke()
 }
 
 function drawChair(ctx: CanvasRenderingContext2D, u: number) {
   ctx.strokeStyle = CHAIR.metal
   ctx.lineWidth = Math.max(1.5, u * 0.022)
   for (const a of [-1, -0.5, 0, 0.5, 1]) {
-    ctx.beginPath(); ctx.moveTo(0, -u * 0.09)
-    ctx.lineTo(Math.sin(a) * u * 0.19, -u * 0.015); ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(0, -u * 0.09)
+    ctx.lineTo(Math.sin(a) * u * 0.19, -u * 0.015)
+    ctx.stroke()
     ctx.fillStyle = '#20242a'
-    ctx.beginPath(); ctx.arc(Math.sin(a) * u * 0.19, -u * 0.012, u * 0.022, 0, Math.PI * 2); ctx.fill()
+    ctx.beginPath()
+    ctx.arc(Math.sin(a) * u * 0.19, -u * 0.012, u * 0.022, 0, Math.PI * 2)
+    ctx.fill()
   }
   ctx.strokeStyle = CHAIR.metal
   ctx.lineWidth = Math.max(2, u * 0.032)
-  ctx.beginPath(); ctx.moveTo(0, -u * 0.08); ctx.lineTo(0, -u * 0.30); ctx.stroke()
+  ctx.beginPath()
+  ctx.moveTo(0, -u * 0.08)
+  ctx.lineTo(0, -u * 0.3)
+  ctx.stroke()
   rr(ctx, -u * 0.205, -u * 0.66, u * 0.41, u * 0.38, u * 0.07, CHAIR.dark)
-  rr(ctx, -u * 0.25, -u * 0.345, u * 0.50, u * 0.075, u * 0.035, CHAIR.mid)
+  rr(ctx, -u * 0.25, -u * 0.345, u * 0.5, u * 0.075, u * 0.035, CHAIR.mid)
 }
 
-function drawSeated(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], u: number, t: number, seed: number, st: BotState) {
+function drawSeated(
+  ctx: CanvasRenderingContext2D,
+  c: (typeof COPPERS)[0],
+  u: number,
+  t: number,
+  seed: number,
+  st: BotState,
+) {
   drawChair(ctx, u)
   const bob = st.working ? Math.sin(t / 420 + seed * 7) * u * 0.008 : 0
   // stubby legs off the seat, feet dangling near the base
-  limb(ctx, c, [[-u * 0.10, -u * 0.30], [-u * 0.185, -u * 0.22], [-u * 0.165, -u * 0.055]], u * 0.062)
-  limb(ctx, c, [[u * 0.10, -u * 0.30], [u * 0.185, -u * 0.22], [u * 0.165, -u * 0.055]], u * 0.062)
+  limb(
+    ctx,
+    c,
+    [
+      [-u * 0.1, -u * 0.3],
+      [-u * 0.185, -u * 0.22],
+      [-u * 0.165, -u * 0.055],
+    ],
+    u * 0.062,
+  )
+  limb(
+    ctx,
+    c,
+    [
+      [u * 0.1, -u * 0.3],
+      [u * 0.185, -u * 0.22],
+      [u * 0.165, -u * 0.055],
+    ],
+    u * 0.062,
+  )
   rr(ctx, -u * 0.225, -u * 0.06, u * 0.12, u * 0.05, u * 0.025, c.dk)
   rr(ctx, u * 0.105, -u * 0.06, u * 0.12, u * 0.05, u * 0.025, c.dk)
   // torso
-  drawTorso(ctx, c, u, -u * 0.62 + bob, u * 0.30, t, seed, st)
+  drawTorso(ctx, c, u, -u * 0.62 + bob, u * 0.3, t, seed, st)
   // laptop on lap, screen back to us with a mint logo
   rr(ctx, -u * 0.16, -u * 0.475, u * 0.32, u * 0.15, u * 0.025, '#3a4048')
   ctx.fillStyle = '#8df0c0'
   ctx.globalAlpha = st.working ? 0.9 : 0.25
-  ctx.beginPath(); ctx.arc(0, -u * 0.40, u * 0.02, 0, Math.PI * 2); ctx.fill()
+  ctx.beginPath()
+  ctx.arc(0, -u * 0.4, u * 0.02, 0, Math.PI * 2)
+  ctx.fill()
   ctx.globalAlpha = st.down ? 0.6 : st.pending ? 0.8 : 1
   // arms typing on the laptop rim
   const lt = st.working ? Math.sin(t / 130 + seed * 3) * u * 0.014 : 0
   const rt2 = st.working ? Math.sin(t / 130 + seed * 3 + Math.PI) * u * 0.014 : 0
-  limb(ctx, c, [[-u * 0.20, -u * 0.56 + bob], [-u * 0.27, -u * 0.44], [-u * 0.12, -u * 0.345 + lt]], u * 0.052)
-  limb(ctx, c, [[u * 0.20, -u * 0.56 + bob], [u * 0.27, -u * 0.44], [u * 0.12, -u * 0.345 + rt2]], u * 0.052)
+  limb(
+    ctx,
+    c,
+    [
+      [-u * 0.2, -u * 0.56 + bob],
+      [-u * 0.27, -u * 0.44],
+      [-u * 0.12, -u * 0.345 + lt],
+    ],
+    u * 0.052,
+  )
+  limb(
+    ctx,
+    c,
+    [
+      [u * 0.2, -u * 0.56 + bob],
+      [u * 0.27, -u * 0.44],
+      [u * 0.12, -u * 0.345 + rt2],
+    ],
+    u * 0.052,
+  )
   hand(ctx, c, -u * 0.105, -u * 0.335 + lt, u * 0.036)
   hand(ctx, c, u * 0.105, -u * 0.335 + rt2, u * 0.036)
   drawHead(ctx, c, u, -u * 0.63 + bob, t, seed, st)
 }
 
-function drawStandingPoint(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], u: number, t: number, seed: number, st: BotState) {
+function drawStandingPoint(
+  ctx: CanvasRenderingContext2D,
+  c: (typeof COPPERS)[0],
+  u: number,
+  t: number,
+  seed: number,
+  st: BotState,
+) {
   const sway = st.working ? Math.sin(t / 900 + seed) * u * 0.008 : 0
-  limb(ctx, c, [[-u * 0.085, -u * 0.34], [-u * 0.095, -u * 0.055]], u * 0.062)
-  limb(ctx, c, [[u * 0.085, -u * 0.34], [u * 0.095, -u * 0.055]], u * 0.062)
+  limb(
+    ctx,
+    c,
+    [
+      [-u * 0.085, -u * 0.34],
+      [-u * 0.095, -u * 0.055],
+    ],
+    u * 0.062,
+  )
+  limb(
+    ctx,
+    c,
+    [
+      [u * 0.085, -u * 0.34],
+      [u * 0.095, -u * 0.055],
+    ],
+    u * 0.062,
+  )
   rr(ctx, -u * 0.165, -u * 0.06, u * 0.13, u * 0.05, u * 0.025, c.dk)
   rr(ctx, u * 0.035, -u * 0.06, u * 0.13, u * 0.05, u * 0.025, c.dk)
   rr(ctx, -u * 0.14, -u * 0.375, u * 0.28, u * 0.06, u * 0.03, c.dk)
-  drawTorso(ctx, c, u, -u * 0.66 + sway, u * 0.30, t, seed, st)
+  drawTorso(ctx, c, u, -u * 0.66 + sway, u * 0.3, t, seed, st)
   // presidential kit: red tie, gold epaulets, gold buttons
   {
     const ty = -u * 0.66 + sway
     ctx.fillStyle = GOLD
     ctx.beginPath()
-    ctx.moveTo(-u * 0.030, ty + u * 0.015)
-    ctx.lineTo(u * 0.030, ty + u * 0.015)
-    ctx.lineTo(u * 0.015, ty + u * 0.20)
+    ctx.moveTo(-u * 0.03, ty + u * 0.015)
+    ctx.lineTo(u * 0.03, ty + u * 0.015)
+    ctx.lineTo(u * 0.015, ty + u * 0.2)
     ctx.lineTo(0, ty + u * 0.235)
-    ctx.lineTo(-u * 0.015, ty + u * 0.20)
+    ctx.lineTo(-u * 0.015, ty + u * 0.2)
     ctx.closePath()
     ctx.fill()
     ctx.strokeStyle = 'rgba(90,60,10,0.55)'
@@ -368,23 +603,26 @@ function drawStandingPoint(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], 
     rr(ctx, u * 0.14, ty - u * 0.005, u * 0.075, u * 0.026, u * 0.01, GOLD)
     for (const by2 of [0.09, 0.15]) {
       ctx.fillStyle = GOLD
-      ctx.beginPath(); ctx.arc(u * 0.065, ty + u * by2, u * 0.012, 0, Math.PI * 2); ctx.fill()
+      ctx.beginPath()
+      ctx.arc(u * 0.065, ty + u * by2, u * 0.012, 0, Math.PI * 2)
+      ctx.fill()
     }
     // armor gloss: specular sweeps on torso and helmet
     ctx.save()
     ctx.beginPath()
-    ctx.roundRect(-u * 0.20, ty, u * 0.40, u * 0.30, u * 0.08)
+    ctx.roundRect(-u * 0.2, ty, u * 0.4, u * 0.3, u * 0.08)
     ctx.clip()
     ctx.fillStyle = 'rgba(255,255,255,0.16)'
     ctx.beginPath()
-    ctx.moveTo(-u * 0.20, ty + u * 0.02)
+    ctx.moveTo(-u * 0.2, ty + u * 0.02)
     ctx.lineTo(-u * 0.06, ty)
-    ctx.lineTo(-u * 0.16, ty + u * 0.30)
-    ctx.lineTo(-u * 0.20, ty + u * 0.30)
+    ctx.lineTo(-u * 0.16, ty + u * 0.3)
+    ctx.lineTo(-u * 0.2, ty + u * 0.3)
     ctx.closePath()
     ctx.fill()
     ctx.restore()
-    const hh2 = u * 0.34, hw2 = u * 0.46
+    const hh2 = u * 0.34,
+      hw2 = u * 0.46
     const hTop = -u * 0.67 + sway - hh2
     ctx.save()
     ctx.beginPath()
@@ -401,48 +639,109 @@ function drawStandingPoint(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], 
     ctx.restore()
   }
   // left arm relaxed
-  limb(ctx, c, [[-u * 0.20, -u * 0.60 + sway], [-u * 0.245, -u * 0.46], [-u * 0.19, -u * 0.38]], u * 0.052)
+  limb(
+    ctx,
+    c,
+    [
+      [-u * 0.2, -u * 0.6 + sway],
+      [-u * 0.245, -u * 0.46],
+      [-u * 0.19, -u * 0.38],
+    ],
+    u * 0.052,
+  )
   hand(ctx, c, -u * 0.185, -u * 0.37, u * 0.034)
   // right arm up, pointing at the board with a red marker
   const lift = st.working ? Math.sin(t / 700 + seed * 5) * u * 0.018 : 0
-  limb(ctx, c, [[u * 0.19, -u * 0.62 + sway], [u * 0.31, -u * 0.76 + lift], [u * 0.43, -u * 0.83 + lift]], u * 0.052)
+  limb(
+    ctx,
+    c,
+    [
+      [u * 0.19, -u * 0.62 + sway],
+      [u * 0.31, -u * 0.76 + lift],
+      [u * 0.43, -u * 0.83 + lift],
+    ],
+    u * 0.052,
+  )
   hand(ctx, c, u * 0.445, -u * 0.835 + lift, u * 0.036)
   ctx.strokeStyle = '#d84a3a'
   ctx.lineWidth = Math.max(1.5, u * 0.024)
   ctx.lineCap = 'round'
   ctx.beginPath()
   ctx.moveTo(u * 0.465, -u * 0.85 + lift)
-  ctx.lineTo(u * 0.525, -u * 0.90 + lift)
+  ctx.lineTo(u * 0.525, -u * 0.9 + lift)
   ctx.stroke()
   ctx.lineCap = 'butt'
   drawHead(ctx, c, u, -u * 0.67 + sway, t, seed, st)
   // gold band across the brow
   {
-    const hh = u * 0.34, hw = u * 0.46
+    const hh = u * 0.34,
+      hw = u * 0.46
     const topY = -u * 0.67 + sway - hh
     ctx.fillStyle = GOLD
-    ctx.fillRect(-hw / 2 + u * 0.02, topY + hh * 0.10, hw - u * 0.04, u * 0.018)
+    ctx.fillRect(-hw / 2 + u * 0.02, topY + hh * 0.1, hw - u * 0.04, u * 0.018)
   }
 }
 
-function drawWalker(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], u: number, t: number, seed: number, st: BotState) {
+function drawWalker(
+  ctx: CanvasRenderingContext2D,
+  c: (typeof COPPERS)[0],
+  u: number,
+  t: number,
+  seed: number,
+  st: BotState,
+) {
   const step = Math.sin(t / 150 + seed)
   const bob = Math.abs(Math.cos(t / 150 + seed)) * u * 0.022
-  limb(ctx, c, [[-u * 0.055, -u * 0.32 - bob], [-u * 0.065 + step * u * 0.10, -u * 0.05]], u * 0.06)
-  limb(ctx, c, [[u * 0.055, -u * 0.32 - bob], [u * 0.065 - step * u * 0.10, -u * 0.05]], u * 0.06)
-  rr(ctx, -u * 0.125 + step * u * 0.10, -u * 0.055, u * 0.12, u * 0.05, u * 0.025, c.dk)
-  rr(ctx, u * 0.005 - step * u * 0.10, -u * 0.055, u * 0.12, u * 0.05, u * 0.025, c.dk)
+  limb(
+    ctx,
+    c,
+    [
+      [-u * 0.055, -u * 0.32 - bob],
+      [-u * 0.065 + step * u * 0.1, -u * 0.05],
+    ],
+    u * 0.06,
+  )
+  limb(
+    ctx,
+    c,
+    [
+      [u * 0.055, -u * 0.32 - bob],
+      [u * 0.065 - step * u * 0.1, -u * 0.05],
+    ],
+    u * 0.06,
+  )
+  rr(ctx, -u * 0.125 + step * u * 0.1, -u * 0.055, u * 0.12, u * 0.05, u * 0.025, c.dk)
+  rr(ctx, u * 0.005 - step * u * 0.1, -u * 0.055, u * 0.12, u * 0.05, u * 0.025, c.dk)
   rr(ctx, -u * 0.125, -u * 0.355 - bob, u * 0.25, u * 0.055, u * 0.027, c.dk)
   drawTorso(ctx, c, u, -u * 0.63 - bob, u * 0.28, t, seed, st)
   // clipboard held with both hands
-  limb(ctx, c, [[-u * 0.185, -u * 0.56 - bob], [-u * 0.185, -u * 0.42 - bob]], u * 0.05)
-  limb(ctx, c, [[u * 0.185, -u * 0.56 - bob], [u * 0.185, -u * 0.42 - bob]], u * 0.05)
-  rr(ctx, -u * 0.14, -u * 0.50 - bob, u * 0.28, u * 0.18, u * 0.02, '#d9d4c4')
+  limb(
+    ctx,
+    c,
+    [
+      [-u * 0.185, -u * 0.56 - bob],
+      [-u * 0.185, -u * 0.42 - bob],
+    ],
+    u * 0.05,
+  )
+  limb(
+    ctx,
+    c,
+    [
+      [u * 0.185, -u * 0.56 - bob],
+      [u * 0.185, -u * 0.42 - bob],
+    ],
+    u * 0.05,
+  )
+  rr(ctx, -u * 0.14, -u * 0.5 - bob, u * 0.28, u * 0.18, u * 0.02, '#d9d4c4')
   rr(ctx, -u * 0.045, -u * 0.525 - bob, u * 0.09, u * 0.03, u * 0.012, '#8a939c')
   ctx.strokeStyle = 'rgba(60,60,70,0.5)'
   ctx.lineWidth = 1
   for (const ly of [0.455, 0.415, 0.375]) {
-    ctx.beginPath(); ctx.moveTo(-u * 0.105, -u * ly - bob); ctx.lineTo(u * 0.105, -u * ly - bob); ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(-u * 0.105, -u * ly - bob)
+    ctx.lineTo(u * 0.105, -u * ly - bob)
+    ctx.stroke()
   }
   hand(ctx, c, -u * 0.18, -u * 0.41 - bob, u * 0.034)
   hand(ctx, c, u * 0.18, -u * 0.41 - bob, u * 0.034)
@@ -451,9 +750,14 @@ function drawWalker(ctx: CanvasRenderingContext2D, c: typeof COPPERS[0], u: numb
 
 function drawBot(
   ctx: CanvasRenderingContext2D,
-  x: number, groundY: number, H: number,
-  pose: Action, t: number, seed: number,
-  st: BotState, flip: boolean,
+  x: number,
+  groundY: number,
+  H: number,
+  pose: Action,
+  t: number,
+  seed: number,
+  st: BotState,
+  flip: boolean,
 ) {
   const c = pose === 'point' ? CHIEF_NAVY : COPPERS[seed % COPPERS.length]
   ctx.save()
@@ -469,7 +773,11 @@ function drawBot(
   ctx.restore()
 }
 
-interface Quote { symbol: string; last: number; move: number }
+interface Quote {
+  symbol: string
+  last: number
+  move: number
+}
 
 function quotesFrom(board: BoardState | null, trading: TradingStatus | null): Quote[] {
   const out: Quote[] = []
@@ -483,7 +791,7 @@ function quotesFrom(board: BoardState | null, trading: TradingStatus | null): Qu
   }
   for (const mode of ['live', 'paper'] as const) {
     for (const p of trading?.modes?.[mode]?.open_positions ?? []) {
-      if (!out.find(q => q.symbol === p.symbol)) {
+      if (!out.find((q) => q.symbol === p.symbol)) {
         out.push({ symbol: p.symbol, last: p.entry, move: 0 })
       }
     }
@@ -493,7 +801,10 @@ function quotesFrom(board: BoardState | null, trading: TradingStatus | null): Qu
 
 function drawScreen(
   ctx: CanvasRenderingContext2D,
-  x: number, y: number, w: number, h: number,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
   q: Quote | null,
   hist: number[],
   now: number,
@@ -512,7 +823,10 @@ function drawScreen(
   ctx.strokeStyle = 'rgba(120,230,160,0.06)'
   ctx.lineWidth = 1
   for (const fy of [0.33, 0.55]) {
-    ctx.beginPath(); ctx.moveTo(x + 3, y + h * fy); ctx.lineTo(x + w - 3, y + h * fy); ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(x + 3, y + h * fy)
+    ctx.lineTo(x + w - 3, y + h * fy)
+    ctx.stroke()
   }
   if (!q) {
     ctx.fillStyle = 'rgba(120,200,160,0.30)'
@@ -526,8 +840,8 @@ function drawScreen(
     const series = hist.length > 2 ? hist : [q.last * 0.996, q.last]
     const min = Math.min(...series)
     const max = Math.max(...series)
-    const flat = (max - min) < Math.max(0.01, (q.last || 1) * 0.0008)
-    const span = flat ? Math.max(0.02, (q.last || 1) * 0.004) : (max - min)
+    const flat = max - min < Math.max(0.01, (q.last || 1) * 0.0008)
+    const span = flat ? Math.max(0.02, (q.last || 1) * 0.004) : max - min
     const base = flat ? (min + max) / 2 - span / 2 : min
     const chartY = y + h * 0.14
     const chartH = h * 0.58
@@ -551,7 +865,8 @@ function drawScreen(
     ctx.font = `bold ${Math.max(7, Math.min(10, h * 0.15))}px ${MONO}`
     ctx.fillText(
       `${q.symbol.slice(0, 5)}  ${q.last ? q.last.toFixed(2) : ''}  ${up ? '+' : ''}${(q.move * 100).toFixed(1)}%`,
-      x + pad + 1, y + h - pad - 2,
+      x + pad + 1,
+      y + h - pad - 2,
     )
   }
   ctx.strokeStyle = 'rgba(160,255,200,0.10)'
@@ -564,17 +879,25 @@ export default function RangeFloor() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sparkRef = useRef<Record<string, number[]>>({})
   const [seats, setSeats] = useState<DeskSeat[]>([])
-  const trading = useDashboardStore(s => s.trading)
-  const fleet = useDashboardStore(s => s.fleet)
-  const board = useDashboardStore(s => s.board)
+  const trading = useDashboardStore((s) => s.trading)
+  const fleet = useDashboardStore((s) => s.fleet)
+  const board = useDashboardStore((s) => s.board)
 
   useEffect(() => {
     let alive = true
-    const load = () => fetch('/api/desk').then(r => r.json())
-      .then(d => { if (alive) setSeats(d.seats) }).catch(() => {})
+    const load = () =>
+      fetch('/api/desk')
+        .then((r) => r.json())
+        .then((d) => {
+          if (alive) setSeats(d.seats)
+        })
+        .catch(() => {})
     load()
     const id = setInterval(load, 60_000)
-    return () => { alive = false; clearInterval(id) }
+    return () => {
+      alive = false
+      clearInterval(id)
+    }
   }, [])
 
   const dataRef = useRef({ seats, trading, fleet, board })
@@ -595,12 +918,20 @@ export default function RangeFloor() {
     // seat genuinely digests every seat's output); the chief finishing sends
     // the brief out of the building (Telegram); a fresh trader alert sends a
     // note from the lobby toward the trading-desk rail.
-    interface Memo { pts: [number, number][]; t0: number; dur: number; tint: string }
+    interface Memo {
+      pts: [number, number][]
+      t0: number
+      dur: number
+      tint: string
+    }
     const memos: Memo[] = []
     let seenRuns: Record<string, string | null> | null = null
     let seenAlert: string | null = null
     let alertPrimed = false
     const mailPreview = new URLSearchParams(window.location.search).get('mail') === 'test'
+    // ?freeze=<ms> pins the animation clock to one instant — deterministic
+    // frames for visual-regression tests (same dev-knob class as ?phase=).
+    const frozenMs = Number(new URLSearchParams(window.location.search).get('freeze')) || null
     let lastPreview = 0
     const spawnMemo = (pts: [number, number][], tint: string, now: number, dur = 3000) => {
       if (memos.length > 12) memos.shift()
@@ -612,16 +943,27 @@ export default function RangeFloor() {
       const p = SPOTS[name]
       if (!p) return
       spawnMemo(
-        [[p.x, p.y - 0.10], [shaftMid, p.y - 0.10], [shaftMid, F3.ground - 0.10], chiefDesk],
-        JOB[name]?.accent ?? '#d9a441', now,
+        [[p.x, p.y - 0.1], [shaftMid, p.y - 0.1], [shaftMid, F3.ground - 0.1], chiefDesk],
+        JOB[name]?.accent ?? '#d9a441',
+        now,
       )
     }
     const chiefMemo = (now: number) =>
       spawnMemo([chiefDesk, [0.66, 0.16], [0.86, 0.09], [1.03, 0.06]], '#d9a441', now, 2400)
     const alertMemo = (now: number) =>
-      spawnMemo([[SPOTS.live.x, F1.ground - 0.10], [0.90, F1.ground - 0.16], [1.03, F1.ground - 0.20]], '#5abf7a', now, 2200)
+      spawnMemo(
+        [
+          [SPOTS.live.x, F1.ground - 0.1],
+          [0.9, F1.ground - 0.16],
+          [1.03, F1.ground - 0.2],
+        ],
+        '#5abf7a',
+        now,
+        2200,
+      )
 
-    const draw = (now: number) => {
+    const draw = (rafNow: number) => {
+      const now = frozenMs ?? rafNow
       const { seats, trading, fleet, board } = dataRef.current
       const dpr = Math.min(window.devicePixelRatio || 1, 2)
       const rect = canvas.getBoundingClientRect()
@@ -633,16 +975,20 @@ export default function RangeFloor() {
       ctx.fillStyle = '#0b1116'
       ctx.fillRect(0, 0, rect.width, rect.height)
 
-      const dx = 0, dy = 0, dw = rect.width, dh = rect.height
+      const dx = 0,
+        dy = 0,
+        dw = rect.width,
+        dh = rect.height
       const X = (fx: number) => fx * dw
       const Y = (fy: number) => fy * dh
       // sprites keep sane proportions at any aspect
-      const S = Math.min(dh, dw * 0.60)
+      const S = Math.min(dh, dw * 0.6)
       const phase = getPhase(trading?.market)
       const room = ROOM[phase]
 
       // office-mail transitions: diff real state, spawn envelopes on change
-      {
+      if (seats.length) {
+        // prime on the first NON-EMPTY snapshot — a page load is not a message
         const runs: Record<string, string | null> = {}
         for (const s of seats) runs[s.name] = s.ran_at ?? null
         if (seenRuns) {
@@ -654,15 +1000,26 @@ export default function RangeFloor() {
           }
         }
         seenRuns = runs
+      }
+      {
         const alerts = trading?.alerts
         const tail = alerts?.length ? alerts[alerts.length - 1] : null
-        if (!alertPrimed) { alertPrimed = trading != null; seenAlert = tail }
-        else if (tail && tail !== seenAlert) { alertMemo(now); seenAlert = tail }
+        if (!alertPrimed) {
+          alertPrimed = trading != null
+          seenAlert = tail
+        } else if (tail && tail !== seenAlert) {
+          alertMemo(now)
+          seenAlert = tail
+        }
         if (mailPreview && now - lastPreview > 4200) {
           lastPreview = now
           const cycle = ['projects', 'ops', 'premarket', 'content', 'paper', 'chief', 'alert']
           const pick = cycle[Math.floor(now / 4200) % cycle.length]
-          pick === 'chief' ? chiefMemo(now) : pick === 'alert' ? alertMemo(now) : seatMemo(pick, now)
+          pick === 'chief'
+            ? chiefMemo(now)
+            : pick === 'alert'
+              ? alertMemo(now)
+              : seatMemo(pick, now)
         }
       }
 
@@ -683,11 +1040,11 @@ export default function RangeFloor() {
           ctx.fillRect(X(0.015), Y(F.top), dw * 0.97, dh * (F.ground - F.top))
         }
         // floor surface band at the bottom of each storey
-        const fg = ctx.createLinearGradient(0, Y(F.ground - 0.020), 0, Y(F.ground + 0.012))
+        const fg = ctx.createLinearGradient(0, Y(F.ground - 0.02), 0, Y(F.ground + 0.012))
         fg.addColorStop(0, room.floorA)
         fg.addColorStop(1, room.floorB)
         ctx.fillStyle = fg
-        ctx.fillRect(X(0.015), Y(F.ground - 0.018), dw * 0.97, dh * 0.030)
+        ctx.fillRect(X(0.015), Y(F.ground - 0.018), dw * 0.97, dh * 0.03)
         ctx.fillStyle = 'rgba(0,0,0,0.20)'
         ctx.fillRect(X(0.015), Y(F.ground - 0.018), dw * 0.97, dh * 0.004)
       }
@@ -707,28 +1064,44 @@ export default function RangeFloor() {
 
       // roof furniture: mast with beacon, small dish
       {
-        const rx = X(0.205), ry = Y(F3.top)
+        const rx = X(0.205),
+          ry = Y(F3.top)
         ctx.strokeStyle = '#3a3128'
         ctx.lineWidth = Math.max(1.5, S * 0.006)
-        ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx, ry - S * 0.055); ctx.stroke()
-        ctx.beginPath(); ctx.moveTo(rx - S * 0.016, ry); ctx.lineTo(rx, ry - S * 0.030); ctx.stroke()
-        ctx.beginPath(); ctx.moveTo(rx + S * 0.016, ry); ctx.lineTo(rx, ry - S * 0.030); ctx.stroke()
+        ctx.beginPath()
+        ctx.moveTo(rx, ry)
+        ctx.lineTo(rx, ry - S * 0.055)
+        ctx.stroke()
+        ctx.beginPath()
+        ctx.moveTo(rx - S * 0.016, ry)
+        ctx.lineTo(rx, ry - S * 0.03)
+        ctx.stroke()
+        ctx.beginPath()
+        ctx.moveTo(rx + S * 0.016, ry)
+        ctx.lineTo(rx, ry - S * 0.03)
+        ctx.stroke()
         const on = Math.floor(now / 1100) % 2 === 0
         ctx.fillStyle = on ? '#f0716a' : '#4a3a38'
-        ctx.beginPath(); ctx.arc(rx, ry - S * 0.062, S * 0.009, 0, Math.PI * 2); ctx.fill()
-        const dxx = X(0.80), dyy = Y(F3.top)
+        ctx.beginPath()
+        ctx.arc(rx, ry - S * 0.062, S * 0.009, 0, Math.PI * 2)
+        ctx.fill()
+        const dxx = X(0.8),
+          dyy = Y(F3.top)
         ctx.fillStyle = '#3a3128'
-        ctx.fillRect(dxx - S * 0.005, dyy - S * 0.026, S * 0.010, S * 0.026)
+        ctx.fillRect(dxx - S * 0.005, dyy - S * 0.026, S * 0.01, S * 0.026)
         ctx.fillStyle = '#8a939c'
         ctx.beginPath()
-        ctx.ellipse(dxx - S * 0.012, dyy - S * 0.034, S * 0.020, S * 0.013, -0.6, 0, Math.PI * 2)
+        ctx.ellipse(dxx - S * 0.012, dyy - S * 0.034, S * 0.02, S * 0.013, -0.6, 0, Math.PI * 2)
         ctx.fill()
-        ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 1; ctx.stroke()
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)'
+        ctx.lineWidth = 1
+        ctx.stroke()
       }
 
       // floor 3 wainscot — dark wood paneling with a gold trim line
       {
-        const wy = Y(0.243), wh2 = dh * (F3.ground - 0.243 - 0.016)
+        const wy = Y(0.243),
+          wh2 = dh * (F3.ground - 0.243 - 0.016)
         ctx.fillStyle = '#4a3220'
         ctx.fillRect(X(0.015), wy, dw * 0.97, wh2)
         ctx.fillStyle = 'rgba(0,0,0,0.22)'
@@ -738,26 +1111,29 @@ export default function RangeFloor() {
         ctx.fillRect(X(0.015), wy, dw * 0.97, 2)
         ctx.globalAlpha = 1
       }
-
-      // elevator shaft through all floors
-      {
+      ctx.fillStyle = '#1a2026'
+      ctx.fillRect(
+        X(SHAFT.x0),
+        Y(F3.top),
+        dw * (SHAFT.x1 - SHAFT.x0),
+        dh * (F1.ground - F3.top + 0.012),
+      )
+      for (const F of [F3, F2, F1]) {
+        const doorW = dw * (SHAFT.x1 - SHAFT.x0) - S * 0.03
+        const doorH = dh * (F.ground - F.top) * 0.62
+        const dx2 = X(SHAFT.x0) + S * 0.015
+        const dy2 = Y(F.ground) - doorH - dh * 0.006
+        ctx.fillStyle = '#39424c'
+        ctx.fillRect(dx2, dy2, doorW, doorH)
+        ctx.fillStyle = 'rgba(255,255,255,0.06)'
+        ctx.fillRect(dx2, dy2, doorW, 2)
         ctx.fillStyle = '#1a2026'
-        ctx.fillRect(X(SHAFT.x0), Y(F3.top), dw * (SHAFT.x1 - SHAFT.x0), dh * (F1.ground - F3.top + 0.012))
-        for (const F of [F3, F2, F1]) {
-          const doorW = dw * (SHAFT.x1 - SHAFT.x0) - S * 0.03
-          const doorH = dh * (F.ground - F.top) * 0.62
-          const dx2 = X(SHAFT.x0) + S * 0.015
-          const dy2 = Y(F.ground) - doorH - dh * 0.006
-          ctx.fillStyle = '#39424c'
-          ctx.fillRect(dx2, dy2, doorW, doorH)
-          ctx.fillStyle = 'rgba(255,255,255,0.06)'
-          ctx.fillRect(dx2, dy2, doorW, 2)
-          ctx.fillStyle = '#1a2026'
-          ctx.fillRect(dx2 + doorW / 2 - 1, dy2, 2, doorH)
-          const here = (F === F1)
-          ctx.fillStyle = here ? '#8df0c0' : '#3a4a40'
-          ctx.beginPath(); ctx.arc(dx2 + doorW / 2, dy2 - dh * 0.012, S * 0.008, 0, Math.PI * 2); ctx.fill()
-        }
+        ctx.fillRect(dx2 + doorW / 2 - 1, dy2, 2, doorH)
+        const here = F === F1
+        ctx.fillStyle = here ? '#8df0c0' : '#3a4a40'
+        ctx.beginPath()
+        ctx.arc(dx2 + doorW / 2, dy2 - dh * 0.012, S * 0.008, 0, Math.PI * 2)
+        ctx.fill()
       }
 
       // ── floor 3: the board room ──
@@ -772,7 +1148,11 @@ export default function RangeFloor() {
       ctx.fillRect(X(BOARD.x) + 3, Y(BOARD.y) + 2, dw * BOARD.w - 6, 2)
       ctx.fillStyle = 'rgba(160,200,180,0.4)'
       ctx.font = `${Math.max(6, dh * 0.013)}px ${MONO}`
-      ctx.fillText('THE TAPE — judged this session', X(BOARD.x + 0.006), Y(BOARD.y + BOARD.h) - dh * 0.010)
+      ctx.fillText(
+        'THE TAPE — judged this session',
+        X(BOARD.x + 0.006),
+        Y(BOARD.y + BOARD.h) - dh * 0.01,
+      )
 
       // LED sign housing (right of the shaft)
       ctx.fillStyle = '#1a1113'
@@ -786,7 +1166,7 @@ export default function RangeFloor() {
       // presidential red carpet with gold border
       ctx.fillStyle = 'rgba(138,36,48,0.75)'
       ctx.beginPath()
-      ctx.ellipse(X(0.50), Y(F3.ground - 0.006), S * 0.27, dh * 0.024, 0, 0, Math.PI * 2)
+      ctx.ellipse(X(0.5), Y(F3.ground - 0.006), S * 0.27, dh * 0.024, 0, 0, Math.PI * 2)
       ctx.fill()
       ctx.strokeStyle = 'rgba(217,164,65,0.65)'
       ctx.lineWidth = 2
@@ -794,45 +1174,64 @@ export default function RangeFloor() {
       ctx.strokeStyle = 'rgba(217,164,65,0.35)'
       ctx.lineWidth = 1
       ctx.beginPath()
-      ctx.ellipse(X(0.50), Y(F3.ground - 0.006), S * 0.22, dh * 0.018, 0, 0, Math.PI * 2)
+      ctx.ellipse(X(0.5), Y(F3.ground - 0.006), S * 0.22, dh * 0.018, 0, 0, Math.PI * 2)
       ctx.stroke()
 
       // standing flags flanking the chief, gold finials
       for (const fx4 of [0.428, 0.607]) {
-        const px3 = X(fx4), base = Y(F3.ground - 0.004)
+        const px3 = X(fx4),
+          base = Y(F3.ground - 0.004)
         const topy = base - dh * 0.155
         ctx.fillStyle = '#3a2a18'
-        ctx.beginPath(); ctx.ellipse(px3, base, S * 0.020, S * 0.007, 0, 0, Math.PI * 2); ctx.fill()
+        ctx.beginPath()
+        ctx.ellipse(px3, base, S * 0.02, S * 0.007, 0, 0, Math.PI * 2)
+        ctx.fill()
         ctx.strokeStyle = '#8a7a4a'
         ctx.lineWidth = Math.max(1.5, S * 0.006)
-        ctx.beginPath(); ctx.moveTo(px3, base); ctx.lineTo(px3, topy); ctx.stroke()
+        ctx.beginPath()
+        ctx.moveTo(px3, base)
+        ctx.lineTo(px3, topy)
+        ctx.stroke()
         ctx.fillStyle = GOLD
-        ctx.beginPath(); ctx.arc(px3, topy - S * 0.008, S * 0.008, 0, Math.PI * 2); ctx.fill()
+        ctx.beginPath()
+        ctx.arc(px3, topy - S * 0.008, S * 0.008, 0, Math.PI * 2)
+        ctx.fill()
         // draped cloth: deep green with gold fringe
         const sway2 = Math.sin(now / 1600 + fx4 * 40) * S * 0.004
         ctx.fillStyle = '#1e4d38'
         ctx.beginPath()
         ctx.moveTo(px3, topy + S * 0.004)
-        ctx.quadraticCurveTo(px3 + S * 0.030 + sway2, topy + S * 0.030, px3 + S * 0.020 + sway2, topy + S * 0.075)
+        ctx.quadraticCurveTo(
+          px3 + S * 0.03 + sway2,
+          topy + S * 0.03,
+          px3 + S * 0.02 + sway2,
+          topy + S * 0.075,
+        )
         ctx.lineTo(px3, topy + S * 0.062)
         ctx.closePath()
         ctx.fill()
         ctx.strokeStyle = 'rgba(217,164,65,0.7)'
         ctx.lineWidth = 1.2
         ctx.beginPath()
-        ctx.moveTo(px3 + S * 0.020 + sway2, topy + S * 0.075)
+        ctx.moveTo(px3 + S * 0.02 + sway2, topy + S * 0.075)
         ctx.lineTo(px3, topy + S * 0.062)
         ctx.stroke()
       }
 
       // gold seal on the wall
       {
-        const sx2 = X(0.632), sy2 = Y(0.105), r2 = S * 0.026
+        const sx2 = X(0.632),
+          sy2 = Y(0.105),
+          r2 = S * 0.026
         ctx.strokeStyle = GOLD
         ctx.lineWidth = Math.max(1.5, S * 0.005)
-        ctx.beginPath(); ctx.arc(sx2, sy2, r2, 0, Math.PI * 2); ctx.stroke()
+        ctx.beginPath()
+        ctx.arc(sx2, sy2, r2, 0, Math.PI * 2)
+        ctx.stroke()
         ctx.lineWidth = 1
-        ctx.beginPath(); ctx.arc(sx2, sy2, r2 * 0.72, 0, Math.PI * 2); ctx.stroke()
+        ctx.beginPath()
+        ctx.arc(sx2, sy2, r2 * 0.72, 0, Math.PI * 2)
+        ctx.stroke()
         ctx.fillStyle = GOLD
         ctx.font = `bold ${Math.max(8, r2 * 1.1)}px ${MONO}`
         ctx.textAlign = 'center'
@@ -841,22 +1240,34 @@ export default function RangeFloor() {
         for (let i = 0; i < 8; i++) {
           const a = (i / 8) * Math.PI * 2
           ctx.beginPath()
-          ctx.arc(sx2 + Math.cos(a) * r2 * 0.86, sy2 + Math.sin(a) * r2 * 0.86, r2 * 0.05, 0, Math.PI * 2)
+          ctx.arc(
+            sx2 + Math.cos(a) * r2 * 0.86,
+            sy2 + Math.sin(a) * r2 * 0.86,
+            r2 * 0.05,
+            0,
+            Math.PI * 2,
+          )
           ctx.fill()
         }
       }
       // chief's ficus and coffee table
       {
-        const fx2 = X(0.615), fy2 = Y(F3.ground - 0.006)
+        const fx2 = X(0.615),
+          fy2 = Y(F3.ground - 0.006)
         ctx.fillStyle = '#7a5230'
-        ctx.fillRect(fx2 - S * 0.020, fy2 - S * 0.040, S * 0.040, S * 0.040)
+        ctx.fillRect(fx2 - S * 0.02, fy2 - S * 0.04, S * 0.04, S * 0.04)
         ctx.fillStyle = '#4f8f4a'
-        ctx.beginPath(); ctx.ellipse(fx2, fy2 - S * 0.075, S * 0.030, S * 0.038, 0, 0, Math.PI * 2); ctx.fill()
+        ctx.beginPath()
+        ctx.ellipse(fx2, fy2 - S * 0.075, S * 0.03, S * 0.038, 0, 0, Math.PI * 2)
+        ctx.fill()
         ctx.fillStyle = '#356534'
-        ctx.beginPath(); ctx.ellipse(fx2 - S * 0.016, fy2 - S * 0.058, S * 0.016, S * 0.020, 0, 0, Math.PI * 2); ctx.fill()
-        const tx2 = X(0.385), ty2 = Y(F3.ground - 0.006)
+        ctx.beginPath()
+        ctx.ellipse(fx2 - S * 0.016, fy2 - S * 0.058, S * 0.016, S * 0.02, 0, 0, Math.PI * 2)
+        ctx.fill()
+        const tx2 = X(0.385),
+          ty2 = Y(F3.ground - 0.006)
         ctx.fillStyle = '#5a4428'
-        ctx.fillRect(tx2 - S * 0.030, ty2 - S * 0.036, S * 0.060, S * 0.008)
+        ctx.fillRect(tx2 - S * 0.03, ty2 - S * 0.036, S * 0.06, S * 0.008)
         ctx.fillRect(tx2 - S * 0.024, ty2 - S * 0.028, S * 0.006, S * 0.028)
         ctx.fillRect(tx2 + S * 0.018, ty2 - S * 0.028, S * 0.006, S * 0.028)
         ctx.fillStyle = '#b45a4a'
@@ -871,18 +1282,27 @@ export default function RangeFloor() {
       const cubTint = room.wash ? 'rgba(255,255,255,0.045)' : 'rgba(255,255,255,0.03)'
       const noteC = ['#d9b24a', '#7fb2d9', '#d97fa0', '#8fd98f']
       for (const bay of BAYS) {
-        const left = X(bay.x - bay.half), right = X(bay.x + bay.half)
+        const left = X(bay.x - bay.half),
+          right = X(bay.x + bay.half)
         ctx.fillStyle = cubTint
         ctx.fillRect(left, Y(bay.top + 0.012), right - left, dh * (bay.ground - bay.top - 0.028))
         // department color: header beam + floor mat
         const accent = JOB[bay.key]?.accent ?? '#d9a441'
         ctx.fillStyle = accent
         ctx.globalAlpha = 0.75
-        ctx.fillRect(left + S * 0.004, Y(bay.top + 0.008), right - left - S * 0.008, dh * 0.010)
+        ctx.fillRect(left + S * 0.004, Y(bay.top + 0.008), right - left - S * 0.008, dh * 0.01)
         ctx.globalAlpha = 0.16
         ctx.fillStyle = accent
         ctx.beginPath()
-        ctx.ellipse(X(bay.x), Y(bay.ground - 0.006), (right - left) * 0.34, dh * 0.020, 0, 0, Math.PI * 2)
+        ctx.ellipse(
+          X(bay.x),
+          Y(bay.ground - 0.006),
+          (right - left) * 0.34,
+          dh * 0.02,
+          0,
+          0,
+          Math.PI * 2,
+        )
         ctx.fill()
         ctx.globalAlpha = 1
         // pinboard notes
@@ -894,23 +1314,27 @@ export default function RangeFloor() {
         ctx.fillRect(0, 0, S * 0.024, S * 0.024)
         ctx.rotate(0.09)
         ctx.fillStyle = noteC[(b0 + 1) % 4]
-        ctx.fillRect(S * 0.010, S * 0.030, S * 0.024, S * 0.024)
+        ctx.fillRect(S * 0.01, S * 0.03, S * 0.024, S * 0.024)
         ctx.restore()
         // the office's own gear on the floor
-        const ax = X(bay.x - bay.half * 0.62), ay = Y(bay.ground - 0.014)
+        const ax = X(bay.x - bay.half * 0.62),
+          ay = Y(bay.ground - 0.014)
         if (bay.key === 'projects') {
           // red toolbox
           ctx.fillStyle = '#b03a30'
-          ctx.fillRect(ax - S * 0.020, ay - S * 0.024, S * 0.040, S * 0.024)
+          ctx.fillRect(ax - S * 0.02, ay - S * 0.024, S * 0.04, S * 0.024)
           ctx.fillStyle = '#8a2a22'
-          ctx.fillRect(ax - S * 0.020, ay - S * 0.030, S * 0.040, S * 0.007)
+          ctx.fillRect(ax - S * 0.02, ay - S * 0.03, S * 0.04, S * 0.007)
           ctx.strokeStyle = '#3a1a16'
           ctx.lineWidth = Math.max(1, S * 0.004)
           ctx.beginPath()
-          ctx.arc(ax, ay - S * 0.030, S * 0.010, Math.PI, 0)
+          ctx.arc(ax, ay - S * 0.03, S * 0.01, Math.PI, 0)
           ctx.stroke()
           // rolled blueprints leaning on the wall
-          for (const [ox, rot] of [[0.036, 0.12], [0.046, 0.05]] as const) {
+          for (const [ox, rot] of [
+            [0.036, 0.12],
+            [0.046, 0.05],
+          ] as const) {
             ctx.save()
             ctx.translate(ax + S * ox, ay)
             ctx.rotate(rot)
@@ -923,9 +1347,9 @@ export default function RangeFloor() {
         } else if (bay.key === 'premarket') {
           // coffee station: machine + warm pot + rising steam
           ctx.fillStyle = '#2e343c'
-          ctx.fillRect(ax - S * 0.018, ay - S * 0.040, S * 0.036, S * 0.040)
+          ctx.fillRect(ax - S * 0.018, ay - S * 0.04, S * 0.036, S * 0.04)
           ctx.fillStyle = '#c9a06a'
-          ctx.fillRect(ax - S * 0.010, ay - S * 0.020, S * 0.020, S * 0.014)
+          ctx.fillRect(ax - S * 0.01, ay - S * 0.02, S * 0.02, S * 0.014)
           ctx.fillStyle = 'rgba(255,200,120,0.8)'
           ctx.fillRect(ax - S * 0.012, ay - S * 0.036, S * 0.024, S * 0.004)
           ctx.strokeStyle = 'rgba(230,230,230,0.35)'
@@ -948,14 +1372,16 @@ export default function RangeFloor() {
           for (let r = 0; r < 4; r++) {
             const on = Math.floor(now / 700 + r + bay.x * 10) % 3 !== 0
             ctx.fillStyle = on ? '#8df0c0' : '#3a4a40'
-            ctx.beginPath(); ctx.arc(ax + S * 0.010, ay - S * 0.058 + r * S * 0.015, S * 0.0038, 0, Math.PI * 2); ctx.fill()
+            ctx.beginPath()
+            ctx.arc(ax + S * 0.01, ay - S * 0.058 + r * S * 0.015, S * 0.0038, 0, Math.PI * 2)
+            ctx.fill()
             ctx.fillStyle = '#39424c'
-            ctx.fillRect(ax - S * 0.014, ay - S * 0.060 + r * S * 0.015, S * 0.016, S * 0.005)
+            ctx.fillRect(ax - S * 0.014, ay - S * 0.06 + r * S * 0.015, S * 0.016, S * 0.005)
           }
           const cx3 = ax + S * 0.042
           ctx.fillStyle = '#e07a3a'
           ctx.beginPath()
-          ctx.moveTo(cx3, ay - S * 0.030)
+          ctx.moveTo(cx3, ay - S * 0.03)
           ctx.lineTo(cx3 - S * 0.011, ay)
           ctx.lineTo(cx3 + S * 0.011, ay)
           ctx.closePath()
@@ -967,35 +1393,45 @@ export default function RangeFloor() {
           ctx.strokeStyle = '#5a4428'
           ctx.lineWidth = Math.max(1, S * 0.005)
           ctx.beginPath()
-          ctx.moveTo(ax - S * 0.014, ay); ctx.lineTo(ax, ay - S * 0.034)
-          ctx.moveTo(ax + S * 0.014, ay); ctx.lineTo(ax, ay - S * 0.034)
+          ctx.moveTo(ax - S * 0.014, ay)
+          ctx.lineTo(ax, ay - S * 0.034)
+          ctx.moveTo(ax + S * 0.014, ay)
+          ctx.lineTo(ax, ay - S * 0.034)
           ctx.stroke()
           ctx.fillStyle = '#1c2126'
-          ctx.fillRect(ax - S * 0.016, ay - S * 0.040, S * 0.032, S * 0.020)
+          ctx.fillRect(ax - S * 0.016, ay - S * 0.04, S * 0.032, S * 0.02)
           ctx.save()
-          ctx.translate(ax - S * 0.016, ay - S * 0.040)
+          ctx.translate(ax - S * 0.016, ay - S * 0.04)
           ctx.rotate(-0.18)
           ctx.fillStyle = '#e8e2d0'
           ctx.fillRect(0, -S * 0.008, S * 0.034, S * 0.008)
           ctx.fillStyle = '#1c2126'
-          for (let i = 0; i < 3; i++) ctx.fillRect(S * 0.004 + i * S * 0.011, -S * 0.008, S * 0.005, S * 0.008)
+          for (let i = 0; i < 3; i++)
+            ctx.fillRect(S * 0.004 + i * S * 0.011, -S * 0.008, S * 0.005, S * 0.008)
           ctx.restore()
           // camera on tripod
           const tx3 = ax + S * 0.052
           ctx.strokeStyle = '#39424c'
           ctx.lineWidth = Math.max(1, S * 0.005)
           ctx.beginPath()
-          ctx.moveTo(tx3 - S * 0.012, ay); ctx.lineTo(tx3, ay - S * 0.036)
-          ctx.moveTo(tx3 + S * 0.012, ay); ctx.lineTo(tx3, ay - S * 0.036)
-          ctx.moveTo(tx3, ay - S * 0.010); ctx.lineTo(tx3, ay - S * 0.036)
+          ctx.moveTo(tx3 - S * 0.012, ay)
+          ctx.lineTo(tx3, ay - S * 0.036)
+          ctx.moveTo(tx3 + S * 0.012, ay)
+          ctx.lineTo(tx3, ay - S * 0.036)
+          ctx.moveTo(tx3, ay - S * 0.01)
+          ctx.lineTo(tx3, ay - S * 0.036)
           ctx.stroke()
           ctx.fillStyle = '#2b3036'
           ctx.fillRect(tx3 - S * 0.012, ay - S * 0.052, S * 0.024, S * 0.016)
           ctx.fillStyle = '#d97fa0'
-          ctx.beginPath(); ctx.arc(tx3 + S * 0.008, ay - S * 0.044, S * 0.005, 0, Math.PI * 2); ctx.fill()
+          ctx.beginPath()
+          ctx.arc(tx3 + S * 0.008, ay - S * 0.044, S * 0.005, 0, Math.PI * 2)
+          ctx.fill()
           const rec = Math.floor(now / 800) % 2 === 0
           ctx.fillStyle = rec ? '#f0716a' : '#5a3a38'
-          ctx.beginPath(); ctx.arc(tx3 - S * 0.008, ay - S * 0.048, S * 0.003, 0, Math.PI * 2); ctx.fill()
+          ctx.beginPath()
+          ctx.arc(tx3 - S * 0.008, ay - S * 0.048, S * 0.003, 0, Math.PI * 2)
+          ctx.fill()
         } else {
           // tall filing cabinet + paper stacks
           ctx.fillStyle = '#39424c'
@@ -1005,34 +1441,46 @@ export default function RangeFloor() {
             ctx.fillRect(ax - S * 0.009, ay - S * hy, S * 0.018, S * 0.004)
           }
           ctx.fillStyle = '#d9d4c4'
-          ctx.fillRect(ax + S * 0.020, ay - S * 0.012, S * 0.030, S * 0.012)
-          ctx.fillRect(ax + S * 0.024, ay - S * 0.020, S * 0.024, S * 0.008)
+          ctx.fillRect(ax + S * 0.02, ay - S * 0.012, S * 0.03, S * 0.012)
+          ctx.fillRect(ax + S * 0.024, ay - S * 0.02, S * 0.024, S * 0.008)
           ctx.fillStyle = '#c9c4b4'
-          ctx.fillRect(ax + S * 0.022, ay - S * 0.026, S * 0.020, S * 0.006)
+          ctx.fillRect(ax + S * 0.022, ay - S * 0.026, S * 0.02, S * 0.006)
         }
         // divider walls
         for (const side of [-1, 1]) {
           const wx = X(bay.x + side * bay.half)
           ctx.fillStyle = '#39424c'
-          ctx.fillRect(wx - S * 0.006, Y(bay.top + 0.008), S * 0.012, dh * (bay.ground - bay.top - 0.016))
+          ctx.fillRect(
+            wx - S * 0.006,
+            Y(bay.top + 0.008),
+            S * 0.012,
+            dh * (bay.ground - bay.top - 0.016),
+          )
           ctx.fillStyle = 'rgba(255,255,255,0.10)'
-          ctx.fillRect(wx - S * 0.006, Y(bay.top + 0.008), S * 0.012, dh * 0.010)
+          ctx.fillRect(wx - S * 0.006, Y(bay.top + 0.008), S * 0.012, dh * 0.01)
         }
       }
 
       // office cosmetics — light strips, wall art, side desks
       for (const bay of BAYS) {
-        const st = stations.find(s => s.key === bay.key)
+        const st = stations.find((s) => s.key === bay.key)
         const occupied = !!st && st.active && !st.down
         // ceiling light strip + a light that clearly reads ON
         const lx = X(bay.x)
         ctx.fillStyle = '#39424c'
-        ctx.fillRect(lx - S * 0.045, Y(bay.top + 0.012), S * 0.090, dh * 0.008)
+        ctx.fillRect(lx - S * 0.045, Y(bay.top + 0.012), S * 0.09, dh * 0.008)
         if (occupied) {
           // hot tube + halo
           ctx.fillStyle = '#fff3cf'
           ctx.fillRect(lx - S * 0.042, Y(bay.top + 0.019), S * 0.084, dh * 0.006)
-          const halo = ctx.createRadialGradient(lx, Y(bay.top + 0.022), 1, lx, Y(bay.top + 0.022), S * 0.09)
+          const halo = ctx.createRadialGradient(
+            lx,
+            Y(bay.top + 0.022),
+            1,
+            lx,
+            Y(bay.top + 0.022),
+            S * 0.09,
+          )
           halo.addColorStop(0, 'rgba(255,240,190,0.35)')
           halo.addColorStop(1, 'rgba(255,240,190,0)')
           ctx.fillStyle = halo
@@ -1051,15 +1499,22 @@ export default function RangeFloor() {
           ctx.fill()
           // the whole room warms up
           ctx.fillStyle = 'rgba(255,236,190,0.085)'
-          ctx.fillRect(X(bay.x - bay.half) + S * 0.006, Y(bay.top + 0.008), dw * bay.half * 2 - S * 0.012, dh * (bay.ground - bay.top - 0.016))
+          ctx.fillRect(
+            X(bay.x - bay.half) + S * 0.006,
+            Y(bay.top + 0.008),
+            dw * bay.half * 2 - S * 0.012,
+            dh * (bay.ground - bay.top - 0.016),
+          )
         } else {
           ctx.fillStyle = 'rgba(120,130,140,0.45)'
-          ctx.fillRect(lx - S * 0.040, Y(bay.top + 0.019), S * 0.080, dh * 0.004)
+          ctx.fillRect(lx - S * 0.04, Y(bay.top + 0.019), S * 0.08, dh * 0.004)
         }
         // framed wall art: tiny seeded chart doodle
         {
-          const fx3 = X(bay.x + bay.half * 0.46), fy3 = Y(bay.top + 0.125)
-          const fw = S * 0.078, fh = S * 0.058
+          const fx3 = X(bay.x + bay.half * 0.46),
+            fy3 = Y(bay.top + 0.125)
+          const fw = S * 0.078,
+            fh = S * 0.058
           ctx.fillStyle = '#5a4428'
           ctx.fillRect(fx3 - 2, fy3 - 2, fw + 4, fh + 4)
           ctx.fillStyle = '#e8e2d0'
@@ -1081,11 +1536,20 @@ export default function RangeFloor() {
             ctx.fill()
             ctx.strokeStyle = '#c98a3a'
             ctx.lineWidth = 1
-            ctx.beginPath(); ctx.moveTo(fx3 + 2, fy3 + fh * 0.72); ctx.lineTo(fx3 + fw - 2, fy3 + fh * 0.72); ctx.stroke()
+            ctx.beginPath()
+            ctx.moveTo(fx3 + 2, fy3 + fh * 0.72)
+            ctx.lineTo(fx3 + fw - 2, fy3 + fh * 0.72)
+            ctx.stroke()
             for (const a of [-0.9, -0.45, 0, 0.45, 0.9]) {
               ctx.beginPath()
-              ctx.moveTo(fx3 + fw / 2 + Math.sin(a) * fw * 0.28, fy3 + fh * 0.72 - Math.cos(a) * fh * 0.42)
-              ctx.lineTo(fx3 + fw / 2 + Math.sin(a) * fw * 0.36, fy3 + fh * 0.72 - Math.cos(a) * fh * 0.58)
+              ctx.moveTo(
+                fx3 + fw / 2 + Math.sin(a) * fw * 0.28,
+                fy3 + fh * 0.72 - Math.cos(a) * fh * 0.42,
+              )
+              ctx.lineTo(
+                fx3 + fw / 2 + Math.sin(a) * fw * 0.36,
+                fy3 + fh * 0.72 - Math.cos(a) * fh * 0.58,
+              )
               ctx.stroke()
             }
           } else if (key2 === 'ops') {
@@ -1121,16 +1585,26 @@ export default function RangeFloor() {
         }
         // side desk with lamp and mug (opposite the floor accessory)
         {
-          const dxc = X(bay.x + bay.half * 0.58), dyg = Y(bay.ground - 0.012)
-          const dwj = S * 0.085, dhj = S * 0.062
+          const dxc = X(bay.x + bay.half * 0.58),
+            dyg = Y(bay.ground - 0.012)
+          const dwj = S * 0.085,
+            dhj = S * 0.062
           ctx.fillStyle = '#5a4428'
-          ctx.fillRect(dxc - dwj / 2, dyg - dhj, dwj, S * 0.010)
-          ctx.fillRect(dxc - dwj / 2 + S * 0.006, dyg - dhj + S * 0.010, S * 0.008, dhj - S * 0.010)
-          ctx.fillRect(dxc + dwj / 2 - S * 0.014, dyg - dhj + S * 0.010, S * 0.008, dhj - S * 0.010)
+          ctx.fillRect(dxc - dwj / 2, dyg - dhj, dwj, S * 0.01)
+          ctx.fillRect(dxc - dwj / 2 + S * 0.006, dyg - dhj + S * 0.01, S * 0.008, dhj - S * 0.01)
+          ctx.fillRect(dxc + dwj / 2 - S * 0.014, dyg - dhj + S * 0.01, S * 0.008, dhj - S * 0.01)
           // warm desk lamp, lit with the office
-          const lx2 = dxc + dwj * 0.28, ly2 = dyg - dhj
+          const lx2 = dxc + dwj * 0.28,
+            ly2 = dyg - dhj
           if (occupied) {
-            const glow = ctx.createRadialGradient(lx2, ly2 - S * 0.02, 1, lx2, ly2 - S * 0.02, S * 0.095)
+            const glow = ctx.createRadialGradient(
+              lx2,
+              ly2 - S * 0.02,
+              1,
+              lx2,
+              ly2 - S * 0.02,
+              S * 0.095,
+            )
             glow.addColorStop(0, 'rgba(255,220,150,0.40)')
             glow.addColorStop(1, 'rgba(255,220,150,0)')
             ctx.fillStyle = glow
@@ -1138,7 +1612,10 @@ export default function RangeFloor() {
           }
           ctx.strokeStyle = '#8a7a4a'
           ctx.lineWidth = Math.max(1, S * 0.005)
-          ctx.beginPath(); ctx.moveTo(lx2, ly2); ctx.lineTo(lx2, ly2 - S * 0.022); ctx.stroke()
+          ctx.beginPath()
+          ctx.moveTo(lx2, ly2)
+          ctx.lineTo(lx2, ly2 - S * 0.022)
+          ctx.stroke()
           ctx.fillStyle = '#3f9a52'
           ctx.beginPath()
           ctx.ellipse(lx2, ly2 - S * 0.025, S * 0.016, S * 0.008, 0, Math.PI, 0)
@@ -1151,10 +1628,16 @@ export default function RangeFloor() {
 
       // ── floor 1 lobby: wall clock, house letters, bench plants ──
       {
-        const cx = X(CLOCK.x), cy = Y(CLOCK.y), r = S * CLOCK.r
-        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2)
-        ctx.fillStyle = '#e6e2d4'; ctx.fill()
-        ctx.lineWidth = Math.max(2, r * 0.09); ctx.strokeStyle = '#2a2320'; ctx.stroke()
+        const cx = X(CLOCK.x),
+          cy = Y(CLOCK.y),
+          r = S * CLOCK.r
+        ctx.beginPath()
+        ctx.arc(cx, cy, r, 0, Math.PI * 2)
+        ctx.fillStyle = '#e6e2d4'
+        ctx.fill()
+        ctx.lineWidth = Math.max(2, r * 0.09)
+        ctx.strokeStyle = '#2a2320'
+        ctx.stroke()
         const et = trading?.market?.et?.match(/(\d{1,2}):(\d{2})/)
         if (et) {
           const hh = (parseInt(et[1], 10) % 12) + parseInt(et[2], 10) / 60
@@ -1163,39 +1646,53 @@ export default function RangeFloor() {
           const ma = (mm / 60) * Math.PI * 2 - Math.PI / 2
           ctx.strokeStyle = '#2a2320'
           ctx.lineWidth = Math.max(1.5, r * 0.09)
-          ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(ha) * r * 0.5, cy + Math.sin(ha) * r * 0.5); ctx.stroke()
+          ctx.beginPath()
+          ctx.moveTo(cx, cy)
+          ctx.lineTo(cx + Math.cos(ha) * r * 0.5, cy + Math.sin(ha) * r * 0.5)
+          ctx.stroke()
           ctx.lineWidth = Math.max(1, r * 0.055)
-          ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(ma) * r * 0.78, cy + Math.sin(ma) * r * 0.78); ctx.stroke()
+          ctx.beginPath()
+          ctx.moveTo(cx, cy)
+          ctx.lineTo(cx + Math.cos(ma) * r * 0.78, cy + Math.sin(ma) * r * 0.78)
+          ctx.stroke()
           ctx.fillStyle = '#2a2320'
-          ctx.beginPath(); ctx.arc(cx, cy, r * 0.08, 0, Math.PI * 2); ctx.fill()
+          ctx.beginPath()
+          ctx.arc(cx, cy, r * 0.08, 0, Math.PI * 2)
+          ctx.fill()
         }
         ctx.fillStyle = 'rgba(160,200,180,0.45)'
-        ctx.font = `${Math.max(7, S * 0.020)}px ${MONO}`
+        ctx.font = `${Math.max(7, S * 0.02)}px ${MONO}`
         ctx.textAlign = 'center'
         ctx.fillText('T E R R A R I U M', cx, cy + r + S * 0.032)
         ctx.textAlign = 'left'
       }
       // lobby bench under the clock + elevator doormat
       {
-        const bx2 = X(CLOCK.x), by2 = Y(F1.ground - 0.010)
+        const bx2 = X(CLOCK.x),
+          by2 = Y(F1.ground - 0.01)
         ctx.fillStyle = '#5a4428'
-        ctx.fillRect(bx2 - S * 0.070, by2 - S * 0.030, S * 0.140, S * 0.012)
+        ctx.fillRect(bx2 - S * 0.07, by2 - S * 0.03, S * 0.14, S * 0.012)
         ctx.fillRect(bx2 - S * 0.058, by2 - S * 0.018, S * 0.008, S * 0.018)
-        ctx.fillRect(bx2 + S * 0.050, by2 - S * 0.018, S * 0.008, S * 0.018)
+        ctx.fillRect(bx2 + S * 0.05, by2 - S * 0.018, S * 0.008, S * 0.018)
         ctx.fillStyle = 'rgba(255,255,255,0.06)'
-        ctx.fillRect(bx2 - S * 0.070, by2 - S * 0.030, S * 0.140, S * 0.004)
+        ctx.fillRect(bx2 - S * 0.07, by2 - S * 0.03, S * 0.14, S * 0.004)
         const mx2 = X((SHAFT.x0 + SHAFT.x1) / 2)
         ctx.fillStyle = 'rgba(120,90,50,0.45)'
-        ctx.fillRect(mx2 - S * 0.055, Y(F1.ground - 0.004), S * 0.110, dh * 0.012)
+        ctx.fillRect(mx2 - S * 0.055, Y(F1.ground - 0.004), S * 0.11, dh * 0.012)
       }
       for (const fx of [0.305, 0.605]) {
-        const px2 = X(fx), py2 = Y(F1.ground - 0.010)
+        const px2 = X(fx),
+          py2 = Y(F1.ground - 0.01)
         ctx.fillStyle = '#7a5230'
-        ctx.fillRect(px2 - S * 0.020, py2 - S * 0.036, S * 0.040, S * 0.036)
+        ctx.fillRect(px2 - S * 0.02, py2 - S * 0.036, S * 0.04, S * 0.036)
         ctx.fillStyle = '#4f8f4a'
-        ctx.beginPath(); ctx.ellipse(px2, py2 - S * 0.056, S * 0.030, S * 0.026, 0, 0, Math.PI * 2); ctx.fill()
+        ctx.beginPath()
+        ctx.ellipse(px2, py2 - S * 0.056, S * 0.03, S * 0.026, 0, 0, Math.PI * 2)
+        ctx.fill()
         ctx.fillStyle = '#356534'
-        ctx.beginPath(); ctx.ellipse(px2 - S * 0.018, py2 - S * 0.046, S * 0.015, S * 0.013, 0, 0, Math.PI * 2); ctx.fill()
+        ctx.beginPath()
+        ctx.ellipse(px2 - S * 0.018, py2 - S * 0.046, S * 0.015, S * 0.013, 0, 0, Math.PI * 2)
+        ctx.fill()
       }
 
       // ── live tape on the board ──      // ── live tape on the board ──      // ── live tape on the board ──
@@ -1216,8 +1713,10 @@ export default function RangeFloor() {
 
       // LED sign — the real session phase and clock
       {
-        const sx = X(SIGN.x), sy = Y(SIGN.y)
-        const sw = dw * SIGN.w, sh = dh * SIGN.h
+        const sx = X(SIGN.x),
+          sy = Y(SIGN.y)
+        const sw = dw * SIGN.w,
+          sh = dh * SIGN.h
         ctx.save()
         ctx.beginPath()
         ctx.roundRect(sx, sy, sw, sh, 4)
@@ -1231,7 +1730,7 @@ export default function RangeFloor() {
         ctx.fillStyle = open ? '#ff5a4a' : '#e0b34d'
         ctx.textAlign = 'center'
         ctx.font = `bold ${Math.max(8, sh * 0.42)}px ${MONO}`
-        ctx.fillText(`${label}${et ? ' · ' + et + ' ET' : ''}`, sx + sw / 2, sy + sh * 0.62)
+        ctx.fillText(`${label}${et ? ` · ${et} ET` : ''}`, sx + sw / 2, sy + sh * 0.62)
         ctx.textAlign = 'left'
         ctx.restore()
       }
@@ -1240,14 +1739,22 @@ export default function RangeFloor() {
 
       // bay monitors — each office's screen glows with its robot's status
       for (const bay of BAYS) {
-        const st = stations.find(s => s.key === bay.key)
+        const st = stations.find((s) => s.key === bay.key)
         if (!st) continue
-        const mw = S * 0.085, mh = S * 0.070
-        const mx = X(bay.x) - bay.half * dw * 0.45 - mw / 2, my = Y(bay.top + 0.040)
+        const mw = S * 0.085,
+          mh = S * 0.07
+        const mx = X(bay.x) - bay.half * dw * 0.45 - mw / 2,
+          my = Y(bay.top + 0.04)
         ctx.fillStyle = '#232a30'
-        ctx.beginPath(); ctx.roundRect(mx - 3, my - 3, mw + 6, mh + 6, 5); ctx.fill()
+        ctx.beginPath()
+        ctx.roundRect(mx - 3, my - 3, mw + 6, mh + 6, 5)
+        ctx.fill()
         const on = st.active && !st.down
-        const glow = st.down ? 'rgba(240,113,106,0.5)' : on ? 'rgba(125,232,168,0.35)' : 'rgba(120,130,140,0.20)'
+        const glow = st.down
+          ? 'rgba(240,113,106,0.5)'
+          : on
+            ? 'rgba(125,232,168,0.35)'
+            : 'rgba(120,130,140,0.20)'
         ctx.fillStyle = on ? '#0b1a12' : '#10151a'
         ctx.fillRect(mx, my, mw, mh)
         ctx.fillStyle = glow
@@ -1294,14 +1801,17 @@ export default function RangeFloor() {
         ctx.textAlign = 'left'
       }
 
-      const withBubbles = stations.filter(s => s.bubble)
+      const withBubbles = stations.filter((s) => s.bubble)
       if (withBubbles.length) {
         const pick = withBubbles[Math.floor(now / 5000) % withBubbles.length]
-        if (pick.key !== bubbleKey) { bubbleKey = pick.key; bubbleAt = now }
+        if (pick.key !== bubbleKey) {
+          bubbleKey = pick.key
+          bubbleAt = now
+        }
         const pop = Math.min(1, (now - bubbleAt) / 240)
-        const ease = 1 - Math.pow(1 - pop, 3)
+        const ease = 1 - (1 - pop) ** 3
         ctx.font = `bold 13px ${MONO}`
-        const text = pick.bubble!.slice(0, 40)
+        const text = pick.bubble?.slice(0, 40)
         const tw = ctx.measureText(text).width
         const bw = Math.min(tw + 28, 330)
         const bh = 30
@@ -1344,18 +1854,23 @@ export default function RangeFloor() {
       for (let i = memos.length - 1; i >= 0; i--) {
         const m = memos[i]
         const t = (now - m.t0) / m.dur
-        if (t > 1.15) { memos.splice(i, 1); continue }
+        if (t > 1.15) {
+          memos.splice(i, 1)
+          continue
+        }
         const tt = Math.min(1, t)
         const pts = m.pts.map(([fx, fy]) => [X(fx), Y(fy)] as [number, number])
         const segs: number[] = []
         let total = 0
         for (let k = 0; k < pts.length - 1; k++) {
           const L = Math.hypot(pts[k + 1][0] - pts[k][0], pts[k + 1][1] - pts[k][1])
-          segs.push(L); total += L
+          segs.push(L)
+          total += L
         }
-        const e = tt < 0.5 ? 2 * tt * tt : 1 - Math.pow(-2 * tt + 2, 2) / 2
+        const e = tt < 0.5 ? 2 * tt * tt : 1 - (-2 * tt + 2) ** 2 / 2
         let dist = e * total
-        let px = pts[pts.length - 1][0], py = pts[pts.length - 1][1]
+        let px = pts[pts.length - 1][0],
+          py = pts[pts.length - 1][1]
         for (let k = 0; k < segs.length; k++) {
           if (dist <= segs[k]) {
             const f = segs[k] ? dist / segs[k] : 1
@@ -1368,7 +1883,8 @@ export default function RangeFloor() {
         ctx.save()
         if (t <= 1) {
           py += Math.sin(now / 90 + i * 2) * 1.5
-          const w = S * 0.030, h = w * 0.68
+          const w = S * 0.03,
+            h = w * 0.68
           ctx.shadowColor = 'rgba(8,6,3,0.35)'
           ctx.shadowBlur = 6
           ctx.shadowOffsetY = 2
@@ -1390,7 +1906,7 @@ export default function RangeFloor() {
           g.addColorStop(0, `rgba(246,242,228,${0.5 * (1 - f)})`)
           g.addColorStop(1, 'rgba(246,242,228,0)')
           ctx.fillStyle = g
-          ctx.fillRect(px - S * 0.05, py - S * 0.05, S * 0.10, S * 0.10)
+          ctx.fillRect(px - S * 0.05, py - S * 0.05, S * 0.1, S * 0.1)
         }
         ctx.restore()
       }
@@ -1398,8 +1914,12 @@ export default function RangeFloor() {
       // vignette pulls the eye to the cast
       {
         const g = ctx.createRadialGradient(
-          rect.width / 2, rect.height * 0.58, rect.height * 0.35,
-          rect.width / 2, rect.height * 0.58, rect.width * 0.72,
+          rect.width / 2,
+          rect.height * 0.58,
+          rect.height * 0.35,
+          rect.width / 2,
+          rect.height * 0.58,
+          rect.width * 0.72,
         )
         g.addColorStop(0, 'rgba(0,0,0,0)')
         g.addColorStop(1, 'rgba(4,6,8,0.30)')

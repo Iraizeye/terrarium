@@ -3,7 +3,6 @@ secret material ever crosses the boundary."""
 
 import json
 import sqlite3
-from pathlib import Path
 
 from backend.routers import home
 
@@ -16,7 +15,8 @@ def test_memory_shelf_parses_index_and_sorts_by_mtime(tmp_path):
     )
     (tmp_path / "old.md").write_text("x")
     (tmp_path / "new.md").write_text("x")
-    import os, time
+    import os
+    import time
     os.utime(tmp_path / "old.md", (time.time() - 9000, time.time() - 9000))
     shelf = home.read_memory_shelf(tmp_path)
     assert [e["title"] for e in shelf] == ["New fact", "Old fact"]
@@ -55,7 +55,8 @@ def test_watch_items_reads_open_positions_readonly(tmp_path):
                  " stop REAL, horizon TEXT, state TEXT)")
     conn.execute("INSERT INTO positions VALUES ('FIVN', 1.0, 31.9, 'day', 'open')")
     conn.execute("INSERT INTO positions VALUES ('ZLAB', 4.0, 20.2, 'day', 'closed')")
-    conn.commit(); conn.close()
+    conn.commit()
+    conn.close()
     items = home.read_watch_items(tmp_path)
     assert [p["symbol"] for p in items["positions"]] == ["FIVN"]
 

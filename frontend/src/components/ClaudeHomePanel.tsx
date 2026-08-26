@@ -9,15 +9,40 @@
 import { useEffect, useState } from 'react'
 import { Clamp2, EmptyState, MONO, Panel, PanelHeader, UI } from '../ui'
 
-interface MemoryEntry { title: string; hook: string; updated: string | null }
-interface Experiment { title: string; sample: string | null; pass_bar: string | null; n: number | null }
-interface Position { mode: string; symbol: string; quantity: number; stop: number; horizon: string }
+interface MemoryEntry {
+  title: string
+  hook: string
+  updated: string | null
+}
+interface Experiment {
+  title: string
+  sample: string | null
+  pass_bar: string | null
+  n: number | null
+}
+interface Position {
+  mode: string
+  symbol: string
+  quantity: number
+  stop: number
+  horizon: string
+}
 interface HomePayload {
   memory: MemoryEntry[]
   doctor: { line: string | null; at: string | null; green: boolean | null }
-  watch: { token_expires_at: number | null; positions: Position[]; kill: boolean; last_broker_contact: string | null }
+  watch: {
+    token_expires_at: number | null
+    positions: Position[]
+    kill: boolean
+    last_broker_contact: string | null
+  }
   experiments: Experiment[]
-  toolbox: { skills: number | null; agents: number | null; commands: number | null; memories: number | null }
+  toolbox: {
+    skills: number | null
+    agents: number | null
+    commands: number | null
+    memories: number | null
+  }
 }
 
 function tokenRunway(expiresAt: number | null): { text: string; warn: boolean } {
@@ -28,12 +53,30 @@ function tokenRunway(expiresAt: number | null): { text: string; warn: boolean } 
   return { text: `${Math.round(hours / 24)}d runway`, warn: false }
 }
 
-function Chip({ label, value, warn, title }: { label: string; value: string; warn?: boolean; title?: string }) {
+function Chip({
+  label,
+  value,
+  warn,
+  title,
+}: {
+  label: string
+  value: string
+  warn?: boolean
+  title?: string
+}) {
   return (
-    <span title={title} style={{
-      fontFamily: MONO, fontSize: 10, padding: '4px 10px', borderRadius: 999,
-      border: UI.hairline, background: UI.surfaceSoft, whiteSpace: 'nowrap',
-    }}>
+    <span
+      title={title}
+      style={{
+        fontFamily: MONO,
+        fontSize: 10,
+        padding: '4px 10px',
+        borderRadius: 999,
+        border: UI.hairline,
+        background: UI.surfaceSoft,
+        whiteSpace: 'nowrap',
+      }}
+    >
       <span style={{ color: UI.dim }}>{label} </span>
       <span style={{ color: warn ? UI.amber : UI.text }}>{value}</span>
     </span>
@@ -42,16 +85,30 @@ function Chip({ label, value, warn, title }: { label: string; value: string; war
 
 function SkeletonBar({ w, delay }: { w: string; delay: number }) {
   return (
-    <div style={{
-      height: 10, width: w, borderRadius: 6, background: 'rgba(148,163,184,0.10)',
-      animation: `led-pulse 1.6s ease-in-out ${delay}s infinite`,
-    }} />
+    <div
+      style={{
+        height: 10,
+        width: w,
+        borderRadius: 6,
+        background: 'rgba(148,163,184,0.10)',
+        animation: `led-pulse 1.6s ease-in-out ${delay}s infinite`,
+      }}
+    />
   )
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ height: '100%', overflowY: 'auto', display: 'grid', gap: 10, alignContent: 'start', padding: '4px 2px 8px' }}>
+    <div
+      style={{
+        height: '100%',
+        overflowY: 'auto',
+        display: 'grid',
+        gap: 10,
+        alignContent: 'start',
+        padding: '4px 2px 8px',
+      }}
+    >
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
         <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: 3, color: UI.brassDim }}>
           {'⌂'} CLAUDE HOME
@@ -72,13 +129,23 @@ export default function ClaudeHomePanel() {
   useEffect(() => {
     let alive = true
     const load = () =>
-      fetch('http://127.0.0.1:8000/api/home')
+      fetch('/api/home')
         .then((r) => r.json())
-        .then((d) => { if (alive) { setData(d); setError(false) } })
-        .catch(() => { if (alive) setError(true) })
+        .then((d) => {
+          if (alive) {
+            setData(d)
+            setError(false)
+          }
+        })
+        .catch(() => {
+          if (alive) setError(true)
+        })
     load()
     const id = setInterval(load, 60_000)
-    return () => { alive = false; clearInterval(id) }
+    return () => {
+      alive = false
+      clearInterval(id)
+    }
   }, [])
 
   if (error) {
@@ -120,24 +187,61 @@ export default function ClaudeHomePanel() {
   return (
     <Shell>
       {/* Doctor — the morning's one-line diagnosis, front and center */}
-      <Panel style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, padding: '10px 14px', borderLeft: `3px solid ${data.doctor.green ? UI.green : UI.amber}` }}>
-        <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: 2, color: data.doctor.green ? UI.green : UI.amber, flexShrink: 0 }}>
+      <Panel
+        style={{
+          flexDirection: 'row',
+          alignItems: 'baseline',
+          gap: 10,
+          padding: '10px 14px',
+          borderLeft: `3px solid ${data.doctor.green ? UI.green : UI.amber}`,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: MONO,
+            fontSize: 10,
+            letterSpacing: 2,
+            color: data.doctor.green ? UI.green : UI.amber,
+            flexShrink: 0,
+          }}
+        >
           {data.doctor.green ? 'DOCTOR · GREEN' : 'DOCTOR'}
         </span>
-        <Clamp2 text={data.doctor.line ?? 'no diagnosis yet — first scheduled run is 9:15 ET'} size={10.5} />
+        <Clamp2
+          text={data.doctor.line ?? 'no diagnosis yet — first scheduled run is 9:15 ET'}
+          size={10.5}
+        />
       </Panel>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.05fr 1fr', gap: 10, alignItems: 'start' }}>
+      <div
+        style={{ display: 'grid', gridTemplateColumns: '1.05fr 1fr', gap: 10, alignItems: 'start' }}
+      >
         <div style={{ display: 'grid', gap: 10 }}>
           {/* Watch — the standing threads that used to need a human to ask */}
           <Panel>
-            <PanelHeader label="Watch" title="the standing threads: auth runway, kill switch, open positions" />
+            <PanelHeader
+              label="Watch"
+              title="the standing threads: auth runway, kill switch, open positions"
+            />
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '10px 14px 12px' }}>
-              <Chip label="token" value={runway.text} warn={runway.warn} title="broker OAuth runway" />
-              <Chip label="kill switch" value={data.watch.kill ? 'ACTIVE' : 'clear'} warn={data.watch.kill} />
+              <Chip
+                label="token"
+                value={runway.text}
+                warn={runway.warn}
+                title="broker OAuth runway"
+              />
+              <Chip
+                label="kill switch"
+                value={data.watch.kill ? 'ACTIVE' : 'clear'}
+                warn={data.watch.kill}
+              />
               <Chip
                 label="broker contact"
-                value={data.watch.last_broker_contact ? data.watch.last_broker_contact.slice(5, 16).replace('T', ' ') : '—'}
+                value={
+                  data.watch.last_broker_contact
+                    ? data.watch.last_broker_contact.slice(5, 16).replace('T', ' ')
+                    : '—'
+                }
               />
               {data.watch.positions.length === 0 && <Chip label="book" value="flat" />}
               {data.watch.positions.map((p) => (
@@ -153,13 +257,28 @@ export default function ClaudeHomePanel() {
 
           {/* Experiments — the pre-registered board, pass bars set before data */}
           <Panel>
-            <PanelHeader label="Experiments · pre-registered" title="pass bars set before the data arrives — no moving the goalposts" />
+            <PanelHeader
+              label="Experiments · pre-registered"
+              title="pass bars set before the data arrives — no moving the goalposts"
+            />
             <div style={{ display: 'grid', gap: 6, padding: '8px 14px 12px' }}>
               {data.experiments.map((e) => (
-                <div key={e.title} style={{ display: 'grid', gap: 2, paddingBottom: 6, borderBottom: UI.hairline }}>
+                <div
+                  key={e.title}
+                  style={{ display: 'grid', gap: 2, paddingBottom: 6, borderBottom: UI.hairline }}
+                >
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                    <span style={{ fontFamily: MONO, fontSize: 11, color: UI.text }}>{e.title}</span>
-                    <span style={{ fontFamily: MONO, fontSize: 10, color: e.n != null ? UI.green : UI.dim, flexShrink: 0 }}>
+                    <span style={{ fontFamily: MONO, fontSize: 11, color: UI.text }}>
+                      {e.title}
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: MONO,
+                        fontSize: 10,
+                        color: e.n != null ? UI.green : UI.dim,
+                        flexShrink: 0,
+                      }}
+                    >
                       {e.n != null ? `n=${e.n}` : 'accruing'}
                     </span>
                   </div>
@@ -167,7 +286,9 @@ export default function ClaudeHomePanel() {
                 </div>
               ))}
               {data.experiments.length === 0 && (
-                <EmptyState>no experiments registered — hypotheses land here with their pass bars.</EmptyState>
+                <EmptyState>
+                  no experiments registered — hypotheses land here with their pass bars.
+                </EmptyState>
               )}
             </div>
           </Panel>
@@ -187,9 +308,21 @@ export default function ClaudeHomePanel() {
             label={`Memory · ${data.memory.length} files`}
             title="the agent's persistent memory index — titles and hooks only"
           />
-          <div style={{ display: 'grid', gap: 8, overflowY: 'auto', minHeight: 0, padding: '8px 14px 12px', maxHeight: 420 }}>
+          <div
+            style={{
+              display: 'grid',
+              gap: 8,
+              overflowY: 'auto',
+              minHeight: 0,
+              padding: '8px 14px 12px',
+              maxHeight: 420,
+            }}
+          >
             {data.memory.map((m) => (
-              <div key={m.title} style={{ display: 'grid', gap: 1, paddingBottom: 6, borderBottom: UI.hairline }}>
+              <div
+                key={m.title}
+                style={{ display: 'grid', gap: 1, paddingBottom: 6, borderBottom: UI.hairline }}
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                   <span style={{ fontFamily: MONO, fontSize: 11, color: UI.text }}>{m.title}</span>
                   {m.updated && (

@@ -1,5 +1,5 @@
-import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite'
 
 // In docker-compose the backend is reachable at http://backend:8000, not
 // localhost — the compose file sets BACKEND_URL accordingly.
@@ -20,7 +20,7 @@ export default defineConfig({
       '/api': {
         target: backend,
         changeOrigin: true,
-      }
-    }
-  }
+      },
+    },
+  },
 })

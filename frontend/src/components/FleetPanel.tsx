@@ -44,26 +44,62 @@ function AgentCard({ agent }: { agent: FleetAgent }) {
   return (
     <div style={{ padding: '5px 14px', borderTop: UI.hairline }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, minWidth: 0 }}>
-        <Led color={STATE_COLOR[agent.state]} pulse={agent.state === 'live'} title={STATE_TITLE[agent.state]} />
-        <span style={{
-          fontSize: 11.5, fontWeight: 700, color: UI.text, fontFamily: MONO,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
+        <Led
+          color={STATE_COLOR[agent.state]}
+          pulse={agent.state === 'live'}
+          title={STATE_TITLE[agent.state]}
+        />
+        <span
+          style={{
+            fontSize: 11.5,
+            fontWeight: 700,
+            color: UI.text,
+            fontFamily: MONO,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
           {agent.project}
         </span>
-        <span style={{ fontSize: 9, color: UI.dim, fontFamily: MONO, marginLeft: 'auto', flexShrink: 0 }}>
+        <span
+          style={{
+            fontSize: 9,
+            color: UI.dim,
+            fontFamily: MONO,
+            marginLeft: 'auto',
+            flexShrink: 0,
+          }}
+        >
           {fmtAge(agent.age_s)}
         </span>
       </div>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'baseline', paddingLeft: 12, minWidth: 0 }}>
-        <span style={{
-          fontSize: 10, color: agent.state === 'done' ? UI.dim : UI.soft, fontFamily: MONO,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
+      <div
+        style={{ display: 'flex', gap: 6, alignItems: 'baseline', paddingLeft: 12, minWidth: 0 }}
+      >
+        <span
+          style={{
+            fontSize: 10,
+            color: agent.state === 'done' ? UI.dim : UI.soft,
+            fontFamily: MONO,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
           {agent.action ?? (agent.state === 'done' ? 'session closed' : 'waiting')}
         </span>
-        <span style={{ fontSize: 9, color: UI.dim, fontFamily: MONO, marginLeft: 'auto', flexShrink: 0 }}>
-          {shortModel(agent.model) ? `${shortModel(agent.model)} · ` : ''}{fmtTokens(agent.tokens)} tok
+        <span
+          style={{
+            fontSize: 9,
+            color: UI.dim,
+            fontFamily: MONO,
+            marginLeft: 'auto',
+            flexShrink: 0,
+          }}
+        >
+          {shortModel(agent.model) ? `${shortModel(agent.model)} · ` : ''}
+          {fmtTokens(agent.tokens)} tok
         </span>
       </div>
     </div>
@@ -88,8 +124,8 @@ export default function FleetPanel() {
       />
       {agents.length === 0 ? (
         <EmptyState>
-          no agent sessions yet today — start a Claude Code session on this
-          machine and it appears here as a card.
+          no agent sessions yet today — start a Claude Code session on this machine and it appears
+          here as a card.
         </EmptyState>
       ) : (
         <div style={{ overflowY: 'auto', minHeight: 0 }}>

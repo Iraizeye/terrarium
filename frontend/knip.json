@@ -1,0 +1,13 @@
+{
+  "entry": [
+    "src/main.tsx"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx}"
+  ],
+  "ignoreDependencies": [
+    "@biomejs/biome",
+    "@playwright/test",
+    "@fontsource-variable/geist"
+  ]
+}

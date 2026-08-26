@@ -22,16 +22,30 @@ from .state import _now_iso, _state, broadcast_status, status_payload
 if DEMO:
     from .demo import (
         demo_agent_fleet as agent_fleet,
+    )
+    from .demo import (
         demo_board_state as board_state,
+    )
+    from .demo import (
         demo_claude_usage as claude_usage,
+    )
+    from .demo import (
         demo_service_checks as service_checks,
+    )
+    from .demo import (
         demo_system_metrics as system_metrics,
+    )
+    from .demo import (
         demo_trading_status as trading_status,
     )
 else:
     from .collectors import (
-        agent_fleet, board_state, claude_usage, service_checks,
-        system_metrics, trading_status,
+        agent_fleet,
+        board_state,
+        claude_usage,
+        service_checks,
+        system_metrics,
+        trading_status,
     )
 
 

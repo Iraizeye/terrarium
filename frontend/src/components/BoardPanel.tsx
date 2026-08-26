@@ -23,7 +23,8 @@ function moveColor(pct: number) {
 function outcomeBadge(arm: BoardArm): { text: string; color: string } {
   if (arm.action === 'buy') return { text: `BUY ${arm.action_symbol ?? ''}`, color: GREEN }
   if (arm.bear_veto) return { text: 'BEAR VETO', color: AMBER }
-  if (arm.action === 'pass') return { text: `PASS${arm.pass_reason ? ` · ${arm.pass_reason}` : ''}`, color: INK.dim }
+  if (arm.action === 'pass')
+    return { text: `PASS${arm.pass_reason ? ` · ${arm.pass_reason}` : ''}`, color: INK.dim }
   return { text: '—', color: INK.dim }
 }
 
@@ -41,26 +42,47 @@ function CandidateRow({ c }: { c: BoardCandidate }) {
           {c.last != null ? `$${c.last.toFixed(2)}` : ''}
           {c.rvol != null ? ` · ${c.rvol.toFixed(1)}x` : ''}
         </span>
-        <span style={{
-          fontSize: 10, fontFamily: MONO, marginLeft: 'auto', flexShrink: 0,
-          color: moveColor(c.move_pct),
-        }}>
+        <span
+          style={{
+            fontSize: 10,
+            fontFamily: MONO,
+            marginLeft: 'auto',
+            flexShrink: 0,
+            color: moveColor(c.move_pct),
+          }}
+        >
           {(c.move_pct * 100).toFixed(1)}%
         </span>
       </div>
       {c.tech && (
-        <div title={c.tech} style={{
-          fontSize: 9, color: INK.soft, fontFamily: MONO, paddingLeft: 2,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
+        <div
+          title={c.tech}
+          style={{
+            fontSize: 9,
+            color: INK.soft,
+            fontFamily: MONO,
+            paddingLeft: 2,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
           {c.tech}
         </div>
       )}
       {c.earn && (
-        <div title={c.earn} style={{
-          fontSize: 9, color: AMBER, fontFamily: MONO, paddingLeft: 2,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
+        <div
+          title={c.earn}
+          style={{
+            fontSize: 9,
+            color: AMBER,
+            fontFamily: MONO,
+            paddingLeft: 2,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
           ⦿ {c.earn}
         </div>
       )}
@@ -75,10 +97,11 @@ export default function BoardPanel() {
 
   const badge = arm ? outcomeBadge(arm) : null
   const funnel = arm?.funnel ?? {}
-  const funnelText = funnel.scanned != null
-    ? `${funnel.scanned} scanned → ${funnel.to_engine ?? '?'} judged` +
-      (funnel.unaffordable_filtered ? ` (${funnel.unaffordable_filtered} unbuyable)` : '')
-    : ''
+  const funnelText =
+    funnel.scanned != null
+      ? `${funnel.scanned} scanned → ${funnel.to_engine ?? '?'} judged` +
+        (funnel.unaffordable_filtered ? ` (${funnel.unaffordable_filtered} unbuyable)` : '')
+      : ''
 
   return (
     <Panel style={{ height: '100%' }}>
@@ -88,7 +111,9 @@ export default function BoardPanel() {
         right={
           <div style={{ display: 'flex', gap: 4 }}>
             {(['live', 'paper'] as const).map((m) => (
-              <PillButton key={m} active={mode === m} onClick={() => setMode(m)}>{m}</PillButton>
+              <PillButton key={m} active={mode === m} onClick={() => setMode(m)}>
+                {m}
+              </PillButton>
             ))}
           </div>
         }
@@ -96,17 +121,29 @@ export default function BoardPanel() {
 
       {!arm || arm.candidates.length === 0 ? (
         <EmptyState>
-          no scan cycle yet today — during market hours the engine's judged
-          candidates land here with the verdict on each.
+          no scan cycle yet today — during market hours the engine's judged candidates land here
+          with the verdict on each.
         </EmptyState>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, padding: '4px 14px 8px' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: 0,
+            padding: '4px 14px 8px',
+          }}
+        >
           <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', paddingBottom: 2 }}>
             {badge && (
-              <span style={{
-                fontSize: 9.5, fontWeight: 700, color: badge.color, fontFamily: MONO,
-                letterSpacing: '0.06em',
-              }}>
+              <span
+                style={{
+                  fontSize: 9.5,
+                  fontWeight: 700,
+                  color: badge.color,
+                  fontFamily: MONO,
+                  letterSpacing: '0.06em',
+                }}
+              >
                 {badge.text}
               </span>
             )}
@@ -115,16 +152,25 @@ export default function BoardPanel() {
             </span>
           </div>
           {arm.gist && (
-            <div style={{
-              fontSize: 9.5, color: INK.soft, lineHeight: 1.35, paddingBottom: 3,
-              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-            }}>
+            <div
+              style={{
+                fontSize: 9.5,
+                color: INK.soft,
+                lineHeight: 1.35,
+                paddingBottom: 3,
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
               {arm.gist}
             </div>
           )}
           <div style={{ overflowY: 'auto', minHeight: 0 }}>
-            {arm.candidates.map((c) => <CandidateRow key={c.symbol} c={c} />)}
+            {arm.candidates.map((c) => (
+              <CandidateRow key={c.symbol} c={c} />
+            ))}
           </div>
         </div>
       )}

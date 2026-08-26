@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 import type {
-  AgentFleet, BoardState, ClaudeUsage, CrewEvent, CrewMember, ServiceHealth, SystemMetrics,
+  AgentFleet,
+  BoardState,
+  ClaudeUsage,
+  CrewEvent,
+  CrewMember,
+  ServiceHealth,
+  SystemMetrics,
   TradingStatus,
 } from '../types'
 

@@ -141,9 +141,13 @@ hosted version.
 ## Tests
 
 ```bash
-make test
+make test     # backend suite + lint (ruff, biome, tsc, knip)
+make visual   # the look itself: golden screenshots at 3 window sizes
 ```
 
-Covers the market clock (including weekend rollover), the trading collector
-against fixture ledgers, incremental usage parsing, demo-mode shape parity,
-and both frozen contracts.
+The backend suite covers the market clock (including weekend rollover), the
+trading collector against fixture ledgers, incremental usage parsing,
+demo-mode shape parity, and both frozen contracts. The visual suite renders
+the building and home page against a frozen, fully scripted demo instant
+and diffs the pixels — layout drift fails the build. After an intentional
+look change, re-approve with `make visual-update` and commit the goldens.

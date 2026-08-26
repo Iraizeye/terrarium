@@ -5,7 +5,7 @@ The poll loop writes here; /api/status and the WS broadcast read from here.
 """
 import asyncio
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import WebSocket
@@ -25,7 +25,7 @@ _ws_lock = asyncio.Lock()
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def status_payload() -> dict[str, Any]:

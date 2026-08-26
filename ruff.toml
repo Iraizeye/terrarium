@@ -1,0 +1,13 @@
+# Backend lint — same tool as range-trader's CI gate.
+target-version = "py312"
+line-length = 100
+include = ["backend/**/*.py"]
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+ignore = [
+  "E501",   # long lines: docstrings/tables read better unwrapped
+  "SIM108", # ternary-vs-if is a taste call
+  "SIM105", # try/except/pass reads fine; suppress() hides intent here
+  "B008",   # FastAPI's Body(...) in defaults is the framework idiom
+]

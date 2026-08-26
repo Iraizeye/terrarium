@@ -8,7 +8,7 @@ rewrite and must not change — hooks in ~/.claude/settings.json depend on it.
 import asyncio
 import uuid
 from collections import deque
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -124,7 +124,7 @@ async def run_crew_idle_decay() -> None:
             member = _crew["claude"]
             last = member.get("last_event_at")
             if member["status"] != "idle" and last:
-                age = (datetime.now(timezone.utc) - datetime.fromisoformat(last)).total_seconds()
+                age = (datetime.now(UTC) - datetime.fromisoformat(last)).total_seconds()
                 if age > IDLE_AFTER_SECONDS:
                     member["status"] = "idle"
                     member["activity"] = None

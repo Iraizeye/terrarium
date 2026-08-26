@@ -24,9 +24,17 @@ from typing import Any
 import psutil
 
 from .config import (
-    ALERTS_TAIL_LINES, CLAUDE_PROJECTS_DIR, ET, HEARTBEAT_STALE_S,
-    LAUNCH_AGENTS_DIR, MARKET_CLOSE_MIN, MARKET_OPEN_MIN, RANGE_TRADER_DIR,
-    SERVICE_PORTS, TRADING_MODES, USAGE_MAX_FILE_MB,
+    ALERTS_TAIL_LINES,
+    CLAUDE_PROJECTS_DIR,
+    ET,
+    HEARTBEAT_STALE_S,
+    LAUNCH_AGENTS_DIR,
+    MARKET_CLOSE_MIN,
+    MARKET_OPEN_MIN,
+    RANGE_TRADER_DIR,
+    SERVICE_PORTS,
+    TRADING_MODES,
+    USAGE_MAX_FILE_MB,
 )
 
 # ---------------------------------------------------------------------------

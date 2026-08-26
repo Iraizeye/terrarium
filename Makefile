@@ -3,7 +3,9 @@
 #   make demo    full dashboard on a scripted synthetic day (no config, no
 #                personal data; a compressed 24h session loops every 5 min)
 #   make dev     dashboard against the real machine (range-trader, Claude, vitals)
-#   make test    backend test suite
+#   make test    backend suite + lint (ruff, biome, knip, tsc)
+#   make visual  visual regression against golden screenshots (isolated demo)
+#   make visual-update  re-approve goldens after an INTENTIONAL look change
 
 VENV := backend/.venv
 PY   := $(VENV)/bin/python
@@ -15,7 +17,7 @@ $(VENV)/bin/uvicorn: backend/requirements.txt
 frontend/node_modules: frontend/package.json
 	cd frontend && npm install
 
-.PHONY: demo dev test
+.PHONY: demo dev test lint visual visual-update
 
 demo: $(VENV)/bin/uvicorn frontend/node_modules
 	@echo "TERRARIUM demo -> http://127.0.0.1:3000  (Ctrl-C stops both)"
@@ -30,6 +32,19 @@ dev: $(VENV)/bin/uvicorn frontend/node_modules
 	(cd frontend && npm run dev) & \
 	wait
 
-test: $(VENV)/bin/uvicorn
+test: $(VENV)/bin/uvicorn lint
 	$(VENV)/bin/pip install -q pytest httpx
 	$(PY) -m pytest backend/tests/ -q
+
+lint: $(VENV)/bin/uvicorn frontend/node_modules
+	$(VENV)/bin/pip install -q ruff
+	$(VENV)/bin/ruff check backend/
+	cd frontend && node_modules/.bin/biome check src/ vite.config.ts
+	cd frontend && npx tsc --noEmit
+	cd frontend && node_modules/.bin/knip
+
+visual: frontend/node_modules
+	cd frontend && npx playwright test
+
+visual-update: frontend/node_modules
+	cd frontend && npx playwright test --update-snapshots

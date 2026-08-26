@@ -1,19 +1,19 @@
 """TERRARIUM backend tests — collectors and the two frozen API contracts."""
 import json
 import sqlite3
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
 
 from backend import collectors
 from backend.collectors import (
-    _consume_usage_lines, _blank_counts, market_clock,
+    _blank_counts,
+    _consume_usage_lines,
+    market_clock,
 )
 from backend.config import ET
-
 
 # ---------------------------------------------------------------------------
 # Market clock
@@ -241,8 +241,8 @@ class TestDemoMode:
         assert demo_market_clock(now=123.0) == demo_market_clock(now=123.0)
 
     def test_system_and_usage_shapes(self):
-        from backend.demo import demo_claude_usage, demo_system_metrics
         from backend.collectors import system_metrics
+        from backend.demo import demo_claude_usage, demo_system_metrics
 
         assert set(demo_system_metrics()) == set(system_metrics())
         usage = demo_claude_usage()
@@ -288,9 +288,9 @@ class TestDemoMode:
             assert seat["ran_at"].endswith("+00:00") or seat["ran_at"].endswith("Z")
         # ran_at is wall-relative so the floor's 20-minute activity lights
         # actually light in demo: most seats recent, premarket off shift.
-        from datetime import datetime, timezone
+        from datetime import datetime
         ages = {
-            s["name"]: (datetime.now(timezone.utc) - datetime.fromisoformat(s["ran_at"])).total_seconds() / 60
+            s["name"]: (datetime.now(UTC) - datetime.fromisoformat(s["ran_at"])).total_seconds() / 60
             for s in day["seats"]
         }
         assert ages["premarket"] > 20
@@ -302,7 +302,8 @@ class TestDemoMode:
 # ---------------------------------------------------------------------------
 
 def _write_transcript(dir_: Path, session: str, rows: list[dict], age_s: float = 0) -> Path:
-    import os, time
+    import os
+    import time
     dir_.mkdir(parents=True, exist_ok=True)
     path = dir_ / f"{session}.jsonl"
     path.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
@@ -489,8 +490,12 @@ class TestUnifiedSearch:
         return db
 
     def test_each_source_is_searched_and_tagged(self, tmp_path):
-        from backend.routers.search import (search_alerts, search_decisions,
-                                            search_memory, search_sessions)
+        from backend.routers.search import (
+            search_alerts,
+            search_decisions,
+            search_memory,
+            search_sessions,
+        )
 
         db = self._seed_sessions(tmp_path)
         hits = search_sessions("trailing", db_path=db)
@@ -521,9 +526,13 @@ class TestUnifiedSearch:
         assert hits[0]["where"] == "some-memory"
 
     def test_missing_files_are_empty_results_never_errors(self, tmp_path):
-        from backend.routers.search import (search_alerts, search_argus,
-                                            search_decisions, search_memory,
-                                            search_sessions)
+        from backend.routers.search import (
+            search_alerts,
+            search_argus,
+            search_decisions,
+            search_memory,
+            search_sessions,
+        )
         gone = tmp_path / "does-not-exist"
         assert search_sessions("x", db_path=gone / "db.sqlite") == []
         assert search_alerts("x", state_dir=gone) == []
@@ -533,6 +542,7 @@ class TestUnifiedSearch:
 
     def test_short_query_is_safe_and_empty(self):
         import asyncio
+
         from backend.routers.search import api_search
         assert asyncio.run(api_search("")) == {"q": "", "hits": []}
         assert asyncio.run(api_search(" n "))["hits"] == []

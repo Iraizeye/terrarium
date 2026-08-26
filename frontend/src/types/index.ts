@@ -37,7 +37,7 @@ export interface OpenPosition {
   broker_stop: boolean
 }
 
-export interface ClosedTrade {
+interface ClosedTrade {
   symbol: string
   quantity: number
   entry: number
@@ -56,7 +56,7 @@ export interface TradingMode {
   last_decision?: LastDecision | null
 }
 
-export interface LastDecision {
+interface LastDecision {
   at: string | null
   action: string | null
   symbol: string | null
@@ -91,7 +91,7 @@ export interface BoardCandidate {
   move_pct: number
 }
 
-export interface BoardShadow {
+interface BoardShadow {
   symbol: string
   mark: number
   last: number
@@ -117,7 +117,7 @@ export interface BoardState {
   arms: Record<'paper' | 'live', BoardArm>
 }
 
-export type FleetState = 'live' | 'idle' | 'done'
+type FleetState = 'live' | 'idle' | 'done'
 
 export interface FleetAgent {
   project: string
@@ -135,7 +135,7 @@ export interface AgentFleet {
   agents: FleetAgent[]
 }
 
-export type CrewStatus = 'idle' | 'thinking' | 'working' | 'waiting'
+type CrewStatus = 'idle' | 'thinking' | 'working' | 'waiting'
 
 export interface CrewMember {
   name: string
@@ -175,10 +175,4 @@ export interface CrewEventMessage {
   timestamp: string
   event: CrewEvent | null
   crew: Record<string, CrewMember>
-}
-
-export interface SessionEntry {
-  ts: string
-  role: string
-  content: string
 }

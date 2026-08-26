@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.13.0 - 2026-08-26 — the quality floor
+
+- The look is now a tested contract: Playwright renders the building and
+  home page against a frozen scripted demo instant (`TERRARIUM_DEMO_AT`,
+  `?freeze=`) and diffs pixels at three window sizes. `make visual`.
+- Lint everywhere: ruff (backend), Biome (frontend, + format), knip
+  (dead code), all under `make test`. First sweep fixed real findings —
+  two absolute URLs that bypassed the vite proxy (home + search were
+  broken under docker), a page refresh spawning phantom office mail, and
+  the last greenhouse-era dead code in theme.ts.
+- Escape now closes the intro overlay; buttons carry explicit types.
+
 ## v0.12.0 - 2026-08-26 — the plugin
 
 - Terrarium is now a Claude Code plugin, and this repo is its marketplace:

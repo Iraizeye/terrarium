@@ -14,7 +14,7 @@ visitor's machine.
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import APIRouter
@@ -116,7 +116,7 @@ def search_memory(q: str, memory_dir: Path = CLAUDE_MEMORY_DIR) -> list[dict]:
         for line in body.splitlines():
             if ql in line.lower() and not line.startswith(("---", "name:", "description:", "metadata", "  type:")):
                 at = datetime.fromtimestamp(
-                    path.stat().st_mtime, tz=timezone.utc).isoformat()
+                    path.stat().st_mtime, tz=UTC).isoformat()
                 hits.append(_hit("memory", at, line, path.stem))
                 break  # one hit per memory file — the file is the unit
         if len(hits) >= MAX_PER_SOURCE:

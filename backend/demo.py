@@ -18,10 +18,22 @@ import asyncio
 import os
 import sqlite3
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 DEMO_DAY_S = int(os.getenv("TERRARIUM_DEMO_DAY_S") or os.getenv("RANGEWATCH_DEMO_DAY_S", "300"))
+
+# TERRARIUM_DEMO_AT freezes the demo at one instant (epoch seconds) — for
+# deterministic screenshots and visual-regression tests. Unset = live loop.
+_DEMO_AT = os.getenv("TERRARIUM_DEMO_AT")
+
+
+def _demo_now() -> float:
+    return float(_DEMO_AT) if _DEMO_AT else time.time()
+
+
+def _demo_wall() -> datetime:
+    return datetime.fromtimestamp(_demo_now(), tz=UTC)
 
 # Loop segments: (fraction of loop, start ET minute, end ET minute)
 _SEGMENTS = [
@@ -34,7 +46,7 @@ _SEGMENTS = [
 
 def _demo_minute(now: float | None = None) -> float:
     """Synthetic ET minute-of-day for this instant of the loop."""
-    frac = ((now if now is not None else time.time()) % DEMO_DAY_S) / DEMO_DAY_S
+    frac = ((now if now is not None else _demo_now()) % DEMO_DAY_S) / DEMO_DAY_S
     for i, (seg_frac, start_min, end_min) in enumerate(_SEGMENTS):
         if frac <= seg_frac or i == len(_SEGMENTS) - 1:
             minute = start_min + min(1.0, frac / seg_frac) * (end_min - start_min)
@@ -156,7 +168,7 @@ def demo_trading_status() -> dict[str, Any]:
     for at, action, symbol, thesis in _DECISIONS:
         if minute >= at:
             last = {
-                "at": datetime.now().isoformat(),
+                "at": _demo_wall().isoformat(),
                 "action": action, "symbol": symbol, "thesis": thesis,
             }
     return {
@@ -323,7 +335,7 @@ def demo_home() -> dict[str, Any]:
     Demo mode must never read the visitor's real ~/.claude; this payload is
     the same shape as /api/home with every line scripted and labeled.
     """
-    wall = datetime.now(timezone.utc)
+    wall = datetime.now(UTC)
     mem = [
         ("[demo] The morning routine", "premarket brief before the open; doctor line is the day's first truth", 2),
         ("[demo] NOVA follow-through", "guidance-raise entries have held VWAP 3/3 times; keep the stop structural", 26),
@@ -377,7 +389,7 @@ _SEARCH_CORPUS = [
 def demo_search(q: str) -> list[dict[str, Any]]:
     """Scripted hits over the demo day — same shape as the real fan-out."""
     ql = q.lower()
-    wall = datetime.now(timezone.utc)
+    wall = _demo_wall()
     return [
         {"source": src, "at": (wall - timedelta(minutes=age)).isoformat(),
          "text": text, "where": where}
@@ -391,7 +403,7 @@ def demo_desk(now: float | None = None) -> dict[str, Any]:
     from .routers.desk import SEATS
 
     minute = _demo_minute(now)
-    wall = datetime.now(timezone.utc)
+    wall = _demo_wall()
     seats = []
     for seat in SEATS:
         run_min, brief = _DESK_RUNS[seat["name"]]
@@ -403,7 +415,7 @@ def demo_desk(now: float | None = None) -> dict[str, Any]:
             "ran_at": ran_at if done else None,
             "brief": brief if done else None,
         })
-    return {"date": datetime.now().strftime("%Y-%m-%d"), "seats": seats}
+    return {"date": _demo_wall().strftime("%Y-%m-%d"), "seats": seats}
 
 
 def seed_demo_sessions(db_path) -> None:

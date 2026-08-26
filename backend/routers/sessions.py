@@ -1,9 +1,11 @@
 import sqlite3
 from datetime import datetime
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, field_validator
-from ..state import _now_iso
+
 from ..config import SESSIONS_DB
+from ..state import _now_iso
 
 router = APIRouter()
 
@@ -55,4 +57,4 @@ async def api_sessions_log(req: SessionLogRequest):
             )
         return {"ok": True, "ts": ts}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

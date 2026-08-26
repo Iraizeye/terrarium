@@ -19,37 +19,64 @@
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; box-shadow: inherit; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: inherit;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 @keyframes fog-breathe {
-  0%, 100% { opacity: 0.55; transform: scale(1); }
-  50%       { opacity: 0.80; transform: scale(1.04); }
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.04);
+  }
 }
 
 @keyframes stat-pulse {
-  0%   { opacity: 1; }
-  30%  { opacity: 0.35; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 1;
+  }
+  30% {
+    opacity: 0.35;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 
 @keyframes link-blink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.28; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.28;
+  }
 }
 
 * {
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   overflow-x: clip;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   min-height: 100dvh;
 }
@@ -100,7 +127,9 @@ html, body, #root {
   flex-direction: column;
   gap: 10px;
 }
-.shell-desk { grid-area: desk; }
+.shell-desk {
+  grid-area: desk;
+}
 
 .shell-stage {
   grid-area: stage;
@@ -143,8 +172,12 @@ html, body, #root {
   animation: tape 32s linear infinite;
 }
 @keyframes tape {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
 }
 
 .shell-footer {
@@ -188,7 +221,10 @@ html, body, #root {
 }
 
 @media (max-width: 720px) {
-  html, body, #root, .app-root {
+  html,
+  body,
+  #root,
+  .app-root {
     height: auto;
     overflow: auto;
   }
@@ -206,7 +242,9 @@ html, body, #root {
     padding: 0 10px 16px;
     row-gap: 8px;
   }
-  .shell-footer { flex-wrap: wrap; }
+  .shell-footer {
+    flex-wrap: wrap;
+  }
 }
 
 body {
@@ -235,6 +273,7 @@ input {
 
 button:hover:not(:disabled),
 select:hover:not(:disabled) {
+  /* biome-ignore lint/complexity/noImportantStyles: must beat inline border styles on hover */
   border-color: #55462f !important;
 }
 
@@ -281,11 +320,22 @@ details[open] {
 }
 
 @keyframes bubble-in {
-  from { opacity: 0; transform: translateY(6px) scale(0.96); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 @keyframes led-pulse {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.35; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
 }

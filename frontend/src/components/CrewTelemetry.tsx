@@ -3,7 +3,12 @@
 
 import { useDashboardStore } from '../store/dashboardStore'
 import type { CrewEvent } from '../types'
-import { Panel as UIPanel, PanelHeader as UIPanelHeader, PillButton as UIPillButton, UI as UISTYLE } from '../ui'
+import {
+  Panel as UIPanel,
+  PanelHeader as UIPanelHeader,
+  PillButton as UIPillButton,
+  UI as UISTYLE,
+} from '../ui'
 
 // ── GO/NO-GO ─────────────────────────────────────────────────────────────────
 
@@ -70,7 +75,10 @@ export function buildBoardCells(store: ReturnType<typeof useDashboardStore.getSt
 // ── Ops log (left rail) ──────────────────────────────────────────────────────
 
 const KIND_GLYPH: Record<CrewEvent['kind'], string> = {
-  tool: '⚙', thought: '◌', lifecycle: '●', hook: '·',
+  tool: '⚙',
+  thought: '◌',
+  lifecycle: '●',
+  hook: '·',
 }
 
 const OPS_FILTERS = ['all', 'tools', 'events'] as const
@@ -79,9 +87,12 @@ export function OpsLog() {
   const allEvents = useDashboardStore((s) => s.crewEvents)
   const filter = useDashboardStore((s) => s.opsFilter)
   const setOpsFilter = useDashboardStore((s) => s.setOpsFilter)
-  const events = filter === 'all' ? allEvents
-    : filter === 'tools' ? allEvents.filter((e) => e.kind === 'tool')
-    : allEvents.filter((e) => e.kind !== 'tool')
+  const events =
+    filter === 'all'
+      ? allEvents
+      : filter === 'tools'
+        ? allEvents.filter((e) => e.kind === 'tool')
+        : allEvents.filter((e) => e.kind !== 'tool')
   return (
     <UIPanel style={{ height: '100%' }}>
       <UIPanelHeader
@@ -90,29 +101,58 @@ export function OpsLog() {
         right={
           <span style={{ display: 'flex', gap: 4 }}>
             {OPS_FILTERS.map((f) => (
-              <UIPillButton key={f} active={filter === f} onClick={() => setOpsFilter(f)}>{f}</UIPillButton>
+              <UIPillButton key={f} active={filter === f} onClick={() => setOpsFilter(f)}>
+                {f}
+              </UIPillButton>
             ))}
           </span>
         }
       />
       <div style={{ padding: '6px 0', overflowY: 'auto', minHeight: 0 }}>
         {events.length === 0 && (
-          <div style={{ padding: '10px 14px', fontSize: 10.5, lineHeight: 1.55, color: UISTYLE.dim, fontFamily: '"JetBrains Mono", "Fira Code", monospace' }}>
-            no agent activity yet — tool calls and session events stream in
-            here live once an agent is working.
+          <div
+            style={{
+              padding: '10px 14px',
+              fontSize: 10.5,
+              lineHeight: 1.55,
+              color: UISTYLE.dim,
+              fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+            }}
+          >
+            no agent activity yet — tool calls and session events stream in here live once an agent
+            is working.
           </div>
         )}
         {events.slice(0, 60).map((e) => (
-          <div key={e.id} style={{ display: 'flex', gap: 8, padding: '3px 14px', alignItems: 'baseline' }}>
-            <span style={{ fontSize: 9, color: UISTYLE.dim, fontVariantNumeric: 'tabular-nums', fontFamily: '"JetBrains Mono", "Fira Code", monospace', flexShrink: 0 }}>
+          <div
+            key={e.id}
+            style={{ display: 'flex', gap: 8, padding: '3px 14px', alignItems: 'baseline' }}
+          >
+            <span
+              style={{
+                fontSize: 9,
+                color: UISTYLE.dim,
+                fontVariantNumeric: 'tabular-nums',
+                fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+                flexShrink: 0,
+              }}
+            >
               {new Date(e.ts).toLocaleTimeString([], { hour12: false })}
             </span>
-            <span style={{ color: UISTYLE.accent, fontSize: 10, flexShrink: 0 }}>{KIND_GLYPH[e.kind] ?? '·'}</span>
-            <span title={e.text} style={{
-              fontSize: 11, color: UISTYLE.soft,
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              fontFamily: '"JetBrains Mono", "Fira Code", monospace',
-            }}>
+            <span style={{ color: UISTYLE.accent, fontSize: 10, flexShrink: 0 }}>
+              {KIND_GLYPH[e.kind] ?? '·'}
+            </span>
+            <span
+              title={e.text}
+              style={{
+                fontSize: 11,
+                color: UISTYLE.soft,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+              }}
+            >
               {e.text}
             </span>
           </div>

@@ -4,7 +4,7 @@ Desk router — The Range's seat roster (the-range-desk launchd seats).
 Read-only view over ~/.the-range-desk/out/<date>/: each seat's schedule,
 last run, and latest brief. The desk writes files; this router only reads.
 """
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 from fastapi import APIRouter
@@ -35,7 +35,7 @@ def _seat_state(name: str, day_dir: Path) -> dict:
 
 
 def _mtime(p: Path) -> str:
-    return datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc).isoformat()
+    return datetime.fromtimestamp(p.stat().st_mtime, tz=UTC).isoformat()
 
 
 @router.get("/api/desk")

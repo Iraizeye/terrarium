@@ -28,7 +28,11 @@ const STATUS_TITLE: Record<Seat['status'], string> = {
 
 function firstLines(brief: string | null, n = 2): string {
   if (!brief) return 'no brief yet — appears after this seat’s first run'
-  return brief.split('\n').filter(l => l.trim()).slice(0, n).join(' · ')
+  return brief
+    .split('\n')
+    .filter((l) => l.trim())
+    .slice(0, n)
+    .join(' · ')
 }
 
 export default function DeskPanel() {
@@ -37,37 +41,53 @@ export default function DeskPanel() {
     let alive = true
     const load = () =>
       fetch('/api/desk')
-        .then(r => r.json())
-        .then(d => { if (alive) setSeats(d.seats) })
+        .then((r) => r.json())
+        .then((d) => {
+          if (alive) setSeats(d.seats)
+        })
         .catch(() => {})
     load()
     const t = setInterval(load, 60_000)
-    return () => { alive = false; clearInterval(t) }
+    return () => {
+      alive = false
+      clearInterval(t)
+    }
   }, [])
 
   return (
     <Panel>
-      <PanelHeader label="The desk" title="scheduled agent seats — each runs on its own clock and files a brief" />
+      <PanelHeader
+        label="The desk"
+        title="scheduled agent seats — each runs on its own clock and files a brief"
+      />
       {seats.length === 0 ? (
         <EmptyState>
-          no scheduled seats configured — optional: recurring agent jobs
-          appear here with their schedules and briefs.
+          no scheduled seats configured — optional: recurring agent jobs appear here with their
+          schedules and briefs.
         </EmptyState>
       ) : (
         <div style={{ padding: '4px 14px 8px', display: 'grid', gap: 6, fontFamily: MONO }}>
-          {seats.map(s => (
+          {seats.map((s) => (
             <div key={s.name} style={{ borderBottom: UI.hairline, paddingBottom: 5 }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <Led color={STATUS_COLOR[s.status]} title={STATUS_TITLE[s.status]} />
                 <span style={{ color: UI.text, fontSize: 12 }}>{s.role}</span>
                 <span style={{ color: UI.dim, fontSize: 10, marginLeft: 'auto' }}>
-                  {s.status === 'pending' ? s.schedule
-                    : s.ran_at ? new Date(s.ran_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                  {s.status === 'pending'
+                    ? s.schedule
+                    : s.ran_at
+                      ? new Date(s.ran_at).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : ''}
                 </span>
               </div>
-              {s.status === 'failed'
-                ? <div style={{ color: UI.red, fontSize: 10 }}>SEAT DOWN — see ops log</div>
-                : <Clamp2 text={firstLines(s.brief)} size={10} />}
+              {s.status === 'failed' ? (
+                <div style={{ color: UI.red, fontSize: 10 }}>SEAT DOWN — see ops log</div>
+              ) : (
+                <Clamp2 text={firstLines(s.brief)} size={10} />
+              )}
             </div>
           ))}
         </div>
