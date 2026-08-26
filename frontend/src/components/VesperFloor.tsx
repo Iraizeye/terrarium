@@ -37,8 +37,8 @@ interface Doctor {
 }
 
 // ── composition ──────────────────────────────────────────────────────────────
-const FRAME = { x: 0.012, y: 0.012, w: 0.976, h: 0.976, r: 26 }
-const BANNER = { x: 0.045, y: 0.045, w: 0.91, h: 0.052 }
+const FRAME = { x: 0.045, y: 0.012, w: 0.91, h: 0.976, r: 26 }
+const BANNER = { x: 0.075, y: 0.045, w: 0.85, h: 0.056 }
 const T3 = { top: 0.125, ground: 0.39 }
 const T2 = { top: 0.415, ground: 0.675 }
 const T1 = { top: 0.7, ground: 0.935 }
@@ -48,12 +48,12 @@ const PATROL = { x0: 0.14, x1: 0.62, period: 19000 }
 // ── palette: warm ember ──────────────────────────────────────────────────────
 const P = {
   night: '#120a07',
-  frame: '#2b1a12',
+  frame: '#221410',
   frameEdge: '#40281b',
-  wallTop: '#3b2a1e',
-  wallBot: '#4a3526',
-  floorA: '#2e1f14',
-  floorB: '#271a11',
+  wallTop: '#241610',
+  wallBot: '#2e1d13',
+  floorA: '#231610',
+  floorB: '#1a100a',
   slab: '#1f140d',
   gold: '#d9a441',
   goldDim: 'rgba(217,164,65,0.55)',
@@ -85,6 +85,7 @@ interface Actor {
   down: boolean
   bubble: string | null
   tag?: string // pit name bubbles: KERNEL / LIVE / PAPER
+  held?: 'candle' | 'clipboard'
 }
 
 const ACTIVE_MS = 20 * 60_000
@@ -434,19 +435,88 @@ function drawRobot(
     const sw = walk ? step * u * 0.06 : 0
     shadedBox(ctx, -u * 0.35 - sw, armY, u * 0.11, u * 0.28, u * 0.05, base, hi, lo)
     shadedBox(ctx, u * 0.24 + sw, armY, u * 0.11, u * 0.28, u * 0.05, base, hi, lo)
+    // shoulder joint spheres — the articulated look
+    for (const sx2 of [-u * 0.295 - sw, u * 0.295 + sw]) {
+      const jg = ctx.createRadialGradient(
+        sx2 - u * 0.015,
+        armY + u * 0.02,
+        1,
+        sx2,
+        armY + u * 0.035,
+        u * 0.055,
+      )
+      jg.addColorStop(0, hi)
+      jg.addColorStop(1, lo)
+      ctx.fillStyle = jg
+      ctx.beginPath()
+      ctx.arc(sx2, armY + u * 0.035, u * 0.055, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    // held props: KERNEL's candle, PAPER's clipboard
+    if (a.held === 'candle') {
+      const hx = u * 0.33
+      const hy = armY + u * 0.24
+      rr(ctx, hx - u * 0.02, hy - u * 0.1, u * 0.04, u * 0.1, u * 0.012, P.cream)
+      const fl2 = 0.75 + 0.25 * Math.sin(t / 150)
+      ctx.fillStyle = P.candle
+      ctx.beginPath()
+      ctx.ellipse(hx, hy - u * 0.13, u * 0.014, u * 0.024 * fl2, 0, 0, Math.PI * 2)
+      ctx.fill()
+      const cg2 = ctx.createRadialGradient(hx, hy - u * 0.12, 1, hx, hy - u * 0.12, u * 0.14)
+      cg2.addColorStop(0, `rgba(246,192,90,${0.3 * fl2})`)
+      cg2.addColorStop(1, 'rgba(246,192,90,0)')
+      ctx.fillStyle = cg2
+      ctx.beginPath()
+      ctx.arc(hx, hy - u * 0.12, u * 0.14, 0, Math.PI * 2)
+      ctx.fill()
+    } else if (a.held === 'clipboard') {
+      ctx.save()
+      ctx.translate(u * 0.31, armY + u * 0.18)
+      ctx.rotate(-0.15)
+      rr(ctx, -u * 0.075, -u * 0.1, u * 0.15, u * 0.2, u * 0.015, '#8a6a3c')
+      rr(ctx, -u * 0.062, -u * 0.085, u * 0.124, u * 0.17, u * 0.01, '#efe6cd')
+      ctx.fillStyle = 'rgba(90,60,30,0.5)'
+      for (let i = 0; i < 3; i++)
+        ctx.fillRect(-u * 0.045, -u * 0.055 + i * u * 0.045, u * 0.09, u * 0.012)
+      ctx.restore()
+    }
   }
-  // head: wider than torso, painted, with inset face panel
-  const headY = torsoY - bob - u * 0.4
-  shadedBox(ctx, -u * 0.3, headY, u * 0.6, u * 0.4, u * 0.12, base, hi, lo)
-  // face panel: warm dark inset so the eyes GLOW out of it
-  const fp = ctx.createLinearGradient(0, headY + u * 0.08, 0, headY + u * 0.34)
-  fp.addColorStop(0, chief ? '#5a1210' : '#3f2f1e')
-  fp.addColorStop(1, chief ? '#420c0b' : '#2e2113')
-  ctx.fillStyle = fp
+  // head: painted DOME with a dark visor band — the reference's helmet look
+  const headY = torsoY - bob - u * 0.42
+  const hg = ctx.createLinearGradient(0, headY, 0, headY + u * 0.42)
+  hg.addColorStop(0, hi)
+  hg.addColorStop(0.55, base)
+  hg.addColorStop(1, lo)
+  ctx.fillStyle = hg
   ctx.beginPath()
-  ctx.roundRect(-u * 0.24, headY + u * 0.08, u * 0.48, u * 0.26, u * 0.08)
+  ctx.moveTo(-u * 0.3, headY + u * 0.42)
+  ctx.lineTo(-u * 0.3, headY + u * 0.2)
+  ctx.arc(0, headY + u * 0.2, u * 0.3, Math.PI, 0)
+  ctx.lineTo(u * 0.3, headY + u * 0.42)
+  ctx.closePath()
   ctx.fill()
-  drawEyes(ctx, 0, headY + u * 0.215, u, a, t)
+  // dome spec highlight
+  ctx.fillStyle = 'rgba(255,248,230,0.28)'
+  ctx.beginPath()
+  ctx.ellipse(-u * 0.1, headY + u * 0.1, u * 0.1, u * 0.05, -0.5, 0, Math.PI * 2)
+  ctx.fill()
+  // visor band: dark glass slot the eyes glow out of
+  const vg2 = ctx.createLinearGradient(0, headY + u * 0.14, 0, headY + u * 0.34)
+  vg2.addColorStop(0, chief ? '#38100e' : '#221a10')
+  vg2.addColorStop(1, chief ? '#200706' : '#151009')
+  ctx.fillStyle = vg2
+  ctx.beginPath()
+  ctx.roundRect(-u * 0.245, headY + u * 0.14, u * 0.49, u * 0.2, u * 0.1)
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(0,0,0,0.4)'
+  ctx.lineWidth = 1
+  ctx.stroke()
+  drawEyes(ctx, 0, headY + u * 0.24, u, a, t)
+  // chin plate
+  ctx.fillStyle = lo
+  ctx.beginPath()
+  ctx.roundRect(-u * 0.12, headY + u * 0.36, u * 0.24, u * 0.05, u * 0.02)
+  ctx.fill()
   // antenna
   ctx.fillStyle = lo
   ctx.fillRect(-u * 0.016, headY - u * 0.055, u * 0.032, u * 0.055)
@@ -569,17 +639,23 @@ export default function VesperFloor() {
       // ── outside: deep night, pines, distant lights ──
       ctx.fillStyle = P.night
       ctx.fillRect(0, 0, dw, dh)
-      for (let i = 0; i < 9; i++) {
-        const px = (i * 0.117 + 0.03) % 1
-        const ph = S * (0.1 + ((i * 53) % 7) * 0.014)
-        const py = i % 2 ? Y(0.06) + ph : Y(0.97)
-        ctx.fillStyle = '#0d1410'
-        ctx.beginPath()
-        ctx.moveTo(X(px), py - ph)
-        ctx.lineTo(X(px) - ph * 0.42, py)
-        ctx.lineTo(X(px) + ph * 0.42, py)
-        ctx.closePath()
-        ctx.fill()
+      for (const side of [0.018, 0.982]) {
+        for (let i = 0; i < 4; i++) {
+          const px = side + (side < 0.5 ? 1 : -1) * i * 0.011
+          const ph = S * (0.34 - i * 0.05)
+          const py = Y(0.55 + i * 0.14)
+          ctx.fillStyle = i % 2 ? '#0c130e' : '#101a13'
+          for (let tier = 0; tier < 3; tier++) {
+            const tw = ph * (0.5 - tier * 0.12)
+            const ty = py - ph * 0.35 * tier
+            ctx.beginPath()
+            ctx.moveTo(X(px), ty - ph * 0.5)
+            ctx.lineTo(X(px) - tw, ty)
+            ctx.lineTo(X(px) + tw, ty)
+            ctx.closePath()
+            ctx.fill()
+          }
+        }
       }
       for (let i = 0; i < 14; i++) {
         const lx = X((i * 0.073 + 0.05) % 1)
@@ -651,16 +727,28 @@ export default function VesperFloor() {
           ctx.fill()
         }
         ctx.fillStyle = warn ? P.cream : P.dim
-        ctx.font = `bold ${Math.max(9, bh * 0.36)}px ${MONO}`
+        ctx.font = `bold ${Math.max(11, bh * 0.46)}px ${MONO}`
         ctx.textAlign = 'left'
-        ctx.fillText(text, ix + S * 0.03, iy + bh * 0.13)
-        for (let i = 0; i < 3; i++) {
-          ctx.fillStyle = warn ? 'rgba(239,227,200,0.7)' : P.dim
+        ctx.fillText(text, ix + S * 0.03, iy + bh * 0.16)
+        // wifi arcs + signal bars, right side
+        const wx2 = bx + bw - S * 0.075
+        ctx.strokeStyle = warn ? 'rgba(239,227,200,0.85)' : P.dim
+        ctx.lineWidth = Math.max(1.5, bh * 0.06)
+        for (let i = 1; i <= 3; i++) {
+          ctx.beginPath()
+          ctx.arc(wx2, iy + bh * 0.18, bh * 0.13 * i, Math.PI * 1.22, Math.PI * 1.78)
+          ctx.stroke()
+        }
+        ctx.fillStyle = warn ? 'rgba(239,227,200,0.85)' : P.dim
+        ctx.beginPath()
+        ctx.arc(wx2, iy + bh * 0.18, bh * 0.05, 0, Math.PI * 2)
+        ctx.fill()
+        for (let i = 0; i < 4; i++) {
           ctx.fillRect(
-            bx + bw - S * 0.03 - i * S * 0.014,
-            iy + bh * 0.16 - (i + 1) * bh * 0.14,
-            S * 0.008,
-            (i + 1) * bh * 0.14,
+            bx + bw - S * 0.038 + i * S * 0.009,
+            iy + bh * 0.2 - (i + 1) * bh * 0.1,
+            S * 0.006,
+            (i + 1) * bh * 0.1,
           )
         }
       }
@@ -671,43 +759,43 @@ export default function VesperFloor() {
         g.addColorStop(0, P.wallTop)
         g.addColorStop(1, P.wallBot)
         ctx.fillStyle = g
-        ctx.fillRect(X(0.05), Y(T.top), dw * 0.9, dh * (T.ground - T.top))
+        ctx.fillRect(X(0.08), Y(T.top), dw * 0.84, dh * (T.ground - T.top))
         if (!night) {
           ctx.fillStyle = phase === 'day' ? 'rgba(255,225,170,0.05)' : 'rgba(240,150,80,0.06)'
-          ctx.fillRect(X(0.05), Y(T.top), dw * 0.9, dh * (T.ground - T.top))
+          ctx.fillRect(X(0.08), Y(T.top), dw * 0.84, dh * (T.ground - T.top))
         }
         // wood paneling: soft vertical seams + a wainscot band
         ctx.strokeStyle = 'rgba(24,13,7,0.5)'
         ctx.lineWidth = 1
-        for (let sx = 0.05; sx < 0.95; sx += 0.075) {
+        for (let sx = 0.08; sx < 0.92; sx += 0.075) {
           ctx.beginPath()
           ctx.moveTo(X(sx), Y(T.top))
           ctx.lineTo(X(sx), Y(T.ground))
           ctx.stroke()
         }
         ctx.fillStyle = 'rgba(30,17,9,0.75)'
-        ctx.fillRect(X(0.05), Y(T.ground - 0.055), dw * 0.9, dh * 0.007)
+        ctx.fillRect(X(0.08), Y(T.ground - 0.055), dw * 0.84, dh * 0.007)
         ctx.fillStyle = 'rgba(217,164,65,0.12)'
-        ctx.fillRect(X(0.05), Y(T.ground - 0.048), dw * 0.9, dh * 0.002)
+        ctx.fillRect(X(0.08), Y(T.ground - 0.048), dw * 0.84, dh * 0.002)
         // night is dim, not empty: a faint ember haze near each floor
         const haze = ctx.createLinearGradient(0, Y(T.ground - 0.09), 0, Y(T.ground))
         haze.addColorStop(0, 'rgba(246,192,90,0)')
         haze.addColorStop(1, 'rgba(246,192,90,0.08)')
         ctx.fillStyle = haze
-        ctx.fillRect(X(0.05), Y(T.ground - 0.09), dw * 0.9, dh * 0.09)
+        ctx.fillRect(X(0.08), Y(T.ground - 0.09), dw * 0.84, dh * 0.09)
         const fg = ctx.createLinearGradient(0, Y(T.ground - 0.016), 0, Y(T.ground + 0.012))
         fg.addColorStop(0, P.floorA)
         fg.addColorStop(1, P.floorB)
         ctx.fillStyle = fg
-        ctx.fillRect(X(0.05), Y(T.ground - 0.016), dw * 0.9, dh * 0.028)
+        ctx.fillRect(X(0.08), Y(T.ground - 0.016), dw * 0.84, dh * 0.028)
         ctx.fillStyle = P.slab
-        ctx.fillRect(X(0.05), Y(T.ground + 0.012), dw * 0.9, dh * 0.02)
+        ctx.fillRect(X(0.08), Y(T.ground + 0.012), dw * 0.84, dh * 0.02)
         // ceiling shadow: rooms are carved, not printed
         const cs = ctx.createLinearGradient(0, Y(T.top), 0, Y(T.top + 0.05))
         cs.addColorStop(0, 'rgba(15,8,4,0.5)')
         cs.addColorStop(1, 'rgba(15,8,4,0)')
         ctx.fillStyle = cs
-        ctx.fillRect(X(0.05), Y(T.top), dw * 0.9, dh * 0.05)
+        ctx.fillRect(X(0.08), Y(T.top), dw * 0.84, dh * 0.05)
       }
       // interior partition walls: left room | center | right room, both upper tiers
       for (const T of [T3, T2]) {
@@ -737,7 +825,7 @@ export default function VesperFloor() {
         )
         for (const T of [T3, T2]) {
           const doorW = dw * (ELEV.x1 - ELEV.x0)
-          const doorH = dh * (T.ground - T.top) * 0.74
+          const doorH = dh * (T.ground - T.top) * 0.88
           const dx2 = X(ELEV.x0)
           const dy2 = Y(T.ground) - doorH
           // frame
@@ -791,10 +879,14 @@ export default function VesperFloor() {
         }
         // amber R indicator between floors
         const rfcHot = freshISO(company?.strategy_at) || packets.some((p) => p.kind === 'rfc')
+        rr(ctx, X(elevMid) - S * 0.026, Y(T2.top) - S * 0.028, S * 0.052, S * 0.022, 3, '#1c110a')
         ctx.fillStyle = rfcHot ? P.amber : '#3a2c1a'
         ctx.beginPath()
-        ctx.arc(X(elevMid), Y(T2.top) + S * 0.012, S * 0.009, 0, Math.PI * 2)
+        ctx.arc(X(elevMid) - S * 0.011, Y(T2.top) - S * 0.017, S * 0.005, 0, Math.PI * 2)
         ctx.fill()
+        ctx.font = `bold ${S * 0.014}px ${MONO}`
+        ctx.fillStyle = rfcHot ? P.amber : P.goldDim
+        ctx.fillText('R', X(elevMid) + S * 0.004, Y(T2.top) - S * 0.013)
         if (rfcHot) {
           const rg = ctx.createRadialGradient(
             X(elevMid),
@@ -812,6 +904,10 @@ export default function VesperFloor() {
           ctx.fill()
         }
       }
+
+      // floor label plates, left wall (as the reference draws them)
+      plaqueAt(ctx, X(0.115), Y(T3.top + 0.028), S * 0.062, ['3F', 'HALL'], S)
+      plaqueAt(ctx, X(0.115), Y(T2.top + 0.028), S * 0.062, ['1F', 'PIT'], S)
 
       // ── data → actors ──
       const chiefSeat = seats.find((s) => s.name === 'chief')
@@ -921,6 +1017,7 @@ export default function VesperFloor() {
           down: kill,
           bubble: null,
           tag: 'KERNEL',
+          held: 'candle',
         },
         {
           key: 'live',
@@ -943,6 +1040,7 @@ export default function VesperFloor() {
           down: trading?.modes?.paper?.status === 'stale',
           bubble: null,
           tag: 'PAPER',
+          held: 'clipboard',
         },
       ]
 
@@ -1170,25 +1268,62 @@ export default function VesperFloor() {
       rr(ctx, X(0.605), Y(T1.ground) - S * 0.068, S * 0.018, S * 0.016, 2, '#8a2f28')
       crateAt(ctx, X(0.685), Y(T1.ground), S * 0.04)
       {
+        // the recessed emblem: dark well, glowing ember ring, leaf mark, railing
         const ex = X(0.84)
-        const ey = Y(T1.ground) - S * 0.012
+        const ey = Y(T1.ground) - S * 0.016
         ctx.save()
         ctx.translate(ex, ey)
-        ctx.scale(1, 0.42)
-        ctx.fillStyle = '#b45a1e'
+        ctx.scale(1, 0.4)
+        // outer well
+        ctx.fillStyle = '#140c07'
         ctx.beginPath()
-        ctx.arc(0, 0, S * 0.085, 0, Math.PI * 2)
+        ctx.arc(0, 0, S * 0.105, 0, Math.PI * 2)
         ctx.fill()
-        ctx.strokeStyle = '#d9822e'
-        ctx.lineWidth = 3
+        // ember ring: radial glow
+        const er2 = ctx.createRadialGradient(0, 0, S * 0.03, 0, 0, S * 0.09)
+        er2.addColorStop(0, '#3a1c08')
+        er2.addColorStop(0.6, '#b45a1e')
+        er2.addColorStop(0.8, '#e88a2e')
+        er2.addColorStop(1, '#2c1810')
+        ctx.fillStyle = er2
         ctx.beginPath()
-        ctx.arc(0, 0, S * 0.062, 0, Math.PI * 2)
-        ctx.stroke()
-        ctx.fillStyle = '#e8dfc8'
-        ctx.beginPath()
-        ctx.ellipse(0, -S * 0.01, S * 0.016, S * 0.038, 0.5, 0, Math.PI * 2)
+        ctx.arc(0, 0, S * 0.09, 0, Math.PI * 2)
         ctx.fill()
+        ctx.fillStyle = '#1c0f08'
+        ctx.beginPath()
+        ctx.arc(0, 0, S * 0.05, 0, Math.PI * 2)
+        ctx.fill()
+        // leaf mark
+        ctx.fillStyle = '#e8a84e'
+        ctx.beginPath()
+        ctx.ellipse(0, -S * 0.008, S * 0.012, S * 0.032, 0, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.strokeStyle = '#e8a84e'
+        ctx.lineWidth = 2
+        for (const la of [-0.7, 0.7]) {
+          ctx.beginPath()
+          ctx.ellipse(Math.sin(la) * S * 0.022, S * 0.005, S * 0.008, S * 0.02, la, 0, Math.PI * 2)
+          ctx.stroke()
+        }
         ctx.restore()
+        // glow rising from the well
+        const wg2 = ctx.createRadialGradient(ex, ey, 1, ex, ey, S * 0.11)
+        wg2.addColorStop(0, 'rgba(232,138,46,0.14)')
+        wg2.addColorStop(1, 'rgba(232,138,46,0)')
+        ctx.fillStyle = wg2
+        ctx.fillRect(ex - S * 0.11, ey - S * 0.08, S * 0.22, S * 0.1)
+        // railing arc behind: thin posts + top rail
+        ctx.strokeStyle = '#3a281a'
+        ctx.lineWidth = Math.max(1.5, S * 0.004)
+        ctx.beginPath()
+        ctx.ellipse(ex, ey - S * 0.05, S * 0.1, S * 0.028, 0, Math.PI, 0)
+        ctx.stroke()
+        for (const rx of [-0.85, -0.4, 0.4, 0.85]) {
+          ctx.beginPath()
+          ctx.moveTo(ex + rx * S * 0.1, ey - S * 0.05 - Math.sqrt(1 - rx * rx) * S * 0.028)
+          ctx.lineTo(ex + rx * S * 0.1, ey - S * 0.008)
+          ctx.stroke()
+        }
       }
       aoAt(ctx, X(0.93), Y(T1.ground), S * 0.06)
       tableAt(ctx, X(0.93), Y(T1.ground), S * 0.07, S * 0.05)

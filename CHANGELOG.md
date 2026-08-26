@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.17.0 - 2026-08-26 — Warm Ember, matched to the reference
+
+The stage now reproduces the marked-favorite illustration, verified
+side-by-side: near-black espresso rooms where light lives only in
+pools; dome-helmet robots with dark visor bands, glowing amber eyes
+(specular cores, sleep lids), shoulder joints and feet; KERNEL carries
+a candle, PAPER a clipboard; solid bronze elevator doors with the gold
+plate mounted ON them and the R-indicator plate above; floor label
+plates (3F HALL / 1F PIT); a recessed ember-glow floor emblem with
+railing; pine forest with lit windows framing both sides; the banner
+gains its wifi + signal icons. Still 100% code-drawn — zero sprites,
+zero assets, every glow telemetry. Goldens regenerated.
+
 ## v0.16.1 - 2026-08-26 — the painted pass
 
 Hard art-lock enforcement: same composition, real paint. Robots gained
