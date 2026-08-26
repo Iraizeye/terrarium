@@ -198,7 +198,7 @@ export default function TradingPanel() {
   const trading = useDashboardStore((s) => s.trading)
 
   return (
-    <Panel style={{ height: '100%' }}>
+    <Panel id="panel-trading" style={{ height: '100%' }}>
       <PanelHeader
         label="Trading desk"
         title="both trading books — live and paper — with the engine's actual reasoning"

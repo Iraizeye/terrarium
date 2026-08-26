@@ -174,12 +174,36 @@ const PATROL = { x0: 430, x1: 1180, y: 1300, period: 19000 }
 const AMBER = '#f5b84a'
 const CREAM = '#efe3c8'
 
+// each bot opens the panel that already tells its story — no new pages
+const BOT_PANEL: Record<keyof typeof SPRITES, string> = {
+  strategy: 'panel-departments',
+  meetA: 'panel-departments',
+  meetB: 'panel-departments',
+  build: 'panel-departments',
+  chief: 'panel-desk',
+  kernel: 'panel-trading',
+  live: 'panel-trading',
+  paper: 'panel-trading',
+}
+
+function agoText(iso?: string | null): string {
+  if (!iso) return 'no run yet'
+  const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000))
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m}m ago`
+  if (m < 60 * 48) return `${Math.round(m / 60)}h ago`
+  return `${Math.round(m / 1440)}d ago`
+}
+
 export default function VesperFloor() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const trading = useDashboardStore((s) => s.trading)
   const [seats, setSeats] = useState<DeskSeat[]>([])
   const [company, setCompany] = useState<CompanyStatus | null>(null)
   const [doctor, setDoctor] = useState<Doctor | null>(null)
+  const [hover, setHover] = useState<{ x: number; y: number; text: string } | null>(null)
+  // the draw loop publishes its contain-fit so pointer math matches pixels
+  const viewRef = useRef({ s: 1, ox: 0, oy: 0 })
 
   useEffect(() => {
     let alive = true
@@ -217,6 +241,10 @@ export default function VesperFloor() {
     const params = new URLSearchParams(window.location.search)
     const frozenMs = Number(params.get('freeze')) || null
     const mailPreview = params.get('mail') === 'test'
+    // ?office=demo — one scripted RFC handoff + one pit hb, then idle
+    const officeDemo = params.get('office') === 'demo'
+    let demoStage = officeDemo ? 0 : 3
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     let lastPreview = 0
 
     interface Packet {
@@ -275,6 +303,7 @@ export default function VesperFloor() {
       const s = Math.min(rect.width / CROP.sw, rect.height / CROP.sh)
       const ox = (rect.width - CROP.sw * s) / 2
       const oy = (rect.height - CROP.sh * s) / 2
+      viewRef.current = { s, ox, oy }
       const X = (cx: number) => ox + cx * s
       const Y = (cy: number) => oy + cy * s
       ctx.fillStyle = '#120a07'
@@ -321,6 +350,15 @@ export default function VesperFloor() {
             meetTalkUntil = now + 8000
           }
         }
+        // scripted demo: one handoff at 1s, one pit heartbeat at 4s, done
+        if (demoStage === 0 && now > 1000) {
+          demoStage = 1
+          spawnRfc(now)
+          meetTalkUntil = now + 8000
+        } else if (demoStage === 1 && now > 4000) {
+          demoStage = 2
+          liveExcT0 = now
+        }
         // a heartbeat landing = age dropping back toward zero
         const la = trading?.modes?.live?.heartbeat_age_s ?? null
         if (la != null) {
@@ -346,7 +384,7 @@ export default function VesperFloor() {
       const talking = now < meetTalkUntil
       type Pose = 'idle' | 'active' | 'talk' | 'sleep'
       const bob = (period: number, amp: number, on: boolean, phase = 0) =>
-        on ? Math.sin((now / period) * Math.PI * 2 + phase) * amp : 0
+        on && !reduceMotion ? Math.sin((now / period) * Math.PI * 2 + phase) * amp : 0
       const sprite = (
         sp: { url: string; x: number; y: number; w: number; h: number; eyes: number[][] },
         pose: Pose,
@@ -360,7 +398,7 @@ export default function VesperFloor() {
         ctx.filter = 'none'
         if (pose === 'active' || pose === 'talk') {
           // breathe extra glow onto the painted amber eyes
-          const pulse = 0.28 + 0.1 * Math.sin(now / 640)
+          const pulse = reduceMotion ? 0.3 : 0.28 + 0.1 * Math.sin(now / 640)
           ctx.save()
           ctx.globalCompositeOperation = 'lighter'
           for (const [ex, ey] of sp.eyes) {
@@ -388,7 +426,7 @@ export default function VesperFloor() {
       // hall pair — on a real handoff they STEP together (500ms ease in),
       // talk for ~8s with a nod, then ease back to their marks (600ms)
       const step =
-        meetTalkUntil > 0
+        meetTalkUntil > 0 && !reduceMotion
           ? ease01((now - (meetTalkUntil - 8000)) / 500) * (1 - ease01((now - meetTalkUntil) / 600))
           : 0
       const meetPose: Pose = talking ? 'talk' : night ? 'sleep' : 'idle'
@@ -408,7 +446,7 @@ export default function VesperFloor() {
       // between heartbeats they stand on their marks. Never constant walking.
       const exc = (t0: number) => {
         const t = now - t0
-        if (t < 0 || t > 1800) return 0
+        if (reduceMotion || t < 0 || t > 1800) return 0
         if (t < 600) return ease01(t / 600)
         if (t < 1100) return 1
         return 1 - ease01((t - 1100) / 700)
@@ -501,7 +539,7 @@ export default function VesperFloor() {
         // ── the Nightbell on the chief's table glows while doctor is unhappy ──
         // same conditions as a warn banner; a green doctor leaves it a bell
         if (warn) {
-          const ring = 0.34 + 0.22 * Math.sin(now / 800)
+          const ring = reduceMotion ? 0.45 : 0.34 + 0.22 * Math.sin(now / 800)
           const gx = X(NIGHTBELL.x)
           const gy = Y(NIGHTBELL.y)
           ctx.save()
@@ -516,6 +554,22 @@ export default function VesperFloor() {
           ctx.fill()
           ctx.restore()
         }
+      }
+
+      // ── ?office=demo is labeled — the stage never fakes silently ──
+      if (officeDemo) {
+        ctx.fillStyle = 'rgba(36,22,16,0.92)'
+        ctx.beginPath()
+        ctx.roundRect(X(1655), Y(162), 116 * s, 46 * s, 8 * s)
+        ctx.fill()
+        ctx.strokeStyle = 'rgba(245,184,74,0.55)'
+        ctx.lineWidth = 1.5
+        ctx.stroke()
+        ctx.fillStyle = AMBER
+        ctx.font = `bold ${Math.max(10, 26 * s)}px ${MONO}`
+        ctx.textAlign = 'center'
+        ctx.fillText('DEMO', X(1713), Y(195))
+        ctx.textAlign = 'left'
       }
 
       // ── bubbles: drawn only when there is something true to say ──
@@ -603,7 +657,7 @@ export default function VesperFloor() {
       led(LEDS.paper.x, LEDS.paper.y, paperStale ? 'down' : paperHb ? 'on' : 'sleep')
 
       // ── patrol light: glides the pit floor only on a fresh live heartbeat ──
-      if (liveHb) {
+      if (liveHb && !reduceMotion) {
         const t = (now % PATROL.period) / PATROL.period
         const goingRight = t < 0.5
         const uu = goingRight ? t * 2 : 1 - (t - 0.5) * 2
@@ -622,6 +676,7 @@ export default function VesperFloor() {
       }
 
       // ── packets ──
+      if (reduceMotion) packets.length = 0
       for (let i = packets.length - 1; i >= 0; i--) {
         const p = packets[i]
         const t = (now - p.t0) / p.dur
@@ -694,10 +749,102 @@ export default function VesperFloor() {
     return () => cancelAnimationFrame(raf)
   }, [])
 
+  // ── pointer layer: every bot is clickable — it opens the panel that ──
+  // already tells its story, and hovers say name + last real event
+  const botAt = (px: number, py: number): keyof typeof SPRITES | null => {
+    const { s, ox, oy } = viewRef.current
+    const cx = (px - ox) / s
+    const cy = (py - oy) / s
+    for (const key of Object.keys(SPRITES) as (keyof typeof SPRITES)[]) {
+      const sp = SPRITES[key]
+      if (cx >= sp.x && cx <= sp.x + sp.w && cy >= sp.y && cy <= sp.y + sp.h) return key
+    }
+    return null
+  }
+  const botLabel = (key: keyof typeof SPRITES): string => {
+    const chiefSeat = seats.find((se) => se.name === 'chief')
+    switch (key) {
+      case 'strategy':
+        return `STRATEGY · ${company?.strategy_at ? `rfc ${agoText(company.strategy_at)}` : 'quiet'}`
+      case 'meetA':
+      case 'meetB':
+        return `HALL · ${company?.strategy_at ? `handoff ${agoText(company.strategy_at)}` : 'no handoff yet'}`
+      case 'build':
+        return `BUILD · ${company?.build_at ? `shipped ${agoText(company.build_at)}` : 'nothing shipped'}`
+      case 'chief':
+        return chiefSeat?.status === 'failed'
+          ? 'CHIEF · last run FAILED'
+          : `CHIEF · brief ${agoText(chiefSeat?.ran_at)}`
+      case 'kernel':
+        return trading?.kill_switch
+          ? 'KERNEL · KILL ACTIVE'
+          : `KERNEL · watchdog ${trading?.modes?.live?.watchdog_armed || trading?.modes?.paper?.watchdog_armed ? 'armed' : 'off'}`
+      case 'live':
+      case 'paper': {
+        const m = trading?.modes?.[key]
+        if (!m) return `${key.toUpperCase()} · no telemetry`
+        return m.status === 'alive'
+          ? `${key.toUpperCase()} · hb ${Math.round(m.heartbeat_age_s ?? 0)}s ago`
+          : `${key.toUpperCase()} · ${m.status}`
+      }
+    }
+  }
+  const onMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    const key = botAt(e.clientX - r.left, e.clientY - r.top)
+    setHover(key ? { x: e.clientX - r.left, y: e.clientY - r.top, text: botLabel(key) } : null)
+  }
+  const onClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    const key = botAt(e.clientX - r.left, e.clientY - r.top)
+    if (!key) return
+    const el = document.getElementById(BOT_PANEL[key])
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    el.animate(
+      [
+        { boxShadow: `0 0 0 2px ${AMBER}66, 0 8px 24px rgba(16,10,4,0.34)` },
+        { boxShadow: '0 8px 24px rgba(16,10,4,0.34)' },
+      ],
+      { duration: 1400, easing: 'ease-out' },
+    )
+  }
+
   return (
-    <canvas
-      ref={canvasRef}
-      style={{ width: '100%', height: '100%', display: 'block', minHeight: 0 }}
-    />
+    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 0 }}>
+      <canvas
+        ref={canvasRef}
+        onMouseMove={onMove}
+        onMouseLeave={() => setHover(null)}
+        onClick={onClick}
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'block',
+          minHeight: 0,
+          cursor: hover ? 'pointer' : 'default',
+        }}
+      />
+      {hover && (
+        <div
+          style={{
+            position: 'absolute',
+            left: Math.max(8, hover.x - 60),
+            top: Math.max(8, hover.y - 40),
+            background: 'rgba(36,22,16,0.94)',
+            border: '1px solid rgba(245,184,74,0.4)',
+            borderRadius: 6,
+            color: CREAM,
+            fontFamily: MONO,
+            fontSize: 11,
+            padding: '4px 8px',
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {hover.text}
+        </div>
+      )}
+    </div>
   )
 }

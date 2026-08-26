@@ -67,7 +67,7 @@ export function DepartmentsPanel() {
     ['BUILD', company?.build_at, 'last shipped commit'],
   ]
   return (
-    <Panel style={{ flexShrink: 0 }}>
+    <Panel id="panel-departments" style={{ flexShrink: 0 }}>
       <PanelHeader
         label="Departments"
         title="on-call: lamps lit by artifacts (RFCs, commits), never by talk"

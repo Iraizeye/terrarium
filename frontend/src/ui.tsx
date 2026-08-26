@@ -35,9 +35,18 @@ export const UI = {
 export const MONO = '"JetBrains Mono", "Fira Code", monospace'
 
 /** Shared panel shell — rounded surface, hairline border, inner top light. */
-export function Panel({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+export function Panel({
+  children,
+  style,
+  id,
+}: {
+  children: ReactNode
+  style?: CSSProperties
+  id?: string
+}) {
   return (
     <div
+      id={id}
       style={{
         display: 'flex',
         flexDirection: 'column',

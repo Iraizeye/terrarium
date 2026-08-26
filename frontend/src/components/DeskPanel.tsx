@@ -55,7 +55,7 @@ export default function DeskPanel() {
   }, [])
 
   return (
-    <Panel>
+    <Panel id="panel-desk">
       <PanelHeader
         label="The desk"
         title="scheduled agent seats — each runs on its own clock and files a brief"
