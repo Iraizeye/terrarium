@@ -53,7 +53,7 @@ def system_metrics() -> dict[str, Any]:
     for proc in psutil.process_iter(["cmdline", "memory_info"]):
         try:
             cmdline = " ".join(proc.info["cmdline"] or [])
-            if "range-trader" in cmdline and "daemon" in cmdline:
+            if ("vesper" in cmdline or "range-trader" in cmdline) and "daemon" in cmdline:
                 trader_rss += proc.info["memory_info"].rss
                 trader_procs += 1
         except (psutil.NoSuchProcess, psutil.AccessDenied):

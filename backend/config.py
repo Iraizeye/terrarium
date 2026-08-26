@@ -1,7 +1,7 @@
 """
 TERRARIUM configuration — every path and constant in one place.
 
-The dashboard watches exactly three things: Claude, the range-trader stack,
+The dashboard watches exactly three things: Claude, the vesper trading stack,
 and this machine. Nothing else.
 """
 import os
@@ -22,7 +22,10 @@ ET = ZoneInfo("America/New_York")
 # (backend/demo.py) — zero config, zero personal data, the full glasshouse.
 DEMO = (os.getenv("TERRARIUM_DEMO") or os.getenv("RANGEWATCH_DEMO", "")) == "1"
 
-RANGE_TRADER_DIR   = Path(os.getenv("RANGE_TRADER_DIR", str(Path.home() / ".range-trader")))
+# VESPER_DIR is the native name (system renamed 2026-08-26); RANGE_TRADER_DIR
+# stays honored as an alias, same pattern as the RANGEWATCH_* -> TERRARIUM_* era.
+RANGE_TRADER_DIR   = Path(os.getenv("VESPER_DIR") or os.getenv("RANGE_TRADER_DIR",
+                                    str(Path.home() / ".vesper")))
 CLAUDE_PROJECTS_DIR = Path(os.getenv("CLAUDE_PROJECTS_DIR",
                                      str(Path.home() / ".claude" / "projects")))
 LAUNCH_AGENTS_DIR  = Path(os.getenv("LAUNCH_AGENTS_DIR",
@@ -74,4 +77,4 @@ CLAUDE_MEMORY_DIR  = Path(os.getenv(
     str(Path.home() / ".claude" / "projects" / "-Users-iris" / "memory")))
 EXPERIMENTS_MD     = Path(os.getenv(
     "EXPERIMENTS_MD",
-    str(Path.home() / "Projects" / "range-trader" / "docs" / "EXPERIMENTS.md")))
+    str(Path.home() / "Projects" / "vesper-trader" / "docs" / "EXPERIMENTS.md")))

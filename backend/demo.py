@@ -262,7 +262,7 @@ def demo_agent_fleet() -> dict[str, Any]:
     return {
         "available": True,
         "agents": [
-            {"project": "range-trader", "session": "a197e4ec", "state": "live",
+            {"project": "vesper", "session": "a197e4ec", "state": "live",
              "age_s": 12, "action": "Edit reconcile.py", "model": "claude-opus-5",
              "tokens": int(96_000 * day_frac), "turns": int(41 * day_frac)},
             {"project": "terrarium", "session": "0e2d77f7", "state": "idle",
@@ -280,7 +280,7 @@ def demo_agent_fleet() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 _CREW_SCRIPT = [
-    ("lifecycle", "session started in range-trader", "thinking", None),
+    ("lifecycle", "session started in vesper", "thinking", None),
     ("thought", "reading the morning tape", "thinking", None),
     ("tool", "Read daemon.py", "working", "Read"),
     ("tool", "run tests: 373 passed", "working", "Bash"),
