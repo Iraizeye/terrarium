@@ -1,35 +1,30 @@
-// Path B — motion-rich sprites, traced from the reference (skill: terrarium-art).
+// The office, in three layers (skill: terrarium-art — art lock Warm Ember):
 //
-// assets/terrarium/traced/* is the Warm Ember painting taken apart:
-// stage-bg.png is the illustration with the characters and baked bubbles
-// inpainted away, and each robot is a feathered-alpha crop of the SAME
-// painted pixels, pasted back at its origin — so at rest the stage is the
-// reference, and every character can move. No robot geometry is invented.
-// The code owns the LIVE layer:
-//   · the banner region (painted opaquely over the baked one — doctor truth)
-//   · the eight robot sprites — idle by default; motion only when state
-//     says so (typing bob on fresh strategy, hall lean-in on a real
-//     handoff, pit sway on fresh heartbeats). Never constant walking.
-//   · speech bubbles — drawn only when there is something true to say
-//   · station state LEDs (STRATEGY BUILD CHIEF KERNEL LIVE PAPER)
-//   · a patrol light gliding the pit floor on a fresh live heartbeat
-//   · the RFC folder / brief envelope packets
-// Baked lamp-light and eyes are the painting's own; sleeping stations dim
-// their sprite, and state is carried by the LED layer, which never lies.
+//   Telemetry (real)                    /api/desk /api/company /api/home + store
+//     → Office Director (tiny state machine, in this file)
+//         strategy: idle | research      build: idle | coding
+//         chief:    idle | brief | alert pit:   idle | check
+//         hall:     idle | meet
+//     → Pixi stage (officeStage.ts)     sprite-sheet clips + walk to mark
+//     → overlay canvas (this file)      banner · bubbles · LEDs · packets ·
+//                                       Nightbell · patrol · DEMO tag
+//
+// The stage plays clips; the Director decides them from REAL state only.
+// Bubbles quote real artifacts (verdicts, RFC names, doctor lines, brief
+// times) — never invented thoughts. Reduce Motion = the static painting.
 
 import { useEffect, useRef, useState } from 'react'
-import buildBotUrl from '../../../assets/terrarium/traced/robot-build.png'
-import chiefBotUrl from '../../../assets/terrarium/traced/robot-chief.png'
-import kernelBotUrl from '../../../assets/terrarium/traced/robot-kernel.png'
-import liveBotUrl from '../../../assets/terrarium/traced/robot-live.png'
-import meetABotUrl from '../../../assets/terrarium/traced/robot-meet-a.png'
-import meetBBotUrl from '../../../assets/terrarium/traced/robot-meet-b.png'
-import paperBotUrl from '../../../assets/terrarium/traced/robot-paper.png'
-import strategyBotUrl from '../../../assets/terrarium/traced/robot-strategy.png'
-import stageBgUrl from '../../../assets/terrarium/traced/stage-bg.png'
 import { useDashboardStore } from '../store/dashboardStore'
 import { getPhase } from '../theme'
 import { MONO } from '../ui'
+import {
+  BOTS,
+  type BotKey,
+  CROP,
+  createOfficeStage,
+  type OfficeStage,
+  type Orders,
+} from './officeStage'
 
 interface DeskSeat {
   name: string
@@ -59,143 +54,9 @@ function doctorCause(line: string | null | undefined): string {
     .slice(0, 46)
 }
 
-const IMG_CACHE = new Map<string, HTMLImageElement>()
-function image(url: string): HTMLImageElement {
-  let im = IMG_CACHE.get(url)
-  if (!im) {
-    im = new Image()
-    im.src = url
-    IMG_CACHE.set(url, im)
-  }
-  return im
-}
-
-// ── the crop of the illustration inside the source PNG ──────────────────────
-const CROP = { sx: 55, sy: 95, sw: 1893, sh: 1350 }
-// sprite origins: the full-image trace boxes shifted into CROP space
-// (generate_traced.py box minus the crop offset)
-// eyes: the painted amber eyes (CROP space) — the active/talk poses breathe
-// extra glow onto them; the chief's smoked visor has none, so no glow there
-const SPRITES = {
-  strategy: {
-    url: strategyBotUrl,
-    x: 489,
-    y: 345,
-    w: 156,
-    h: 210,
-    eyes: [
-      [545, 395],
-      [580, 395],
-    ],
-  },
-  meetA: {
-    url: meetABotUrl,
-    x: 1217,
-    y: 351,
-    w: 160,
-    h: 212,
-    eyes: [
-      [1250, 397],
-      [1285, 400],
-    ],
-  },
-  meetB: {
-    url: meetBBotUrl,
-    x: 1363,
-    y: 351,
-    w: 142,
-    h: 212,
-    eyes: [
-      [1407, 403],
-      [1443, 405],
-    ],
-  },
-  build: {
-    url: buildBotUrl,
-    x: 533,
-    y: 680,
-    w: 174,
-    h: 260,
-    eyes: [
-      [617, 733],
-      [647, 733],
-    ],
-  },
-  chief: { url: chiefBotUrl, x: 1360, y: 655, w: 170, h: 285, eyes: [] },
-  kernel: {
-    url: kernelBotUrl,
-    x: 420,
-    y: 1050,
-    w: 150,
-    h: 205,
-    eyes: [
-      [477, 1077],
-      [513, 1079],
-    ],
-  },
-  live: {
-    url: liveBotUrl,
-    x: 660,
-    y: 1050,
-    w: 143,
-    h: 205,
-    eyes: [
-      [747, 1079],
-      [780, 1081],
-    ],
-  },
-  paper: {
-    url: paperBotUrl,
-    x: 950,
-    y: 1050,
-    w: 160,
-    h: 205,
-    eyes: [
-      [1007, 1081],
-      [1043, 1083],
-    ],
-  },
-}
-// regions/anchors in CROP space
-const BANNER = { x: 128, y: 42, w: 1648, h: 98 }
-const BUBBLE_STRAT = { cx: 605, top: 270 } // where "Quiet shift tonight" lived
-const BUBBLE_MEET = { cx: 1415, top: 272 } // where "RFC looks steady." lived
-const CHIEF_BUBBLE = { cx: 1440, top: 640 }
-const NIGHTBELL = { x: 1632, y: 766 } // the painted bell on the chief's table
-const LEDS = {
-  strategy: { x: 540, y: 585, label: 'STRATEGY' },
-  build: { x: 618, y: 905, label: 'BUILD' },
-  chief: { x: 1452, y: 905, label: 'CHIEF' },
-  kernel: { x: 505, y: 1250, label: 'KERNEL' },
-  live: { x: 722, y: 1252, label: 'LIVE' },
-  paper: { x: 1012, y: 1252, label: 'PAPER' },
-}
-const PATROL = { x0: 430, x1: 1180, y: 1300, period: 19000 }
-const AMBER = '#f5b84a'
-const CREAM = '#efe3c8'
-// the painting's own flames + lamp bulbs (CROP space) — the flicker layer
-// breathes light onto them; it never adds fire the painting doesn't have
-const FLAMES: { x: number; y: number; r: number; seed: number; lamp?: boolean; follow?: string }[] =
-  [
-    { x: 380, y: 280, r: 62, seed: 1, lamp: true }, // 3F left cone lamp
-    { x: 1595, y: 295, r: 62, seed: 2, lamp: true }, // 3F right cone lamp
-    { x: 385, y: 635, r: 48, seed: 3, lamp: true }, // 1F sconce
-    { x: 1565, y: 400, r: 26, seed: 4 }, // 3F candle by the hall
-    { x: 1592, y: 755, r: 26, seed: 5 }, // chief's candle
-    { x: 1745, y: 1110, r: 30, seed: 6 }, // pit-right candle
-    { x: 562, y: 1105, r: 22, seed: 7, follow: 'kernel' }, // kernel's hand candle
-  ]
-
-// each bot opens the panel that already tells its story — no new pages
-const BOT_PANEL: Record<keyof typeof SPRITES, string> = {
-  strategy: 'panel-departments',
-  meetA: 'panel-departments',
-  meetB: 'panel-departments',
-  build: 'panel-departments',
-  chief: 'panel-desk',
-  kernel: 'panel-trading',
-  live: 'panel-trading',
-  paper: 'panel-trading',
+function words(text: string, max: number): string {
+  const w = text.split(/\s+/)
+  return w.length <= max ? text : `${w.slice(0, max).join(' ')}…`
 }
 
 function agoText(iso?: string | null): string {
@@ -207,8 +68,41 @@ function agoText(iso?: string | null): string {
   return `${Math.round(m / 1440)}d ago`
 }
 
+// regions/anchors in CROP space
+const BANNER = { x: 128, y: 42, w: 1648, h: 98 }
+const BUBBLE_STRAT = { cx: 605, top: 270 }
+const BUBBLE_MEET = { cx: 1415, top: 272 }
+const BUBBLE_BUILD = { cx: 620, top: 600 }
+const CHIEF_BUBBLE = { cx: 1440, top: 640 }
+const NIGHTBELL = { x: 1632, y: 766 } // the painted bell on the chief's table
+const LEDS = {
+  strategy: { x: 540, y: 585 },
+  build: { x: 618, y: 905 },
+  chief: { x: 1452, y: 905 },
+  kernel: { x: 505, y: 1250 },
+  live: { x: 722, y: 1252 },
+  paper: { x: 1012, y: 1252 },
+}
+const PATROL = { x0: 430, x1: 1180, y: 1300, period: 19000 }
+const AMBER = '#f5b84a'
+const CREAM = '#efe3c8'
+
+// each bot opens the panel that already tells its story — no new pages
+const BOT_PANEL: Record<BotKey, string> = {
+  strategy: 'panel-departments',
+  meetA: 'panel-departments',
+  meetB: 'panel-departments',
+  build: 'panel-departments',
+  chief: 'panel-desk',
+  kernel: 'panel-trading',
+  live: 'panel-trading',
+  paper: 'panel-trading',
+}
+
 export default function VesperFloor() {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const hostRef = useRef<HTMLDivElement | null>(null)
+  const overlayRef = useRef<HTMLCanvasElement | null>(null)
+  const stageRef = useRef<OfficeStage | null>(null)
   const trading = useDashboardStore((s) => s.trading)
   const [seats, setSeats] = useState<DeskSeat[]>([])
   const [company, setCompany] = useState<CompanyStatus | null>(null)
@@ -245,19 +139,31 @@ export default function VesperFloor() {
   dataRef.current = { seats, trading, company, doctor }
 
   useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
+    const host = hostRef.current
+    const overlay = overlayRef.current
+    if (!host || !overlay) return
+    const ctx = overlay.getContext('2d')
     if (!ctx) return
+    let disposed = false
     let raf = 0
+    let lastNow = 0
+    let lastW = 0
+    let lastH = 0
     const params = new URLSearchParams(window.location.search)
     const frozenMs = Number(params.get('freeze')) || null
     const mailPreview = params.get('mail') === 'test'
-    // ?office=demo — one scripted RFC handoff + one pit hb, then idle
+    // ?office=demo — one scripted day cycle (research → handoff → build →
+    // pit check → brief), DEMO plaque on the whole time, then real state
     const officeDemo = params.get('office') === 'demo'
-    let demoStage = officeDemo ? 0 : 3
+    let demoT0: number | null = null
+    const demoFired: Record<string, boolean> = {}
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     let lastPreview = 0
+
+    createOfficeStage(host).then((st) => {
+      if (disposed) st.destroy()
+      else stageRef.current = st
+    })
 
     interface Packet {
       pts: [number, number][]
@@ -268,8 +174,10 @@ export default function VesperFloor() {
     const packets: Packet[] = []
     let seenStrategyAt: string | null | undefined
     let seenChiefRan: string | null | undefined
+    let seenBuildAt: string | null | undefined
     let meetTalkUntil = 0 // real handoff opens ~8s of hall talk, then idle
-    // pit excursions: a fresh heartbeat sends each bot toward its prop and back
+    let buildBubbleUntil = 0
+    // pit checks: a fresh heartbeat sends each bot to its prop and back
     let prevLiveAge: number | null = null
     let prevPaperAge: number | null = null
     let liveExcT0 = Number.NEGATIVE_INFINITY
@@ -302,28 +210,27 @@ export default function VesperFloor() {
 
     const draw = (rafNow: number) => {
       const now = frozenMs ?? rafNow
+      const dtMs = lastNow ? Math.min(100, rafNow - lastNow) : 16
+      lastNow = rafNow
       const { seats, trading, company, doctor } = dataRef.current
       const dpr = Math.min(window.devicePixelRatio || 1, 2)
-      const rect = canvas.getBoundingClientRect()
-      canvas.width = rect.width * dpr
-      canvas.height = rect.height * dpr
+      const rect = host.getBoundingClientRect()
+      overlay.width = rect.width * dpr
+      overlay.height = rect.height * dpr
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      ctx.imageSmoothingEnabled = true
-      ctx.imageSmoothingQuality = 'high'
+      ctx.clearRect(0, 0, rect.width, rect.height)
+      if (rect.width !== lastW || rect.height !== lastH) {
+        lastW = rect.width
+        lastH = rect.height
+        stageRef.current?.resize()
+      }
 
-      // contain-fit the cropped illustration
       const s = Math.min(rect.width / CROP.sw, rect.height / CROP.sh)
       const ox = (rect.width - CROP.sw * s) / 2
       const oy = (rect.height - CROP.sh * s) / 2
       viewRef.current = { s, ox, oy }
       const X = (cx: number) => ox + cx * s
       const Y = (cy: number) => oy + cy * s
-      ctx.fillStyle = '#120a07'
-      ctx.fillRect(0, 0, rect.width, rect.height)
-      const img = image(stageBgUrl)
-      if (img.complete && img.naturalWidth) {
-        ctx.drawImage(img, CROP.sx, CROP.sy, CROP.sw, CROP.sh, ox, oy, CROP.sw * s, CROP.sh * s)
-      }
 
       // ── telemetry ──
       const night = getPhase(trading?.market) === 'night'
@@ -339,20 +246,35 @@ export default function VesperFloor() {
       const paperStale = trading?.modes?.paper?.status === 'stale'
       const kill = !!trading?.kill_switch
       const wd = !!trading?.modes?.live?.watchdog_armed || !!trading?.modes?.paper?.watchdog_armed
+      const notReady = /NOT READY/i.test(doctor?.line ?? '')
+      const degraded = doctor?.green === false
+      const noTel = !trading
+      const warn = noTel || kill || notReady || degraded
 
+      // ── real events → timers (first data load is a baseline, not an event) ──
       {
-        const at = company?.strategy_at ?? null
-        if (seenStrategyAt === undefined) seenStrategyAt = at
-        else if (at && at !== seenStrategyAt) {
-          spawnRfc(now)
-          meetTalkUntil = now + 8000
-          seenStrategyAt = at
+        if (company) {
+          const at = company.strategy_at ?? null
+          if (seenStrategyAt === undefined) seenStrategyAt = at
+          else if (at && at !== seenStrategyAt) {
+            spawnRfc(now)
+            meetTalkUntil = now + 8000
+            seenStrategyAt = at
+          }
+          const ba = company.build_at ?? null
+          if (seenBuildAt === undefined) seenBuildAt = ba
+          else if (ba && ba !== seenBuildAt) {
+            buildBubbleUntil = now + 6000
+            seenBuildAt = ba
+          }
         }
-        const cr = chiefSeat?.ran_at ?? null
-        if (seenChiefRan === undefined) seenChiefRan = cr
-        else if (cr && cr !== seenChiefRan) {
-          spawnBrief(now)
-          seenChiefRan = cr
+        if (chiefSeat) {
+          const cr = chiefSeat.ran_at ?? null
+          if (seenChiefRan === undefined) seenChiefRan = cr
+          else if (cr && cr !== seenChiefRan) {
+            spawnBrief(now)
+            seenChiefRan = cr
+          }
         }
         if (mailPreview && now - lastPreview > 5200) {
           lastPreview = now
@@ -361,15 +283,6 @@ export default function VesperFloor() {
             spawnRfc(now)
             meetTalkUntil = now + 8000
           }
-        }
-        // scripted demo: one handoff at 1s, one pit heartbeat at 4s, done
-        if (demoStage === 0 && now > 1000) {
-          demoStage = 1
-          spawnRfc(now)
-          meetTalkUntil = now + 8000
-        } else if (demoStage === 1 && now > 4000) {
-          demoStage = 2
-          liveExcT0 = now
         }
         // a heartbeat landing = age dropping back toward zero
         const la = trading?.modes?.live?.heartbeat_age_s ?? null
@@ -387,192 +300,105 @@ export default function VesperFloor() {
         }
       }
 
-      // ── the robots: living traced sprites (animated-film idle layer) ──
-      // Everyone breathes, blinks, and sways on their own clock — that is
-      // being ALIVE, not being busy. WORK (typing rhythm, brighter eyes),
-      // TALK (step + nod) and pit excursions still fire only on real
-      // telemetry, and Reduce Motion stills the whole floor.
-      const talking = now < meetTalkUntil
-      type Pose = 'idle' | 'active' | 'talk' | 'sleep'
-      const bob = (period: number, amp: number, on: boolean, phase = 0) =>
-        on && !reduceMotion ? Math.sin((now / period) * Math.PI * 2 + phase) * amp : 0
-      const sprite = (
-        sp: { url: string; x: number; y: number; w: number; h: number; eyes: number[][] },
-        pose: Pose,
-        seed: number,
-        dx = 0,
-        dy = 0,
-        tiltExtra = 0,
-      ) => {
-        const im = image(sp.url)
-        if (!(im.complete && im.naturalWidth)) return
-        // breathing: bottom-anchored squash & stretch, volume-preserving
-        let squash = 0
-        let tilt = tiltExtra
-        if (!reduceMotion) {
-          if (pose === 'active') {
-            squash = 0.011 * Math.sin(now / 430 + seed * 2.1) + 0.005 * Math.sin(now / 1600 + seed)
-            tilt += 0.006 * Math.sin(now / 1900 + seed * 1.7)
-          } else if (pose === 'talk') {
-            squash = 0.01 * Math.sin(now / 520 + seed * 3.1)
-            tilt += 0.012 * Math.sin(now / 900 + seed * 2.3)
-          } else if (pose === 'sleep') {
-            squash = 0.005 * Math.sin(now / 2600 + seed)
-          } else {
-            squash = 0.008 * Math.sin(now / 1500 + seed * 1.9)
-            tilt += 0.008 * Math.sin(now / 2800 + seed * 1.3)
+      // ── the scripted demo day (labeled DEMO on the stage) ──
+      let demo: { strat?: boolean; build?: boolean; chief?: boolean } = {}
+      if (officeDemo) {
+        if (demoT0 === null) demoT0 = now
+        const t = now - demoT0
+        if (t < 26000) {
+          demo = {
+            strat: t > 500 && t < 6000,
+            build: t > 14000 && t < 19000,
+            chief: t > 20000 && t < 25000,
+          }
+          if (t > 5000 && !demoFired.rfc) {
+            demoFired.rfc = true
+            spawnRfc(now)
+            meetTalkUntil = now + 8000
+          }
+          if (t > 19000 && !demoFired.hb) {
+            demoFired.hb = true
+            liveExcT0 = now
+            kernelExcT0 = now + 350
+          }
+          if (t > 21000 && !demoFired.brief) {
+            demoFired.brief = true
+            spawnBrief(now)
           }
         }
-        const cxp = X(sp.x + dx) + (sp.w * s) / 2
-        const byp = Y(sp.y + dy) + sp.h * s
-        ctx.save()
-        ctx.translate(cxp, byp)
-        ctx.rotate(tilt)
-        ctx.scale(1 - squash * 0.6, 1 + squash)
-        if (pose === 'sleep') ctx.filter = 'brightness(0.55) saturate(0.85)'
-        ctx.drawImage(im, -(sp.w * s) / 2, -sp.h * s, sp.w * s, sp.h * s)
-        ctx.filter = 'none'
-        // blink: quick eyelid pass on each bot's own clock
-        const cycle = 3400 + ((seed * 811) % 2100)
-        const bt = (now + seed * 1327) % cycle
-        const blinking = !reduceMotion && pose !== 'sleep' && bt < 130
-        if (blinking) {
-          ctx.fillStyle = 'rgba(38,28,20,0.95)'
-          for (const [ex, ey] of sp.eyes) {
-            ctx.beginPath()
-            ctx.ellipse(X(ex + dx) - cxp, Y(ey + dy) - byp, 13 * s, 10 * s, 0, 0, Math.PI * 2)
-            ctx.fill()
-          }
-        }
-        ctx.restore()
-        if ((pose === 'active' || pose === 'talk') && !blinking) {
-          // breathe extra glow onto the painted amber eyes
-          const pulse = reduceMotion ? 0.3 : 0.3 + 0.14 * Math.sin(now / 640 + seed)
-          ctx.save()
-          ctx.globalCompositeOperation = 'lighter'
-          for (const [ex, ey] of sp.eyes) {
-            const gx = X(ex + dx)
-            const gy = Y(ey + dy)
-            const g = ctx.createRadialGradient(gx, gy, 1, gx, gy, 16 * s)
-            g.addColorStop(0, `rgba(255,190,80,${pulse})`)
-            g.addColorStop(1, 'rgba(255,190,80,0)')
-            ctx.fillStyle = g
-            ctx.beginPath()
-            ctx.arc(gx, gy, 16 * s, 0, Math.PI * 2)
-            ctx.fill()
-          }
-          ctx.restore()
-        }
       }
-      const pose = (on: boolean, sleeps: boolean): Pose =>
-        on ? 'active' : night && sleeps ? 'sleep' : 'idle'
-      const ease01 = (u: number) => {
-        const c = Math.max(0, Math.min(1, u))
-        return c < 0.5 ? 2 * c * c : 1 - (-2 * c + 2) ** 2 / 2
-      }
-      // strategy at the laptop — typing rhythm while the RFC artifact is fresh
-      sprite(SPRITES.strategy, pose(stratOn, true), 0)
-      // hall pair — on a real handoff they STEP together (500ms ease in),
-      // talk ~8s leaning into each other, then ease back to their marks
-      const step =
-        meetTalkUntil > 0 && !reduceMotion
-          ? ease01((now - (meetTalkUntil - 8000)) / 500) * (1 - ease01((now - meetTalkUntil) / 600))
-          : 0
-      const meetPose: Pose = talking ? 'talk' : night ? 'sleep' : 'idle'
-      sprite(SPRITES.meetA, meetPose, 1, 14 * step, bob(1800, 1, talking), 0.02 * step)
-      sprite(SPRITES.meetB, meetPose, 2, -14 * step, bob(1800, 1, talking, Math.PI), -0.02 * step)
-      // build at the tablet — typing rhythm while the last commit is fresh
-      sprite(SPRITES.build, pose(buildOn, true), 3)
-      // chief: smoked visor — the elder statesman sways slowest of all
-      sprite(SPRITES.chief, night && !chiefRan && !chiefDown ? 'sleep' : 'idle', 4)
-      // the pit never dims — SYSTEMS NEVER SLEEP. A fresh heartbeat sends
-      // each bot stepping toward its prop (locker / charts / stack) with a
-      // little two-hop gait, then back to its mark.
-      const exc = (t0: number) => {
-        const t = now - t0
-        if (reduceMotion || t < 0 || t > 1800) return 0
-        if (t < 600) return ease01(t / 600)
-        if (t < 1100) return 1
-        return 1 - ease01((t - 1100) / 700)
-      }
-      const hop = (t0: number) => {
-        const t = now - t0
-        if (reduceMotion || t < 0 || t > 1800) return 0
-        return -2.4 * Math.abs(Math.sin((t / 1800) * Math.PI * 3))
-      }
-      sprite(
-        SPRITES.kernel,
-        wd && !kill ? 'active' : 'idle',
-        5,
-        -10 * exc(kernelExcT0),
-        hop(kernelExcT0),
-      )
-      sprite(
-        SPRITES.live,
-        liveHb ? 'active' : !liveStale ? 'sleep' : 'idle',
-        6,
-        10 * exc(liveExcT0),
-        hop(liveExcT0),
-      )
-      sprite(
-        SPRITES.paper,
-        paperHb ? 'active' : !paperStale ? 'sleep' : 'idle',
-        7,
-        8 * exc(paperExcT0),
-        hop(paperExcT0),
-      )
 
-      // ── firelight: every painted flame flickers, the emblem breathes ──
-      if (!reduceMotion) {
-        ctx.save()
-        ctx.globalCompositeOperation = 'lighter'
-        for (const f of FLAMES) {
-          const n =
-            0.5 + 0.3 * Math.sin(now / 97 + f.seed * 5.1) + 0.2 * Math.sin(now / 233 + f.seed * 2.7)
-          const a = f.lamp ? 0.05 + 0.05 * n : 0.09 + 0.1 * n
-          const r = f.r * (1 + 0.07 * Math.sin(now / 141 + f.seed * 3.3)) * s
-          const fx = X(f.x + (f.follow === 'kernel' ? -10 * exc(kernelExcT0) : 0))
-          const fy = Y(f.y)
-          const g = ctx.createRadialGradient(fx, fy, 1, fx, fy, r)
-          g.addColorStop(0, `rgba(255,190,96,${a})`)
-          g.addColorStop(1, 'rgba(255,170,80,0)')
-          ctx.fillStyle = g
-          ctx.beginPath()
-          ctx.arc(fx, fy, r, 0, Math.PI * 2)
-          ctx.fill()
-        }
-        // the orange floor emblem breathes like a banked forge
-        const eb = 0.045 + 0.045 * Math.sin(now / 2400)
-        const ex2 = X(1410)
-        const ey2 = Y(1160)
-        const eg = ctx.createRadialGradient(ex2, ey2, 10 * s, ex2, ey2, 190 * s)
-        eg.addColorStop(0, `rgba(255,140,60,${eb})`)
-        eg.addColorStop(1, 'rgba(255,120,50,0)')
-        ctx.fillStyle = eg
-        ctx.beginPath()
-        ctx.arc(ex2, ey2, 190 * s, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.restore()
+      // ── the Office Director: telemetry in, named states out ──
+      const talking = now < meetTalkUntil
+      const strategyState = stratOn || demo.strat ? 'research' : 'idle'
+      const buildState = buildOn || demo.build ? 'coding' : 'idle'
+      const chiefState = warn ? 'alert' : chiefRan || demo.chief ? 'brief' : 'idle'
+      const hallState = talking ? 'meet' : 'idle'
+      const pitCheck = (t0: number, tx: number) => {
+        const t = now - t0
+        if (t < 0 || t > 2600) return { checking: false, tx: 0 }
+        return { checking: true, tx: t < 1500 ? tx : 0 }
       }
+      const kCheck = pitCheck(kernelExcT0, -10)
+      const lCheck = pitCheck(liveExcT0, 10)
+      const pCheck = pitCheck(paperExcT0, 8)
+
+      // Director → stage orders (clip + walk target + dim)
+      const orders: Orders = {
+        strategy: {
+          clip: strategyState === 'research' ? 'work' : 'idle',
+          tx: 0,
+          dim: night && strategyState === 'idle',
+        },
+        meetA: {
+          clip: hallState === 'meet' ? 'talk' : 'idle',
+          tx: hallState === 'meet' ? 34 : 0,
+          dim: night && hallState === 'idle',
+        },
+        meetB: {
+          clip: hallState === 'meet' ? 'talk' : 'idle',
+          tx: hallState === 'meet' ? -34 : 0,
+          dim: night && hallState === 'idle',
+        },
+        build: {
+          clip: buildState === 'coding' ? 'work' : 'idle',
+          tx: 0,
+          dim: night && buildState === 'idle',
+        },
+        chief: {
+          clip: chiefState === 'alert' ? 'talk' : chiefState === 'brief' ? 'work' : 'idle',
+          tx: 0,
+          dim: night && chiefState === 'idle' && !chiefDown,
+        },
+        kernel: {
+          clip: kCheck.checking ? 'work' : 'idle',
+          tx: kCheck.tx,
+          dim: false, // the pit never dims — SYSTEMS NEVER SLEEP
+        },
+        live: {
+          clip: lCheck.checking ? 'work' : liveHb ? 'idle' : 'idle',
+          tx: lCheck.tx,
+          dim: !liveHb && !liveStale,
+        },
+        paper: {
+          clip: pCheck.checking ? 'work' : 'idle',
+          tx: pCheck.tx,
+          dim: !paperHb && !paperStale,
+        },
+      }
+      stageRef.current?.update(now, dtMs, orders, reduceMotion)
 
       // ── the banner: painted opaquely over the baked strip — doctor truth ──
       {
-        const notReady = /NOT READY/i.test(doctor?.line ?? '')
-        const degraded = doctor?.green === false
-        const noTel = !trading
         const flat =
           (trading?.modes?.live?.open_positions?.length ?? 0) === 0 &&
           (trading?.modes?.paper?.open_positions?.length ?? 0) === 0
         let text: string
-        let warn = true
         if (noTel) text = 'TELEMETRY DOWN — NOT A VERDICT'
         else if (kill) text = 'KILL ACTIVE — BUYS HALTED'
         else if (notReady) text = `NOT READY — ${doctorCause(doctor?.line).toUpperCase()}`
         else if (degraded) text = `DEGRADED — ${doctorCause(doctor?.line).toUpperCase()}`
-        else {
-          warn = false
-          text = night && flat ? 'NIGHT WATCH · ALL QUIET' : 'ALL SYSTEMS GO'
-        }
+        else text = night && flat ? 'NIGHT WATCH · ALL QUIET' : 'ALL SYSTEMS GO'
         const bx = X(BANNER.x)
         const by = Y(BANNER.y)
         const bw = BANNER.w * s
@@ -581,7 +407,6 @@ export default function VesperFloor() {
         ctx.beginPath()
         ctx.roundRect(bx, by, bw, bh, 10 * s)
         ctx.fill()
-        // subtle top glint like the painting's
         ctx.fillStyle = 'rgba(255,235,190,0.12)'
         ctx.fillRect(bx, by, bw, 4 * s)
         const ix = bx + 60 * s
@@ -626,8 +451,7 @@ export default function VesperFloor() {
           )
         }
 
-        // ── the Nightbell on the chief's table glows while doctor is unhappy ──
-        // same conditions as a warn banner; a green doctor leaves it a bell
+        // ── the Nightbell on the chief's table rings while doctor is unhappy ──
         if (warn) {
           const ring = reduceMotion ? 0.45 : 0.34 + 0.22 * Math.sin(now / 800)
           const gx = X(NIGHTBELL.x)
@@ -662,7 +486,7 @@ export default function VesperFloor() {
         ctx.textAlign = 'left'
       }
 
-      // ── bubbles: drawn only when there is something true to say ──
+      // ── bubbles: only real artifacts speak (truncated, never invented) ──
       const bubble = (cx: number, top: number, text: string, minW = 0) => {
         ctx.font = `bold ${Math.max(10, 30 * s)}px ${MONO}`
         const tw = Math.max(minW * s, Math.min(ctx.measureText(text).width + 44 * s, 620 * s))
@@ -693,19 +517,33 @@ export default function VesperFloor() {
         ctx.restore()
       }
 
-      const stratText = stratOn
-        ? (company?.strategy_verdict ?? 'writing the RFC').slice(0, 30)
-        : night
-          ? 'Quiet shift tonight'
-          : null
+      const stratText =
+        strategyState === 'research'
+          ? company?.strategy_verdict
+            ? words(company.strategy_verdict, 9)
+            : 'writing the RFC'
+          : night
+            ? 'Quiet shift tonight'
+            : null
       if (stratText) bubble(BUBBLE_STRAT.cx, BUBBLE_STRAT.top, stratText, 320)
-      if (talking) bubble(BUBBLE_MEET.cx, BUBBLE_MEET.top, 'RFC looks steady.', 280)
-      const chiefBubble = chiefOk
-        ? 'brief sent — floor is yours'
-        : company?.strategy_verdict
-          ? `strategy: ${company.strategy_verdict.slice(0, 24)}`
-          : null
-      if (chiefBubble) bubble(CHIEF_BUBBLE.cx, CHIEF_BUBBLE.top, chiefBubble)
+      if (hallState === 'meet') {
+        const rfcName = company?.rfcs?.[0]?.name
+        bubble(
+          BUBBLE_MEET.cx,
+          BUBBLE_MEET.top,
+          rfcName ? words(`RFC ${rfcName}`, 8) : 'RFC looks steady.',
+          280,
+        )
+      }
+      if (now < buildBubbleUntil && company?.build_at)
+        bubble(BUBBLE_BUILD.cx, BUBBLE_BUILD.top, `shipped ${agoText(company.build_at)}`)
+      const chiefText =
+        chiefState === 'alert'
+          ? words(doctorCause(doctor?.line) || 'telemetry down', 8)
+          : chiefOk
+            ? `brief filed ${agoText(chiefSeat?.ran_at)}`
+            : null
+      if (chiefText) bubble(CHIEF_BUBBLE.cx, CHIEF_BUBBLE.top, chiefText)
 
       // ── station LEDs: the honest state layer over the painting ──
       const led = (x: number, y: number, state: 'on' | 'idle' | 'down' | 'sleep') => {
@@ -775,7 +613,7 @@ export default function VesperFloor() {
           continue
         }
         const tt = Math.min(1, t)
-        const pts = p.pts.map(([bx, by]) => [X(bx), Y(by)] as [number, number])
+        const pts = p.pts.map(([bx2, by2]) => [X(bx2), Y(by2)] as [number, number])
         const segs: number[] = []
         let total = 0
         for (let k = 0; k < pts.length - 1; k++) {
@@ -836,31 +674,35 @@ export default function VesperFloor() {
       raf = requestAnimationFrame(draw)
     }
     raf = requestAnimationFrame(draw)
-    return () => cancelAnimationFrame(raf)
+    return () => {
+      disposed = true
+      cancelAnimationFrame(raf)
+      stageRef.current?.destroy()
+      stageRef.current = null
+    }
   }, [])
 
-  // ── pointer layer: every bot is clickable — it opens the panel that ──
-  // already tells its story, and hovers say name + last real event
-  const botAt = (px: number, py: number): keyof typeof SPRITES | null => {
+  // ── pointer layer: click a bot → the panel that already tells its story ──
+  const botAt = (px: number, py: number): BotKey | null => {
     const { s, ox, oy } = viewRef.current
     const cx = (px - ox) / s
     const cy = (py - oy) / s
-    for (const key of Object.keys(SPRITES) as (keyof typeof SPRITES)[]) {
-      const sp = SPRITES[key]
+    for (const key of Object.keys(BOTS) as BotKey[]) {
+      const sp = BOTS[key]
       if (cx >= sp.x && cx <= sp.x + sp.w && cy >= sp.y && cy <= sp.y + sp.h) return key
     }
     return null
   }
-  const botLabel = (key: keyof typeof SPRITES): string => {
+  const botLabel = (key: BotKey): string => {
     const chiefSeat = seats.find((se) => se.name === 'chief')
     switch (key) {
       case 'strategy':
-        return `STRATEGY · ${company?.strategy_at ? `rfc ${agoText(company.strategy_at)}` : 'quiet'}`
+        return `STRATEGY · ${freshISO(company?.strategy_at) ? 'research' : 'idle'} · ${company?.strategy_at ? `rfc ${agoText(company.strategy_at)}` : 'quiet'}`
       case 'meetA':
       case 'meetB':
         return `HALL · ${company?.strategy_at ? `handoff ${agoText(company.strategy_at)}` : 'no handoff yet'}`
       case 'build':
-        return `BUILD · ${company?.build_at ? `shipped ${agoText(company.build_at)}` : 'nothing shipped'}`
+        return `BUILD · ${freshISO(company?.build_at) ? 'coding' : 'idle'} · ${company?.build_at ? `shipped ${agoText(company.build_at)}` : 'nothing shipped'}`
       case 'chief':
         return chiefSeat?.status === 'failed'
           ? 'CHIEF · last run FAILED'
@@ -901,17 +743,26 @@ export default function VesperFloor() {
   }
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 0 }}>
+    <div
+      ref={hostRef}
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        minHeight: 0,
+        background: '#120a07',
+      }}
+    >
       <canvas
-        ref={canvasRef}
+        ref={overlayRef}
         onMouseMove={onMove}
         onMouseLeave={() => setHover(null)}
         onClick={onClick}
         style={{
+          position: 'absolute',
+          inset: 0,
           width: '100%',
           height: '100%',
-          display: 'block',
-          minHeight: 0,
           cursor: hover ? 'pointer' : 'default',
         }}
       />
