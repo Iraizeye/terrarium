@@ -402,11 +402,13 @@ export default function VesperFloor() {
         meetA: {
           clip: hallState === 'meet' ? 'talk' : 'idle',
           tx: hallState === 'meet' ? 34 : 0,
+          face: 1, // partner stands to the right
           dim: night && hallState === 'idle',
         },
         meetB: {
           clip: hallState === 'meet' ? 'talk' : 'idle',
           tx: hallState === 'meet' ? -34 : 0,
+          face: -1,
           dim: night && hallState === 'idle',
         },
         build: {

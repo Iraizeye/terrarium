@@ -1,42 +1,97 @@
-// The Pixi stage: Warm Ember painting + sprite-sheet bots (skill: terrarium-art).
-//
-// This is the renderer HALF of the office. It knows nothing about telemetry:
-// the Office Director (in VesperFloor) hands it per-bot orders — clip + walk
-// target — and the stage plays stepped sprite-sheet clips (idle / work /
-// walk / talk / blink) baked from the traced painting by generate_frames.py.
-// Bots walk to their marks at a fixed gait; the walk clip plays itself
-// whenever a bot is in transit. Firelight flickers on the painted flames.
-// Reduce Motion renders the static painting: frame 0, no flicker, no walks.
+// The Pixi stage: Warm Ember painting + articulated sprite-sheet bots
+// (skill: terrarium-art). Renderer half only — the Office Director hands
+// each bot an order (clip + walk target + rail + visibility) and the stage
+// performs it: stepped body clips, a head that rotates on its neck pivot
+// (glances on its own clock, nods while working, turns while talking,
+// blinks), whole-body waddle frames while walking, floor shadows, door
+// fades, firelight. Reduce Motion renders the static painting.
 
 import { Application, Assets, Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js'
 import buildSheetUrl from '../../../assets/terrarium/traced/sheets/build.png'
+import buildHeadUrl from '../../../assets/terrarium/traced/sheets/build-head.png'
 import chiefSheetUrl from '../../../assets/terrarium/traced/sheets/chief.png'
+import chiefHeadUrl from '../../../assets/terrarium/traced/sheets/chief-head.png'
 import kernelSheetUrl from '../../../assets/terrarium/traced/sheets/kernel.png'
+import kernelHeadUrl from '../../../assets/terrarium/traced/sheets/kernel-head.png'
 import liveSheetUrl from '../../../assets/terrarium/traced/sheets/live.png'
+import liveHeadUrl from '../../../assets/terrarium/traced/sheets/live-head.png'
 import meetASheetUrl from '../../../assets/terrarium/traced/sheets/meet-a.png'
+import meetAHeadUrl from '../../../assets/terrarium/traced/sheets/meet-a-head.png'
 import meetBSheetUrl from '../../../assets/terrarium/traced/sheets/meet-b.png'
+import meetBHeadUrl from '../../../assets/terrarium/traced/sheets/meet-b-head.png'
 import paperSheetUrl from '../../../assets/terrarium/traced/sheets/paper.png'
+import paperHeadUrl from '../../../assets/terrarium/traced/sheets/paper-head.png'
 import strategySheetUrl from '../../../assets/terrarium/traced/sheets/strategy.png'
+import strategyHeadUrl from '../../../assets/terrarium/traced/sheets/strategy-head.png'
 import stageBgUrl from '../../../assets/terrarium/traced/stage-bg.png'
 
 export const CROP = { sx: 55, sy: 95, sw: 1893, sh: 1350 }
-const PAD_X = 8
-const PAD_Y = 6
-const CLIP_ROW = { idle: 0, work: 1, walk: 2, talk: 3, blink: 4 } as const
-export type ClipName = 'idle' | 'work' | 'walk' | 'talk'
-export const WALK_SPEED = 110 // CROP px per second — a purposeful shuffle
+const PAD_X = 10
+const PAD_Y = 8
+const HEAD_PAD = 14
+const BODY_ROW = { idle: 0, work: 1, talk: 2, walk: 3 } as const
+export type ClipName = 'idle' | 'work' | 'talk'
+export const WALK_SPEED = 110 // CROP px per second
 const FRAME_MS = 150 // stepped, hand-animated cadence
 
-// sprite boxes in CROP space (origin + unpadded size) — must match the trace
+// sprite boxes in CROP space + neck fraction (must match generate_frames.py)
 export const BOTS = {
-  strategy: { url: strategySheetUrl, x: 489, y: 345, w: 156, h: 210 },
-  meetA: { url: meetASheetUrl, x: 1217, y: 351, w: 160, h: 212 },
-  meetB: { url: meetBSheetUrl, x: 1363, y: 351, w: 142, h: 212 },
-  build: { url: buildSheetUrl, x: 533, y: 680, w: 174, h: 260 },
-  chief: { url: chiefSheetUrl, x: 1360, y: 655, w: 170, h: 285 },
-  kernel: { url: kernelSheetUrl, x: 420, y: 1050, w: 150, h: 205 },
-  live: { url: liveSheetUrl, x: 660, y: 1050, w: 143, h: 205 },
-  paper: { url: paperSheetUrl, x: 950, y: 1050, w: 160, h: 205 },
+  strategy: {
+    url: strategySheetUrl,
+    head: strategyHeadUrl,
+    x: 489,
+    y: 345,
+    w: 156,
+    h: 210,
+    headFrac: 0.42,
+  },
+  meetA: {
+    url: meetASheetUrl,
+    head: meetAHeadUrl,
+    x: 1217,
+    y: 351,
+    w: 160,
+    h: 212,
+    headFrac: 0.42,
+  },
+  meetB: {
+    url: meetBSheetUrl,
+    head: meetBHeadUrl,
+    x: 1363,
+    y: 351,
+    w: 142,
+    h: 212,
+    headFrac: 0.42,
+  },
+  build: { url: buildSheetUrl, head: buildHeadUrl, x: 533, y: 680, w: 174, h: 260, headFrac: 0.38 },
+  chief: {
+    url: chiefSheetUrl,
+    head: chiefHeadUrl,
+    x: 1360,
+    y: 655,
+    w: 170,
+    h: 285,
+    headFrac: 0.34,
+  },
+  kernel: {
+    url: kernelSheetUrl,
+    head: kernelHeadUrl,
+    x: 420,
+    y: 1050,
+    w: 150,
+    h: 205,
+    headFrac: 0.42,
+  },
+  live: { url: liveSheetUrl, head: liveHeadUrl, x: 660, y: 1050, w: 143, h: 205, headFrac: 0.42 },
+  paper: {
+    url: paperSheetUrl,
+    head: paperHeadUrl,
+    x: 950,
+    y: 1050,
+    w: 160,
+    h: 205,
+    headFrac: 0.42,
+  },
 } as const
 export type BotKey = keyof typeof BOTS
 
@@ -57,14 +112,21 @@ export interface BotOrder {
   dim: boolean // sleeping station — dimmed, slow frames, no blink
   ty?: number // vertical offset (elevator ride puts a 3F bot on the mid rail)
   hidden?: boolean // inside the elevator car — fades out at the doors
+  face?: -1 | 1 // talk partner direction: head turns that way
 }
 export type Orders = Record<BotKey, BotOrder>
 
 interface BotActor {
-  sprite: Sprite
+  root: Container
+  body: Sprite
+  headSprite: Sprite
   shadow: Graphics
-  frames: Record<keyof typeof CLIP_ROW, Texture[]>
+  bodyFrames: Record<keyof typeof BODY_ROW, Texture[]>
+  heads: { normal: Texture; blink: Texture; glow: Texture }
   home: { x: number; y: number }
+  h: number
+  headFrac: number
+  hasEyes: boolean
   offset: number // current walk offset (CROP px)
   fade: number // 1 = visible, 0 = inside the elevator car
   seed: number
@@ -103,24 +165,28 @@ export async function createOfficeStage(host: HTMLElement): Promise<OfficeStage>
     world.addChild(bg)
   }
 
-  const glowLayer = new Container()
   const botLayer = new Container()
+  const glowLayer = new Container()
   world.addChild(botLayer)
   world.addChild(glowLayer)
 
-  const flameGfx = FLAMES.map((f) => {
+  // soft radial: bright core fading to nothing — no visible circle edge
+  const softGlow = (color: number, r: number) => {
     const g = new Graphics()
-    g.circle(0, 0, f.r)
-    g.fill({ color: 0xffbe60, alpha: 1 })
+    for (let i = 5; i >= 1; i--) {
+      g.circle(0, 0, (r * i) / 5)
+      g.fill({ color, alpha: 0.06 * (6 - i) })
+    }
     g.blendMode = 'add'
+    return g
+  }
+  const flameGfx = FLAMES.map((f) => {
+    const g = softGlow(0xffbe60, f.r)
     g.position.set(f.x, f.y)
     glowLayer.addChild(g)
     return g
   })
-  const emblem = new Graphics()
-  emblem.circle(0, 0, 190)
-  emblem.fill({ color: 0xff8c3c, alpha: 1 })
-  emblem.blendMode = 'add'
+  const emblem = softGlow(0xff8c3c, 160)
   emblem.position.set(1410, 1160)
   glowLayer.addChild(emblem)
 
@@ -129,32 +195,61 @@ export async function createOfficeStage(host: HTMLElement): Promise<OfficeStage>
   for (const key of Object.keys(BOTS) as BotKey[]) {
     const b = BOTS[key]
     const sheet: Texture | null = await Assets.load(b.url).catch(() => null)
-    if (!sheet) continue
+    const headTex: Texture | null = await Assets.load(b.head).catch(() => null)
+    if (!sheet || !headTex) continue
     const cw = b.w + 2 * PAD_X
     const ch = b.h + 2 * PAD_Y
-    const frames = {} as BotActor['frames']
-    for (const clip of Object.keys(CLIP_ROW) as (keyof typeof CLIP_ROW)[]) {
-      frames[clip] = [0, 1, 2, 3].map(
+    const bodyFrames = {} as BotActor['bodyFrames']
+    for (const clip of Object.keys(BODY_ROW) as (keyof typeof BODY_ROW)[]) {
+      bodyFrames[clip] = [0, 1, 2, 3].map(
         (col) =>
           new Texture({
             source: sheet.source,
-            frame: new Rectangle(col * cw, CLIP_ROW[clip] * ch, cw, ch),
+            frame: new Rectangle(col * cw, BODY_ROW[clip] * ch, cw, ch),
           }),
       )
     }
-    const sprite = new Sprite(frames.idle[0])
-    sprite.anchor.set(0.5, 1)
+    const headH = Math.round(b.h * b.headFrac)
+    const hw = b.w + 2 * HEAD_PAD
+    const hh = headH + 2 * HEAD_PAD
+    const headCell = (i: number) =>
+      new Texture({ source: headTex.source, frame: new Rectangle(i * hw, 0, hw, hh) })
+    const heads = { normal: headCell(0), blink: headCell(1), glow: headCell(2) }
+
+    const root = new Container()
     const home = { x: b.x + b.w / 2, y: b.y + b.h + PAD_Y }
-    sprite.position.set(home.x, home.y)
-    // a soft floor shadow so the walk reads as feet on wood
+    root.position.set(home.x, home.y)
     const shadow = new Graphics()
     shadow.ellipse(0, 0, b.w * 0.32, 9)
     shadow.fill({ color: 0x120a06, alpha: 1 })
-    shadow.position.set(home.x, home.y - 2)
+    shadow.position.set(0, -2)
     shadow.alpha = 0.3
-    botLayer.addChild(shadow)
-    botLayer.addChild(sprite)
-    actors[key] = { sprite, shadow, frames, home, offset: 0, fade: 1, seed: seedIdx++ }
+    const body = new Sprite(bodyFrames.idle[0])
+    body.anchor.set(0.5, 1)
+    const headSprite = new Sprite(heads.normal)
+    // neck pivot: rotate around a point just above the cut line
+    const pivotY = headH - 6 + HEAD_PAD
+    headSprite.anchor.set(0.5, pivotY / hh)
+    headSprite.position.set(0, -(b.h - (headH - 6)))
+    root.addChild(shadow)
+    root.addChild(body)
+    root.addChild(headSprite)
+    botLayer.addChild(root)
+    actors[key] = {
+      root,
+      body,
+      headSprite,
+      shadow,
+      bodyFrames,
+      heads,
+      home,
+      h: b.h,
+      headFrac: b.headFrac,
+      hasEyes: key !== 'chief',
+      offset: 0,
+      fade: 1,
+      seed: seedIdx++,
+    }
   }
 
   const resize = () => {
@@ -186,24 +281,59 @@ export async function createOfficeStage(host: HTMLElement): Promise<OfficeStage>
       if (Math.abs(fd) > 0.01) a.fade += Math.sign(fd) * Math.min(Math.abs(fd), dtMs / 350)
       else a.fade = fadeTarget
       const ty = o.ty ?? 0
-      a.sprite.position.set(a.home.x + a.offset, a.home.y + ty)
-      a.shadow.position.set(a.home.x + a.offset, a.home.y + ty - 2)
+      a.root.position.set(a.home.x + a.offset, a.home.y + ty)
+      a.root.alpha = a.fade
       const walking = !reduceMotion && Math.abs(o.tx - a.offset) > 0.5
-      const clip: keyof typeof CLIP_ROW = walking ? 'walk' : o.clip
       // walking left reads better mirrored; home-facing is the painted pose
-      a.sprite.scale.x = walking && d < 0 ? -1 : 1
-      // stepped frames; sleeping stations breathe at half speed
+      a.root.scale.x = walking && d < 0 ? -1 : 1
+
       const cadence = o.dim ? FRAME_MS * 2 : FRAME_MS
       const frame = reduceMotion ? 0 : Math.floor(now / cadence + a.seed * 1.7) % 4
-      let tex = a.frames[clip][frame]
-      // blink on the bot's own clock (never while dimmed or reduced)
-      if (!reduceMotion && !o.dim && clip !== 'walk') {
-        const cycle = 3400 + ((a.seed * 811) % 2100)
-        if ((now + a.seed * 1327) % cycle < 140) tex = a.frames.blink[0]
+      if (walking) {
+        // whole-body waddle frames carry the head
+        a.body.texture = a.bodyFrames.walk[frame]
+        a.headSprite.visible = false
+        a.root.scale.y = 1
+      } else {
+        a.body.texture = a.bodyFrames[o.clip][frame]
+        a.headSprite.visible = true
+        // ── the head acts on its own ──
+        let rot = 0
+        let headTex = a.heads.normal
+        if (!reduceMotion) {
+          if (o.clip === 'work') {
+            rot = 0.05 * Math.sin(now / 550 + a.seed * 2.1) // nodding at the desk
+            if (a.hasEyes) headTex = a.heads.glow
+          } else if (o.clip === 'talk') {
+            rot = (o.face ?? 1) * 0.09 + 0.04 * Math.sin(now / 700 + a.seed) // turned to partner
+            if (a.hasEyes) headTex = a.heads.glow
+          } else {
+            rot = 0.035 * Math.sin(now / 2300 + a.seed * 1.9) // idle drift
+            // a scheduled glance — every bot looks around on its own clock
+            const g = (now + a.seed * 3137) % 9600
+            if (g < 1100 && !o.dim)
+              rot += (a.seed % 2 ? 1 : -1) * 0.1 * Math.sin((Math.PI * g) / 1100)
+          }
+          // blink on the bot's own clock (never while dimmed)
+          if (a.hasEyes && !o.dim) {
+            const cycle = 3400 + ((a.seed * 811) % 2100)
+            if ((now + a.seed * 1327) % cycle < 140) headTex = a.heads.blink
+          }
+          // an occasional full-body stretch, feet planted
+          const st = (now + a.seed * 4211) % 14000
+          a.root.scale.y = st < 600 && !o.dim ? 1 + 0.035 * Math.sin((Math.PI * st) / 600) : 1
+          // tiny head bob keeps the stepped frames fluid
+          a.headSprite.position.y =
+            -(a.h - (Math.round(a.h * a.headFrac) - 6)) + 1.2 * Math.sin(now / 900 + a.seed)
+        } else {
+          a.root.scale.y = 1
+        }
+        a.headSprite.rotation = rot
+        a.headSprite.texture = headTex
       }
-      a.sprite.texture = tex
-      a.sprite.tint = o.dim ? 0x9a8878 : 0xffffff
-      a.sprite.alpha = a.fade
+      const tint = o.dim ? 0x9a8878 : 0xffffff
+      a.body.tint = tint
+      a.headSprite.tint = tint
       a.shadow.alpha = 0.3 * a.fade * (o.dim ? 0.6 : 1)
     }
     // firelight
@@ -216,7 +346,7 @@ export async function createOfficeStage(host: HTMLElement): Promise<OfficeStage>
       }
       const n =
         0.5 + 0.3 * Math.sin(now / 97 + f.seed * 5.1) + 0.2 * Math.sin(now / 233 + f.seed * 2.7)
-      g.alpha = f.lamp ? 0.05 + 0.05 * n : 0.1 + 0.11 * n
+      g.alpha = f.lamp ? 0.16 + 0.16 * n : 0.3 + 0.32 * n
       g.scale.set(1 + 0.07 * Math.sin(now / 141 + f.seed * 3.3))
       if (f.follow && actors[f.follow]) g.position.set(f.x + actors[f.follow].offset, f.y)
     }
