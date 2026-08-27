@@ -177,25 +177,54 @@ export default function VesperFloor() {
     let seenBuildAt: string | null | undefined
     let meetTalkUntil = 0 // real handoff opens ~8s of hall talk, then idle
     let buildBubbleUntil = 0
+    // ── the handoff choreography (FLOORS are rails, ELEVATOR is vertical) ──
+    // On a REAL RFC, strategy DELIVERS: walks the 3F rail to the elevator
+    // carrying the folder, rides the car down (doors swallow the bot, the
+    // folder shows in the shaft), steps onto the mid rail, walks to the
+    // Build tablet, hands the folder over — Build works — then rides home.
+    let handoffT0 = Number.NEGATIVE_INFINITY
+    const ELEV_X = 985 // the shaft, both floors (CROP)
+    const S_HOME = { cx: 489 + 156 / 2, feet: 345 + 210 + 6 } // strategy desk mark
+    const B_HOME = { cx: 533 + 174 / 2, feet: 680 + 260 + 6 } // build tablet mark
+    const S_DX = ELEV_X - S_HOME.cx // ≈ +418 along the 3F rail
+    const RAIL_DY = B_HOME.feet - S_HOME.feet // 3F rail → mid rail
+    const DELIVER_X = B_HOME.cx + 52 // hand-over spot beside the tablet
+    const WALK_MS = (px: number) => Math.round((Math.abs(px) / 110) * 1000)
+    const HO = (() => {
+      const doors = 400 // fade at the elevator doors
+      const shaft = 1500 // the car ride
+      const walkS = WALK_MS(S_DX) // desk → elevator, 3F
+      const walkD = WALK_MS(ELEV_X - DELIVER_X) // elevator → tablet, mid rail
+      const enter = walkS // doors close on strategy
+      const rideDown = enter + doors // folder visible in the shaft
+      const exit2f = rideDown + shaft // doors open on the mid rail
+      const deliver = exit2f + doors // walking to the tablet
+      const handover = deliver + walkD + 400 // folder lands on the desk
+      const back = handover + walkD // walked back to the elevator
+      const rideUp = back + doors + shaft + doors // home floor again
+      const done = rideUp + walkS // back at the desk
+      return {
+        doors,
+        shaft,
+        walkS,
+        walkD,
+        enter,
+        rideDown,
+        exit2f,
+        deliver,
+        handover,
+        back,
+        rideUp,
+        done,
+        workEnd: handover + 8000,
+      }
+    })()
     // pit checks: a fresh heartbeat sends each bot to its prop and back
     let prevLiveAge: number | null = null
     let prevPaperAge: number | null = null
     let liveExcT0 = Number.NEGATIVE_INFINITY
     let paperExcT0 = Number.NEGATIVE_INFINITY
     let kernelExcT0 = Number.NEGATIVE_INFINITY
-    const spawnRfc = (now: number) =>
-      packets.length < 2 &&
-      packets.push({
-        kind: 'rfc',
-        t0: now,
-        dur: 4200,
-        pts: [
-          [560, 480],
-          [985, 480],
-          [985, 860],
-          [660, 860],
-        ],
-      })
     const spawnBrief = (now: number) =>
       packets.length < 2 &&
       packets.push({
@@ -257,7 +286,7 @@ export default function VesperFloor() {
           const at = company.strategy_at ?? null
           if (seenStrategyAt === undefined) seenStrategyAt = at
           else if (at && at !== seenStrategyAt) {
-            spawnRfc(now)
+            handoffT0 = now
             meetTalkUntil = now + 8000
             seenStrategyAt = at
           }
@@ -276,11 +305,11 @@ export default function VesperFloor() {
             seenChiefRan = cr
           }
         }
-        if (mailPreview && now - lastPreview > 5200) {
+        if (mailPreview && now - lastPreview > 24000) {
           lastPreview = now
-          if (Math.floor(now / 5200) % 2) spawnBrief(now)
+          if (Math.floor(now / 24000) % 2) spawnBrief(now)
           else {
-            spawnRfc(now)
+            handoffT0 = now
             meetTalkUntil = now + 8000
           }
         }
@@ -305,23 +334,22 @@ export default function VesperFloor() {
       if (officeDemo) {
         if (demoT0 === null) demoT0 = now
         const t = now - demoT0
-        if (t < 26000) {
+        if (t < 34000) {
           demo = {
-            strat: t > 500 && t < 6000,
-            build: t > 14000 && t < 19000,
-            chief: t > 20000 && t < 25000,
+            strat: t > 500 && t < 5000,
+            chief: t > 28000 && t < 33000,
           }
           if (t > 5000 && !demoFired.rfc) {
             demoFired.rfc = true
-            spawnRfc(now)
+            handoffT0 = now
             meetTalkUntil = now + 8000
           }
-          if (t > 19000 && !demoFired.hb) {
+          if (t > 25000 && !demoFired.hb) {
             demoFired.hb = true
             liveExcT0 = now
             kernelExcT0 = now + 350
           }
-          if (t > 21000 && !demoFired.brief) {
+          if (t > 29000 && !demoFired.brief) {
             demoFired.brief = true
             spawnBrief(now)
           }
@@ -342,13 +370,34 @@ export default function VesperFloor() {
       const kCheck = pitCheck(kernelExcT0, -10)
       const lCheck = pitCheck(liveExcT0, 10)
       const pCheck = pitCheck(paperExcT0, 8)
+      // handoff phases: the sender rides the elevator and delivers in person
+      const hoT = reduceMotion ? Number.POSITIVE_INFINITY : now - handoffT0
+      const hoActive = hoT >= 0 && hoT < Math.max(HO.done, HO.workEnd)
+      const inCar =
+        hoActive && ((hoT >= HO.enter && hoT < HO.exit2f) || (hoT >= HO.back && hoT < HO.rideUp))
+      const onMidRail = hoActive && hoT >= HO.exit2f && hoT < HO.rideUp
+      let stratTx = 0
+      if (hoActive) {
+        if (hoT < HO.deliver)
+          stratTx = S_DX // desk → elevator (and riding)
+        else if (hoT < HO.handover)
+          stratTx = DELIVER_X - S_HOME.cx // elevator → tablet
+        else if (hoT < HO.back)
+          stratTx = S_DX // tablet → elevator
+        else if (hoT < HO.rideUp)
+          stratTx = S_DX // riding up
+        else stratTx = 0 // elevator → desk
+      }
+      const buildWorking = hoActive && hoT >= HO.handover && hoT < HO.workEnd
 
       // Director → stage orders (clip + walk target + dim)
       const orders: Orders = {
         strategy: {
-          clip: strategyState === 'research' ? 'work' : 'idle',
-          tx: 0,
-          dim: night && strategyState === 'idle',
+          clip: strategyState === 'research' && !hoActive ? 'work' : 'idle',
+          tx: stratTx,
+          ty: onMidRail ? RAIL_DY : 0,
+          hidden: inCar,
+          dim: night && strategyState === 'idle' && !hoActive,
         },
         meetA: {
           clip: hallState === 'meet' ? 'talk' : 'idle',
@@ -361,9 +410,9 @@ export default function VesperFloor() {
           dim: night && hallState === 'idle',
         },
         build: {
-          clip: buildState === 'coding' ? 'work' : 'idle',
+          clip: buildWorking || buildState === 'coding' ? 'work' : 'idle',
           tx: 0,
-          dim: night && buildState === 'idle',
+          dim: night && buildState === 'idle' && !hoActive,
         },
         chief: {
           clip: chiefState === 'alert' ? 'talk' : chiefState === 'brief' ? 'work' : 'idle',
@@ -484,6 +533,43 @@ export default function VesperFloor() {
         ctx.textAlign = 'center'
         ctx.fillText('DEMO', X(1713), Y(195))
         ctx.textAlign = 'left'
+      }
+
+      // ── the RFC folder: carried on the rails, shown alone in the shaft ──
+      if (hoActive && hoT < HO.workEnd) {
+        let fx: number | null = null
+        let fy = 0
+        const offS = stageRef.current?.getOffset('strategy') ?? 0
+        if (hoT < HO.enter) {
+          fx = S_HOME.cx + offS + 45
+          fy = S_HOME.feet - 95
+        } else if (hoT >= HO.rideDown && hoT < HO.exit2f) {
+          const p = (hoT - HO.rideDown) / HO.shaft
+          const e = p < 0.5 ? 2 * p * p : 1 - (-2 * p + 2) ** 2 / 2
+          fx = ELEV_X
+          fy = 472 + (866 - 472) * e
+        } else if (hoT >= HO.exit2f && hoT < HO.handover) {
+          fx = S_HOME.cx + offS + 45
+          fy = B_HOME.feet - 95
+        } else if (hoT >= HO.handover) {
+          fx = B_HOME.cx + 52
+          fy = B_HOME.feet - 92
+        }
+        // fx === null → inside the elevator car with its courier
+        if (fx !== null) {
+          const w = 44 * s
+          ctx.save()
+          ctx.shadowColor = 'rgba(10,6,3,0.45)'
+          ctx.shadowBlur = 6
+          ctx.fillStyle = '#e8c94a'
+          ctx.beginPath()
+          ctx.roundRect(X(fx) - w / 2, Y(fy) - w * 0.34, w, w * 0.62, 3)
+          ctx.fill()
+          ctx.shadowColor = 'transparent'
+          ctx.fillStyle = '#d9b433'
+          ctx.fillRect(X(fx) - w / 2, Y(fy) - w * 0.34, w * 0.45, w * 0.16)
+          ctx.restore()
+        }
       }
 
       // ── bubbles: only real artifacts speak (truncated, never invented) ──

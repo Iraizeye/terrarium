@@ -24,7 +24,7 @@ const PAD_X = 8
 const PAD_Y = 6
 const CLIP_ROW = { idle: 0, work: 1, walk: 2, talk: 3, blink: 4 } as const
 export type ClipName = 'idle' | 'work' | 'walk' | 'talk'
-const WALK_SPEED = 55 // CROP px per second — a purposeful shuffle
+export const WALK_SPEED = 110 // CROP px per second — a purposeful shuffle
 const FRAME_MS = 150 // stepped, hand-animated cadence
 
 // sprite boxes in CROP space (origin + unpadded size) — must match the trace
@@ -55,20 +55,24 @@ export interface BotOrder {
   clip: ClipName // what to play once the bot is on its mark
   tx: number // walk target, CROP px offset from home mark
   dim: boolean // sleeping station — dimmed, slow frames, no blink
+  ty?: number // vertical offset (elevator ride puts a 3F bot on the mid rail)
+  hidden?: boolean // inside the elevator car — fades out at the doors
 }
 export type Orders = Record<BotKey, BotOrder>
 
 interface BotActor {
   sprite: Sprite
+  shadow: Graphics
   frames: Record<keyof typeof CLIP_ROW, Texture[]>
   home: { x: number; y: number }
   offset: number // current walk offset (CROP px)
+  fade: number // 1 = visible, 0 = inside the elevator car
   seed: number
-  blinkAt: number
 }
 
 export interface OfficeStage {
   update: (now: number, dtMs: number, orders: Orders, reduceMotion: boolean) => void
+  getOffset: (key: BotKey) => number
   resize: () => void
   destroy: () => void
 }
@@ -142,15 +146,15 @@ export async function createOfficeStage(host: HTMLElement): Promise<OfficeStage>
     sprite.anchor.set(0.5, 1)
     const home = { x: b.x + b.w / 2, y: b.y + b.h + PAD_Y }
     sprite.position.set(home.x, home.y)
+    // a soft floor shadow so the walk reads as feet on wood
+    const shadow = new Graphics()
+    shadow.ellipse(0, 0, b.w * 0.32, 9)
+    shadow.fill({ color: 0x120a06, alpha: 1 })
+    shadow.position.set(home.x, home.y - 2)
+    shadow.alpha = 0.3
+    botLayer.addChild(shadow)
     botLayer.addChild(sprite)
-    actors[key] = {
-      sprite,
-      frames,
-      home,
-      offset: 0,
-      seed: seedIdx++,
-      blinkAt: 2000 + seedIdx * 900,
-    }
+    actors[key] = { sprite, shadow, frames, home, offset: 0, fade: 1, seed: seedIdx++ }
   }
 
   const resize = () => {
@@ -176,9 +180,18 @@ export async function createOfficeStage(host: HTMLElement): Promise<OfficeStage>
       } else if (reduceMotion) {
         a.offset = o.tx
       }
-      a.sprite.position.set(a.home.x + a.offset, a.home.y)
+      // elevator doors: fade out riding, fade back in on arrival
+      const fadeTarget = o.hidden && !reduceMotion ? 0 : 1
+      const fd = fadeTarget - a.fade
+      if (Math.abs(fd) > 0.01) a.fade += Math.sign(fd) * Math.min(Math.abs(fd), dtMs / 350)
+      else a.fade = fadeTarget
+      const ty = o.ty ?? 0
+      a.sprite.position.set(a.home.x + a.offset, a.home.y + ty)
+      a.shadow.position.set(a.home.x + a.offset, a.home.y + ty - 2)
       const walking = !reduceMotion && Math.abs(o.tx - a.offset) > 0.5
       const clip: keyof typeof CLIP_ROW = walking ? 'walk' : o.clip
+      // walking left reads better mirrored; home-facing is the painted pose
+      a.sprite.scale.x = walking && d < 0 ? -1 : 1
       // stepped frames; sleeping stations breathe at half speed
       const cadence = o.dim ? FRAME_MS * 2 : FRAME_MS
       const frame = reduceMotion ? 0 : Math.floor(now / cadence + a.seed * 1.7) % 4
@@ -190,7 +203,8 @@ export async function createOfficeStage(host: HTMLElement): Promise<OfficeStage>
       }
       a.sprite.texture = tex
       a.sprite.tint = o.dim ? 0x9a8878 : 0xffffff
-      a.sprite.alpha = 1
+      a.sprite.alpha = a.fade
+      a.shadow.alpha = 0.3 * a.fade * (o.dim ? 0.6 : 1)
     }
     // firelight
     for (let i = 0; i < FLAMES.length; i++) {
@@ -211,6 +225,7 @@ export async function createOfficeStage(host: HTMLElement): Promise<OfficeStage>
 
   return {
     update,
+    getOffset: (key: BotKey) => actors[key]?.offset ?? 0,
     resize,
     destroy: () => {
       app.destroy(true, { children: true, texture: false })
